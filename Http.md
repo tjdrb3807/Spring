@@ -48,6 +48,7 @@
     * `전송 제어 프로토콜(Transmission Control Protocol)`
     * 연결 지향
       * 클라이언트와 서버가 연결이 되있는지 모르는 상태에서 일단 연결을 하고 메세지를 보낸다
+        * 논리적인 접속을 성립하기 위함
       * `TCP 3 way handshake(가상 연결)`
         ![](img/img69.png) 
         * 개념적으로만 서버와 클라이언트간에 연결이 되어있는 상태를 의미한다
@@ -129,7 +130,7 @@
       * 중간에 이름을 집어 넣으면 그 리소스의 결과가 나와야하는데 Mapping이 굉장이 어려운 사안이라 URN은 거의 사용하지 않는다 
   * ##### URL 전체 문법
     ```
-    scheme://[uwerinfo@]host[:port][/path][?query][#fragment]
+    scheme://[userinfo@]host[:port][/path][?query][#fragment]
     https://www.google.com:443/search?q=hello&hl=ko
     ``` 
     * 프로토콜(https)
@@ -643,12 +644,12 @@
       * POST, PUT, PATCH
       * 회원 가입, 상품 주문, 리소스 등록, 리소스 변경
     * 4가지 상황
-      * `정정 데이터 조회`
+      * `정적 데이터 조회`
         * 쿼리 파라미터 미사용
           ![](img/img129.png) 
           * 이미지, 정적 텍스트 문서
           * 조회는 GET사용
-          * 정정 데이터는 일반적으로 쿼리 파라미터 없이 리소스 결로로 단순하게 조회 가능
+          * 정적 데이터는 일반적으로 쿼리 파라미터 없이 리소스 경로로 단순하게 조회 가능
       * `동적 데이터 조회`
         * 쿼리 파라미터 사용
           ![](img/img130.png) 
@@ -848,7 +849,7 @@
           * /members -> /users
           * /event -> /new-event
         * `일시 리다이렉션` - 일시적인 변경
-          * 주문 완료 후 주문 내열 화면으로 이동
+          * 주문 완료 후 주문 내역 화면으로 이동
           * PRG: Post/Redirect/Get
         * `특수 리다이렉션`
           * 결과 대신 캐시를 사용
@@ -947,8 +948,8 @@
       * 요청 메세지
         ```
         GET /search?q=hello&hl=ko HTTP/1.1
-        |Host: www.google.com
-      ``` 
+        |Host: www.google.com|
+        ``` 
       * 응답 메세지
         ```
         HTTP/1.1 200 OK
@@ -991,7 +992,7 @@
       ![](img/img145.png)
       * 메세지 본문(message body)을 통해 표현 데이터 전달
       * 메세지 본문 = 페이로드(payload)
-        * 페이로듸: 사용에 있어서 사용되는 데이터, 실제 데이터
+        * 페이로드: 사용에 있어서 사용되는 데이터, 실제 데이터
       * `표현`은 요청이나 응답에서 전달할 실제 데이터
       * `표현 헤더는 표현 데이터`를 해성할 수 있는 정보 제공
         * 데이터 유형(html, json), 데이터 길이, 압충 정보 등등
@@ -999,126 +1000,569 @@
     * ##### 왜 표현이라고 말하는가?
       * 실제로 리소스는 매우 추상적인 데이터이다.
       * 리소스를 클라이언트와 서버간에 서로 주고 받을때는 서로 이해할 수 있는 무엇인가로 변환(`표현`)해서 데이터를 주고 받아야한다.
+        * member 리소스가 있다고 가정하면 이 member Resource는 클라이언트와 서버간에 주고받을 때는 서로 이해할 수 있는 무언가로 변환(표현)해서 데이터는 주고 받아야 한다.
+  * #### 표현
+    * Content-Type: 표현 데이터의 형식
+    * Content-Encoding: 표현 데이터의 압충 방식
+    * Content-Language: 표현 데이터의 자연 언ㅇ너
+    * Content-Length: 표현 데이터의 길이
+    * 표현 헤더는 전송, 응답 둘다 사용
+  * #### Content-Type_표현 데이터의 형식 설병
+    * 미디어 타입, 문자 인코딩
+      * texml/html;charset=utf-8
+      * application/json
+        * 참고: application/json의 default = utf-8
+      * image/png
+  * #### Content-Encoding_표현 데이터 인코딩
+    * 표현 데이터를 압축하기 위해 사용
+    * 데이터를 전달하는 곳에서 압축 후 인코딩 헤더 추가
+    * 데이터를 읽는 쪽에서 인코딩 헤더의 정보로 압축 해제
+      * gzip
+      * deflate
+      * identity: 압출을 하지 않는다
+  * #### Content-Language_표현 데이터의 언어
+    * 표현 데이터의 자연 언어를 표현
+      * ko
+      * en
+      * en-Us
+  * #### Content-Length_표현 데이터의 길이
+    * 바이트 단위
+    * `Transfer-Encoding`(전송 코딩)을 사용하면 Content-Length를 사용하면 안된다
+  * #### 협상(콘텐츠 네고시에이션)_클라이언트가 선호나는 표현 요청
+    * 클라이언트가 원하는 xxx 를 서버가 준다
+      * 서버가 못 줄 수도 있다(최대한 노력)
+    * Accept: 클라이언트가 선호하는 미디어 타입 전달
+    * Accept-Charset: 클라이언트가 선호하는 문자 인코딩
+    * Accept-Encoding: 클라이언트가 선호하는 압충 인코딩
+    * Accept-Language: 클라이언트가 선호나는 자연 언어
+      * Accecpt-Language 적용 전
+        ![](img/img189.png)
+        * 클라이언트가 한국 브라우저인지는 서버는 알 수 없다.
+      * Accecpt-Language 적용 후  
+        ![](img/img190.png) 
+        * Accept-Language: ko를 요청 메세지에 담아 전송하면 서버는 한국어를 우선순위로 올려 응답메세지에 적용시킨다
+      * Accecpt-Language 복잡한 예시
+        ![](img/img191.png)    
+        * 가급적 한국어를 원하지만 독일어보다는 영어를 원하는 클라이언트
+        * Accept-Language: ko 를 요청 메세지에 담아 서버로 전송하지만 서버는 한국어 지원이 없으므로 그냥 우선순위가 높은 순으로 독일어를 응답 메세지에 담아 전송한다
+    * `협상 헤더는 요청시에만 사용`
+    * ##### 협상과 우선순위1_Quality Values(q)
+      ```
+      GET /event
+      Accect-Language: ko-KR, ko;q=0.9, en-US;q=0.8, en;q=0.7
+      ``` 
+      * Quality Values(q)값 사용
+      * 0 ~ 1, `클수록 노픈 우선순위`
+      * 생략하면 1
+      * Accept-Language:ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7
+        * 1. ko-RK;q=1(q생략)
+        * 2. ko;q=0.9
+        * 3. en-US;q=0.8
+        * 4. en;q=0.7
+      * Accept-Language 복잡한 예시
+        ![](img/img192.png)
+    * ##### 협상과 우선순위2_Quality Values(q)
+      ```
+      GET /event
+      Accept: text/*, text/plain, text/plain;format=flowed, */*
+      ```  
+      * 구체적인 것이 우선한다.
+      * Accept: text/*, text/plain, text/plain;format=flowed, */*
+        * 1. text/plain;format=flowed
+        * 2. text/plain
+        * 3. text/*
+        * 4. */*
+    * ##### 협상과 우선순위3_Quality Values(q)
+      * 구체적인 것을 기중으로 미디어 타입을 맞춘다
+      * Accept: `text/*`;q=0.3, `text/html`;q=0.7, `text/html;level=1`, `text/html;level=2`;q=0.4, `*/*`;q=0.5
+        ![](img/img193.png)
+  * #### 전송 방식
+    * ##### 단순 전송_Content-Length
+      ```
+      HTTP/1.1 200 OK
+      Content-Type: text/html;charset=utf-8
+      |Content-Length: 3423|
 
+      <html>
+        <body>...</body>
+      </html>
+      ``` 
+      * Content-Length에 대한 길이를 알고 그 길이만큼 전송
+      * 한 번에 요청하고 한 번에 응답한다
+    * ##### 압충 전송_Content-Encoding
+      ```
+      HTTP/1.1 200 OK
+      Content-Type: application/json
+      |Content-Encoding: gzip|
+      Content-Length: 421
 
+      lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjkl
+      ``` 
+      * Content-Enconding 필수 기입
+    * ##### 분할 전송_Transfer-Encoding
+      ```
+      HTTP/1.1 200 OK
+      Content-Type: text/plain
+      |Transfer-Encoding: chunked|
 
-
-* HTTP 헤더
-  * 페이로드: 실제 데이터부분?
-  * 왜 표현이라고 말하나?
-    * 회원 리소스가 있다고 가정하면 이 회원 리로소스를 HTML표현(형식)으로 전송 or JSON 표현(형식)으로 전송할지 
-    * 리소스는 실제로 굉자히 추상적인 데이터이다. 이 리소스를 클라이언트와 서버간에 서로 주고받을 떄는 서로 이해할 수 있는 무언가로 변환(표현)해서 데이터를 주고 받아야한다
-* 표현
-  * content type
-    * 참고: application/json의 기본이 UTF-8
-  * content Encoding
-    * identity: 압축을 하지 않는다
-* 협상
-  * 클라이언트가 원하는 xxx 를서버가 준다
-    * 서버가 못 줄 수도 있다(최대한 노력)
-  * Accept-Language
-    * 클라이언트가 한국어 인지 서버는 알지 못한다
-    * Accept-Language: ko를 요청으로 보내면 한국어 먼저
-    * 복잡한 예시
-      * 가급적 한국어를 원하지만 독일어보다는 영어를 원하는 클라이언트
-      * Accept-Language: ko 를 보냄 서버는 한국어 지원이 없으므로 그냥 우선순위인 독일어를 응답으로 보냄
-        * Quality Values(q)
-          우선순위가 높은 순으로 응답을 보낸다
-* 전송 방식
-  * 단순전송
-    * Content-Length에 대한 길이를 알고 그 길이만큰 전송
-    * 한 번에 요청하고 한 번에 응답
-  * 압축 전송
-    * Contetn-Encodeing 필수 기입
-  * 분할 전송
-    * Trasfer-Encoding: chunked
+      5
+      Hello
+      5
+      World
+      0
+      \r\n
+      ``` 
       * chunke: 덩어리
       * 5byte
-      * hello
-      * 분할해서 전송하면 오는대로 표현할 수 있다
-      * Content-Length를 넣으면 안된다
-        * 처음에 길이가 예상이 안된다
-  * 범위 전송
-* 일반 정보
-  * From
-  * Refere
-    * 캡처화면 참고
-    * 유입 경로 분석 가능
-  * User-Agent
-    * 캠처 참고
-      * 서버입장에서 굉장히 도운이 된다
-      * 예를들어 특정 브라우저에서 버그가 생성된다면 로그를 파싱해보면 알 수 있다
-  * Server
-    * ORIGIN 서버
-      * 실제로 HTTP 요청을 서버에 보내게 되면 수많은 프록시 서버들을 거치게 된다
-      * 중간 프록시 서버를 제외한 목적 서버를 ORIGIN 서버라 한다
-      * 표현 데이터를 만들어주는 서버
-* 특별한 정보
-  * Host
-    * 필수!!!!
-    * 하나의 IP주소에 여러 도메인이 적용되어 있을 때
-    * 하나의 서버가 여러 도메인을 처리해야 할때
-      * 이떄 구분은 해주는 것이다
-    * 가상 호스트
-      * 하나의 서버(IP)안에 여려개의 다른 도메인이 구성
-      * Host가 없으면 요청이 서버(IP)의 어떤 도메인(애플리케이션)에 들어가야할 지 구분할 수 없다
-        * IP로만 통신하기 때문에
-      * Host를 입력하면 IP로 가서 어떤 애플리케이션으로 갈지 서버에서 작성해서 알 수 있다
-  * Allow
-* 인증
-  * WWW-Authenticate
-    * 접근을 했는데 인증이 제대로 안되거나 문제가 있을 경우 401 Unauthorized
-    * 401 오류가 날 때 WWW-Authenticate 헤더를 넣어줘야 한다
-* 쿠키
-  * 쿠키를 사용할때 필요한 두 개의 헤더
-    * Set-Cookie
-    * Cookie
-  * 로그인 이후 welcome 페이지 접근
-    * 서버 입장에서는 로그인한 사용자인지 아닌지 알 방법이 없다
-    * HTTP는 정송이 끝나면 연결을 끊어버리는 특성을 가지고 있다(무상태 프로토콜)
-      * HTTP는 무상태(Stateless) 프로토콜이다.
-      * 클라이언트와 서버가 요청과 응답을 주고 받으면 연결이 끊어진다
-      * 클라이언트가 다시 요청하면 서버는 이전 요청을 기억하지 못한다
-      * 클라이언트과 서버는 서로 상태를 유지하지 않는다
-    * 대안의 문제점.. 모든 요청에 사용자 정보,,
-  * 로그인
-    * 웹 브라우저 내부에는 쿠키 저장소가 있다
-      * 서버가 응답해서 만든 set-cookiy의 키 벨류를 쿠키저장소에 저장한다
-  * 로그인 이후
-    * 웹 브라우저는 자동으로 서버에 요청을 보낼때 마다 쿠키 저장소를 뒤진다
-    * 쿠키를 뒤져서 Cookie: 키 = 벨류 를 요청 메세지로 만들어 보낸다
-  * 쿠키
-    * 쿠키를 서버에서 세팅할 때 set-cookie: sessionId = asdf; expire(쿠키가 만료되는 시간); path(이러한 경로들에 대해서 허용), domain(이러한 도메인에 대해서 허용); secure(보안 허용)
-    * 사용자 로그인 세션 관리
-      * 사용자가 로그인을 하면 set-Cookie 처럼 유저의 정보를 그대로 보내는 것을 매우 위험하다
-      * 그래서 로그인이 성공하면 sessionKey라는것을 서버에서 만들어서 서버의 데이터베이스에 저장을 해두고 sessionId = ,,, 이런식으로 클라이언트에게 반환
-      * 그러면 클라이언트는 서버에 요청할 때 마다 sessionId를 서버에 보낸다
-      * 서버는 요청으로 들어온 메세지에 sessionId가 있으면 아 이 요청은 홍길동 이구나 라는 것을 알 수 있다
-    * 쿠키 - 생명주기
-    * 쿠키 - 도메인
-    * 쿠키 - 경로
-* 캐시와 조건부 요청1
-  * 캐시가 없을 때
-  * 캐시 적용
-    * cache-control: 캐시가 유효한 시간(초)
-    * 웹 브라우저에는 캐시를 저장하는 캐시 저장소가 있다
-  * 검증 헤더와 조건부 요청1
-    * 검증 헤더
-      * Last-Modified: 이 데이터가 마지막에 수정된 시간
-    * 두 번째 요청
-      * 조건부 요청
-      * if-modified-since
-* 캐시와 조건부 요청2
-  * 예시
-    * 304 리다이렉션: 너의 캐시로 디라이렉션 해서 그 데이터를 뿌려라
-  * ETag
-    * 캐시용 데이터에 임의의 고유한 버전 이름(날짜가 아닌)을 달아둠
-      * 해시값을 이용해서
-* 캐시와 조건부 요청 헤더
-  * 원(origin)서버: 클라이언트와 목적 서버 사이데는 수많은 캐시 프록시 서버들이 존재한다 
-    * 목적서버 = 원 서버
-* 프록시 캐시
-* 캐시 무효화
-  * 
+      * Hello
+      * 분할해서 전송하면 메세지가 오는대로 표현할 수 있다.
+      * `Content-Length를 넣으면 안된다`
+    * ##### 범위 전송_Range, Content-Range
+      ```
+      GET /event HTTP/1.1
+      Range: bytes=1001-2000
+      ``` 
+      ```
+      HTTP/1.1 200 OK
+      Content-Type: text/html
+      Content-Range: bytes 1001-2000 / 2000
 
- 
+      qweqwe1l2iu3019u2oehj1987askjh3q98y
+      ```
+  * #### 일반 정보
+    * ##### Form: 유저 에이전트의 이메일 정보
+      * 일반적으로 잘 사용되지 않음
+      * 검색 엔진 같은 곳에서 주로 사용
+      * 요청에서 사용
+    * Referer: 이전 웹 페이지 주소
+      ![](img/img194.png) 
+      * 현재 요청된 페이지의 이전 웹 파이지 주소
+      * A -> B로 이동하는 경우 B를 요청할 때 Referer: A를 포함해서 요청
+      * Referer를 사용해서 유입 경로 분석 가능
+      * 요청에서 사용
+      * 참고 referer 는 referrer의 오타...
+    * User-Agent: 유저 에이전트 애플리케이션 정보
+      ![](img/img195.png)
+      * 클라이언트의 애플리케이션 정보(웹 브라우저 정보, ...)
+      * 통계 정보 - 서버 입장에서 굉장한 도움
+        * 예) 특정 브라우저에서 버그가 생성된다면 로그를 파싱해보면 알 수 있다. 
+      * 오청에서 사용
+    * Server: 요청을 처리하는 ORIGIN 서버의 소프트웨어 정보
+      ```
+      Server: Apache/2.2.22(Debian)
+      server: nginx
+      ``` 
+      * 응답에서 사용
+      * ORIGIN 서버
+        * 실제로 HTTP 요청을 서버에 전송하게 되면 수많은 프록시 서버들을 거치게 된다
+        * 중간에 프로시 서버를 제외한 목적 서버를 ORIGIN Server라 한다
+        * 표현 데이터를 만들어주는 서버
+    * Date: 메시지가 생성된 날짜
+      ```
+      Date: Tue, 15 Nov 1994 08:12:31 GMT
+      ``` 
+      * 응답에서 사용
+  * #### 특별한 정보
+    * ##### Host: 요청한 호스트 정보(도메인)
+      ```
+      GET /search?q=hello&hl=ko HTTP/1.1
+      |Host: www.google.com|
+      ``` 
+      * `요청에서 사용(필수)`
+      * 하나의 서버가 여러 도메인을 처리해야 할 때
+      * 하나의 IP 주소에 여러 도메인이 적용되어 있을 때 `구분해주기 위함`
+      * ###### 요청한 호스트 정보(도메인)
+        ![](img/img196.pmg)
+        * 가상 호스트
+          * 하나의 서버(IP)안에 여러개의 다른 도메인이 구성
+        ![](img/img197.pmg)
+        * Host가 없으면 요청이 서버(IP)의 어떤 도메인(애플리케이션)에 들어가야 할지 구분할 수 없다.
+          * IP로만 통신하기 때문
+        ![](img/img198.pmg) 
+          * Host를 입력하면 IP로 가서 어떤 도메인(애플리케이션)으로 갈지 서버에서 작성해서 알 수 있다.
+  * #### Location: 페이지 리다이렉션
+    * 웹 브라우저는 3xx 응답의 결과에 Location 헤더가 있으면, Location 위치로 자동 이동(리다이렉트)
+    * 응답코드 3xx에서 설명
+    * 201(Created): Location 값은 요청에 의해 생성된 리소스 URI
+    * 301(Redirection): Location 값은 요청을 자동으로 리다이렉션하기 위한 대상 리소스를 가리킴
+  * #### Allow: 허용 가능한 HTTP 메서드
+    * 405(Method Not Allowed)에서 응담에 포함해야함
+      ```
+      Allow: GET, HEAD, PUT
+      ``` 
+  * #### Retry-After: 유저 에이전트가 다음 요청을 하기까지 기다려야 하는 시간
+    * 503(Service Unavailable): 서비스가 언제까지 불능인지 알려줄 수 있음
+      ```
+      Retry-After: Fri, 31 Dec 1999 23:59:59 GMT(날짜 표기)
+      Retty-After: 120(초단위 표기)
+      ``` 
+  * #### 인증
+    * Authorization: 클라이언트 인증 정보를 서버에 전달
+    * WWW-Authenticate: 리소스 접근시 필요한 인증 방법 정의
+    * ##### Authorization - 클라이언트 인증 정보를 서버에 전달
+      ```
+      Authorization: Basic xxxxxxxxxxxxxxx
+      ``` 
+    * ##### WWW-Authenticate - 리소스 접근시 필요한 인증 방법 정의
+      * 리소스 접근시 필요한 인증 방법 정의
+      * 401 Unauthorized 응답과 함께 사용
+        * 접근을 했는데 인증이 제대로 안되거나 문제가 있을 경우
+          ```
+          WWW-Authenticate: Newauth realm="apps", type=1,
+                            title="Login to \"apps\"",Basic realm="simple"
+          ``` 
+* ### 쿠키
+  * #### 쿠키를 사용할때 필요한 헤더
+    * Set-Cookie: 서버에서 클라이언트로 쿠키 전달(응답)
+    * Cookie: 클라이언트가 서버에서 받은 쿠키를 정하고, HTTP 요청시 서버로 전달
+  * #### 쿠키 미사용 - 처음 welcome 페이지 접근
+    ![](img/img199.png)
+  * #### 쿠키 미사용 - 로그인
+    ![](img/img200.png)
+  * #### 쿠키 미사용 - 로그인 이후 welcome 페이지 접근
+    ![](img/img201.png) 
+    * 서버 입장에서는 로그인한 사용자인지 아닌지 알 방법이 없다
+    * HTTP는 전송이 끝나면 연결을 끊어버리는 특성을 가지고 있다(Stateless)
+    * ##### Stateless
+      * HTTP는 무상태(Stateless) 프로토콜이다
+      * 클라이언트와 서버가 요청과 응답을 주고 받으면 연결이 끊어진다
+      * 클라이언트가 다시 요청하면 서버는 이전 요청을 기억하지 못한다.
+      * 클라이언트와 서버는 서로 상태를 유지하지 않는다.
+  * #### 쿠키 미사용 - 대안: 모든 요청에 사용자 정보 포함
+    ![](img/img202.png)
+    ![](img/img203.png) 
+    * 모든 요청에 정보를 넘기는 문제
+      * 모든 요청에 사용자 정보가 포함되도록 개발 해야함
+      * 브라우저를 완전히 종료하고 다시 열면...?
+  * #### 로그인
+    ![](img/img204.png)
+    * 웹 브라우저 내부에는 쿠키 저장소가 있다
+    * 서버가 응답해서 만든 Set-Cookie의 key/value 를 쿠키 저장소에 저장한다
+  * #### 로그인 이후 welcome 페이지 접근
+    ![](img/img205.png) 
+    * 웹 브라우저는 자동으로 서버에 요청 메세지를 전송할 때 마다 쿠키 저장소를 조회한다
+    * 쿠키 저장소를 조회해서 Cookie: key=value 를 요청 메세지에 담아서 전송한다
+  * #### 모든 요청에 쿠키 정보 자동 포함
+    ![](img/img206.png)   
+  * #### 정리
+    ```
+    Set-Cookie: sessionId=abcde1235; 
+                expires=Sat, 26-Dec-2000 00:00:00 GMT; (쿠키가 만료되는 시간)
+                paht=/; (이러한 경로들에 대해서 허용)
+                domain=.google.com;  (이러한 도메인에 대해서 허용)
+                Secure (보안 허용)
+    ``` 
+    * 사용처
+      * 사용자 로그인 세션 관리
+        * 사용자가 로그인을 하면 Set-Cookie 처럼 유저의 정보를 그대로 보내는 것은 매우 위헙하다
+        * 그래서 로그인이 성공하면 sessionKey라는것을 서버에서 만들어 서버의 데이터베이스에 저장해두고 sessionId=... 이런식으로 클라이언트에게 반환
+        * 그러면 클라이언트는 서버에 요청할 때 마다 sessionId를 서버에 보낸다
+        * 서버는 요청으로 들어온 메세지에 sessionId가 있으면 아 이 요청은 홍길동이구나 라는 것을 알 수 있다
+        * 광고 정보 트래킹
+    * 쿠키 정보는 항상 서버에 전송됨
+      * 네트워크 트래픽 추가 유발
+      * 최소한의 정보만 사용(세션 id, 인증 토큰)
+      * 서버에 전송하지 않고, 웹 브라우저 내부에 데이터를 저장하고 싶으면 웹 스토리지(localStorage, sessionStorage) 참고
+    * 주의
+      * 보안에 민감한 데이터는 저장하면 안됨(주민번호, 신용카드 번호 등등)
+    * ##### 생명주기 - Expires, max-age
+      ```
+      Set-Cookie: expires=Sat, 26-Dec-2020 04:23:12 GMT
+      ```
+      * 만료일이 되면 쿠키 삭제
+      ```
+      Set-Cookie: max-age=3600(3600초)
+      ``` 
+      * 0이나 음수를 지정하면 쿠키 삭제
+      * 세션 쿠키: 만료 날짜를 생략하면 브라우저 종료시 까지만 유지
+      * 영속 쿠키: 만료 날짜를 입력하면 해당 날짜까지 유지
+    * ##### 도메인 - Domain
+      ```
+      domain=example.org
+      ``` 
+      * 명시: 명시한 문서 기준 도메인 + 서브 도메인 포함
+        * domain=example.org를 지정해서 쿠키 생성
+          * exmaple.org는 물론이고
+          * dev.example.org도 쿠키 접근
+      * 생략: 현재 문서 기준 도메인만 적용
+        * example.org에서 쿠키를 생성하고 domain 지정을 생략
+          * example.org 에서만 쿠키 접근
+          * dev.example.org는 쿠키 미접근
+    * ##### 경로 - Path
+      ```
+      path=/home
+      ``` 
+      * 이 경로를 포함한 하위 경로 페이지만 쿠키 접근
+      * 일반적으로 path=/ 루트로 지정
+        * path=/home 지정
+        * /home -> 가능
+        * /home/level1 -> 가능
+        * /home/level1/level2 -> 가능
+        * /hello -> 불가능
+    * ##### 보안 - Secure, HttpOnly, SameSite
+      * Secure
+        * 쿠키는 http, https를 구분하지 않고 전송
+        * Secure를 정용하면 https인 경우에만 전송
+      * HttpOnly
+        * XSS 공격 방지
+        * 자바스크립트에서 접근 불가(document.cookie)
+        * HTTP 전송에만 사용
+      * SameSite
+        * XSRF 공격 방지
+        * 요청 도메인과 쿠키에 설정된 도메인이 같은 경우만 쿠키 정송
+* ### 캐시와 조건부 요청
+* #### 캐시가 없을 때
+  * ##### 첫 번째 요청
+    ```
+    GET /star.jpg HTTP/1.1
+    ``` 
+    ![](img/img207.png)
+    ```
+    HTTP/1.1 200 OK
+    Content-Tpye: image/jpeg
+    Content-Length: 34012
+
+    lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjkla slkjdfl;qkawj9;o4ruawsldkal;skdjfa;ow9ejkl3123123
+    ```
+    ![](img/img208.png)
+  * ##### 두 번째 요청
+    ```
+    GET /star.jpg HTTP/1.1
+    ```
+    ![](img/img209.png)
+    ```
+    HTTP/1.1 200 OK
+    Content-Tpye: image/jpeg
+    Content-Length: 34012
+
+    lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjkla slkjdfl;qkawj9;o4ruawsldkal
+    ```
+    ![](img/img210.png)
+    * 데이터가 변경되지 않아도 계속 네트워크를 통해서 데이터를 다운로드 받아야 한다
+    * 인터넷 네트워크는 매우 느리고 비싸다
+    * 브라우저 로딩 속도가 느리다
+* #### 캐시 적용
+  * ##### 첫 번째 요청
+    ```
+    GET /star.jpg HTTP/1.1
+    ```   
+    ![](img/img211.png)
+    ```
+    HTTP/1.1 200 OK
+    Content-Type: image/jpeg
+    |cache-control: max-age=60| (캐시가 유요한 시간(초))
+    Content-Length: 34012
+
+    lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjkla slkjdfl;qkawj9;o4ruawsldkal;skdjfa;ow9ejkl3123123
+    ```
+    ![](img/img212.png)
+  * ##### 두 번째 요청
+    ![](img/img213.png) 
+    ![](img/img214.png)
+    * 캐시 덕분에 캐시 가능 시간동안 네트워크를 사용하지 않아도 된다
+    * 비싼 네트워크 사용량을 줄일 수 있다
+    * 브라우저 로딩 속도가 매우 빠르다
+  * ##### 세 번째 요청 - 캐시 시간 초과
+    ![](img/img215.png) 
+    ```
+    GET /star.jpa HTTP/1.1
+    ```
+    ![](img/img216.png) 
+    ```
+    HTTP/1.1 200 OK
+    Content-Type: image/jpeg
+    |cache-control: max-age=60| (캐시가 유요한 시간(초))
+    Content-Length: 34012
+
+    lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjkla slkjdfl;qkawj9;o4ruawsldkal;skdjfa;ow9ejkl3123123
+    ```
+    ![](img/img217.png) 
+    * 캐시 유효 시간이 초과하면, 서버를 통해 데이터를 다시 조회하고, 캐시를 갱신한다.
+    * 이때 다시 네트워크 다운로드가 발생한다.
+* ### 검증 헤더와 조건부 요청1
+  * 캐시 유효 시간이 초과해서 서버에 다시 요청하면 두 가지 상황이 나타난다
+    1. 서버에서 기존 데이터를 변경함 
+    2. 서버에서 기존 데이터는 변경하지 않음 
+  * 캐시 만료후에도 서버에서 데이터를 변경하지 않았을 경우
+    * 데이터를 전송하는 대신 저장해 두었던 캐시를 재사용 할 수 있다
+    * 단 클라이언트의 데이터와 서버의 데이터가 같다는 사실을 확인할 수 있는 방법이 필요하다.
+      ![](img/img218.png)
+  * #### 검증 헤더 추가
+    * ##### 첫 번째 요청
+      ```
+      GET /star.jap HTTP/1.1
+      ```    
+      ![](img/img219.png)
+      ```
+      HTTP/1.1 200 OK
+      Content-Type: image/jpeg
+      cache-control: max-age=60
+      |Last-Modified: 2020년 11월 10일 10:00:00|  (데이터가 마지막에 수정된 시간)
+      Content-Length: 34012
+
+      lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjklasl kjdfl;qkawj9;o4ruawsldkal;skdjfa;ow9ejkl3123123
+      ```
+      ![](img/img220.png)
+    * ##### 두 번째 요청 - 캐시 시간 초과
+      ![](img/img221.png) 
+      ![](img/img222.png) 
+      ![](img/img223.png) 
+      ![](img/img224.png) 
+      ![](img/img225.png) 
+        ```
+        HTTP/1.1 304 Not Modified
+        Content-Type: image/jpeg
+        cache-control: max-age=60
+        Last-Modified: 2020년 11월 10일 10:00:00
+        Content-Length: 34012
+
+        ```
+        * HTTP Message Body가 없다!!!
+      ![](img/img226.png)  
+      ![](img/img227.png) 
+    * ##### 정리
+      * 캐시 유효 시간이 초과해도, 서버의 데이터가 갱신되지 않으면
+      * 304 Not Modified + 헤더 메타 정보만 응답(바디x)
+      * 클라이언트는 서버가 보낸 응답 헤더 정보로 캐시의 메타 정보를 갱신
+      * 클라이언트는 캐시에 저장되어 있는 데이터 재활용
+      * 결과적으로 네트워크 다운로드가 발생하지만 용량이 적은 헤더 정보만 다운로드
+      * 매우 실용적인 해결책
+* ### 검증 헤더와 조건부 요청2
+  * #### 검증 헤더
+    * 캐시 데이터와 서버 데이터가 같은지 검증하는 데이터
+    * Last-Modified, ETag
+  * #### 조건부 요청 헤더
+    * 검증 헤더로 조건에 따른 분기
+    * If-Modified-Since: Last-Modified 사용
+    * If-None-Match: ETag 사용
+    * 조건이 만족하면 200 OK
+    * 조건이 만족하지 않으면 304 Not Modified
+  * #### 예시
+    * If-Modified-Since: 이후에 데이터가 수정되었으면?
+      * 데이터 미변경 예시
+        * 캐시: 2020년 11원 10일 10:00:00 vs 서버: 2020년 11월 10일 10:00:00
+        * 304 Not Modified, 헤더 데이터만 전송(Body 미포함)
+        * 전송 용량 0.1(헤더 0.1M, 바디 1.0M)
+      * 데이터 변경 예시
+        * 캐시: 2020년 11원 10일 10:00:00 vs 서버: 2020년 11월 10일 11:00:00 
+        * 200 OK, 모든 데이터 전송(Body 포함)
+        * 전송 용량 1.1M(헤더 0.1M, 바디 1.0M)
+  * #### Last-Modified, If-Modified-Since 단점
+    * 1초 미만(0.x초)단위로 캐시 조정이 불가능
+    * 날짜 기반의 로직 사용
+    * 데이터를 수정해서 날짜가 다르지만, 같은 데이터를 수정해서 데이터 결과가 똑같은 경우 
+    * 서버에서 별도의 캐시 로직을 관리하고 싶은 경우
+      * 스페이스나 주석처럼 크게 영향이 없는 변경에서 캐시를 유지하고 싶은 경우
+  * #### ETag, If-None-Match
+    * ETag(Entity Tag)
+    * 캐시용 데이터에 임의의 고유한 버전 이름을 달아둠
+      * ETag: "v1.0", ETag: "a2jiodwijdkjl3"
+    * 데이터가 변경되면 이 이름을 바꾸어서 변경함(Hash를 다시 생성)
+      * ETag: "aaaaaa" -> ETag: "bbbbbbbb"
+    * 진짜 단순하게 ETag만 보내서 같으면 유지, 다르면 다시 받기!
+  * #### 검증 헤더 추가
+    * ##### 첫 번째 요청
+      ```
+      GET /star.jpg HTTP/1.1
+      ``` 
+      ![](img/img228.png)
+      ```
+      HTTP/1.1 200 OK
+      Content-Type: image/jpeg
+      cache-control: max-age=60
+      |ETag: "aaaaaaaaa"|
+      Content-Length: 34012
+
+      lkj123kljoiasudlkjaweioluywlnfdo912u34ljko98udjklasl kjdfl;qkawj9;o4ruawsldkal;skdjfa;ow9ejkl3123123
+      ```
+      ![](img/img229.png)
+    * ##### 두 번째 요청 - 캐시 시간 초과
+      ![](img/img230.png) 
+      ![](img/img231.png)
+      ![](img/img232.png)
+      ![](img/img233.png)
+      ![](img/img232.png)
+        ```
+        HTTP/1.1 304 Not Modified
+        Content-Type: image/jpeg
+        cache-control: max-age=60
+        |ETag: "aaaaaaaaa"|
+        Content-Length: 34012
+
+        ```
+        * HTTP Body가 없다!!
+      ![](img/img233.png) 
+      ![](img/img234.png)
+  * #### ETag, If-None-Match 정리
+    * 진짜 단순하게 ETag만 서버에 보내서 같으면 유지, 다르면 다시 받기
+    * `캐시 제어 로직을 서버에서 완전히 관리`
+    * 클라이언트는 단순히 이 값을 서버에 제공(클라이언트는 캐시 메커니즘을 모름)
+      * 예시
+        * 서버는 베타 오픈 기간인 3일동안 파일이 변경되어도 ETag를 동일하게 유지
+        * 애플리게이션 배포 주기에 맞추어 ETag 모두 갱신    
+* ### 캐시와 조건부 요청 헤더
+* #### 캐시 제어 헤더
+  * ##### Cache-Control: 캐시 제어
+    * 캐시 시지어(directives)
+      * Cache-Control: max-age
+        * 캐시 유효 시간, 초 단위
+      * Cache-Control: no-cache
+        * 데이터는 캐시해도 되지만, 항상 원(origin)서버에 검증하고 사용
+      * Chche-Control: no-store
+        * 데이터에 민감한 정보가 있으므로 저장하면 안됨(메모리에서 사용하고 최대한 빨리 삭제)
+  * ##### Pragma: 캐시 제어(하위 호환)
+    * Pragma: no-cache
+    * HTTP 1.0 하위 호환
+  * ##### Expires: 캐시 유효 기간(하위 호환)
+    * expires: Mon, 01 Jan 1990 00:00:00 GMT
+    * 캐시 만료일을 정확한 날짜로 지정
+    * HTTP 1.0 부터 사용
+    * 지금은 더 유연한 Cache-Control: max-age 권장
+    * Chche-Contrl: max-age와 함께 사용하면 Expiressms 무시
+* #### 검증 헤더와 조건부 요청 헤더
+  * #### 검증 헤더(Validator)
+    * ETag: "v10", ETag: "asid93jkrh2l"
+    * Last-Modified: Thu, 04 Jun 2020 07:18:25 GMT
+  * #### 조건부 요청 헤더
+    * If-Match, If-None-Match: ETag 값 사용
+    * If-Modified-Since, If-Unmodified-Since: Lasg-Modified 값 사용
+* ### 프록시 캐시
+* #### 원 서버 직접 접근
+  * ##### Origin 서버
+    ![](img/img237.png) 
+* #### 프로시 캐시 도입
+  * ##### 첫 번째 요청
+    ![](img/img238.png)  
+    ![](img/img239.png) 
+* #### Cache-Control - 캐시 지시어(directives)
+  * Cache-Control: public
+    * 응답이 public 캐시에 저장되더도 됨
+  * Cache-Control: private
+    * 응답이 해당 사용자만을 위한 것임, private 캐싱에 저장해야 함(기본값)
+  * Cache-Control: s-maxage
+    * 프록시 캐시에만 적용되는 max-age
+  * Age:60(HTTP 헤더)
+    * 오리진 서버에서 응답 후 프록시 캐시 내에 머문 시간(초)
+* ### 캐시 무효화
+* #### 확실한 캐시 무효화 응답
+  * Cache-Control: no-cache, no-store, must-revalidate
+  * Pragma: no-cache
+    * HTTP 1.0 하위 호환
+* #### 캐시 지시어(directives) - 확실한 캐시 무효화
+  * Cache-Control: no-cache
+    * 데이터는 캐시해도 되지만, 항상 원 서버에 검증하고 사용(이름에 주의!)
+  * Cache-Control: no-stroe
+    * 데이터에 민감한 정보가 있으므로 저장하면 안됨(메모리에서 사용하고 최대한 빨리 삭제)
+  * Cache-Control: must-revalidate
+    * 캐시 만료 후 최초 조회시 원 서버에 검증해야함
+    * 원 서버 접근 실패시 반드시 오류가 발생해야함 - 504(Gateway Timout)
+    * must-revalidate는 캐시 유효 시간이라면 캐시를 사용함
+  * Pragma: no-cache
+    * HTTP 1.0 하위 호환
+* #### no-cache vs must-revalidate
+  * ##### no-cache 기본 동작
+    ![](img/img240.png)  
+    ![](img/img241.png) 
+    ![](img/img242.png)
+  * #### must-revalidate
+    ![](img/img243.png) 
