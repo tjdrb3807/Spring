@@ -1172,13 +1172,13 @@
       * 하나의 서버가 여러 도메인을 처리해야 할 때
       * 하나의 IP 주소에 여러 도메인이 적용되어 있을 때 `구분해주기 위함`
       * ###### 요청한 호스트 정보(도메인)
-        ![](img/img196.pmg)
+        ![](img/img196.png)
         * 가상 호스트
           * 하나의 서버(IP)안에 여러개의 다른 도메인이 구성
-        ![](img/img197.pmg)
+        ![](img/img197.png)
         * Host가 없으면 요청이 서버(IP)의 어떤 도메인(애플리케이션)에 들어가야 할지 구분할 수 없다.
           * IP로만 통신하기 때문
-        ![](img/img198.pmg) 
+        ![](img/img198.png) 
           * Host를 입력하면 IP로 가서 어떤 도메인(애플리케이션)으로 갈지 서버에서 작성해서 알 수 있다.
   * #### Location: 페이지 리다이렉션
     * 웹 브라우저는 3xx 응답의 결과에 Location 헤더가 있으면, Location 위치로 자동 이동(리다이렉트)
@@ -1481,7 +1481,6 @@
       ![](img/img231.png)
       ![](img/img232.png)
       ![](img/img233.png)
-      ![](img/img232.png)
         ```
         HTTP/1.1 304 Not Modified
         Content-Type: image/jpeg
@@ -1491,7 +1490,6 @@
 
         ```
         * HTTP Body가 없다!!
-      ![](img/img233.png) 
       ![](img/img234.png)
   * #### ETag, If-None-Match 정리
     * 진짜 단순하게 ETag만 서버에 보내서 같으면 유지, 다르면 다시 받기

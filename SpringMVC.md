@@ -3538,13 +3538,7 @@
 * #### 요청 매핑
   * ##### MappingController
     ```Java
-    package hello.springmvc.basic.requestmapping;
-
-    import org.slf4j.Logger;
-    import org.slf4j.LoggerFactory;
-    import org.springframework.web.bind.annotation.RequestMapping;
-    import org.springframework.web.bind.annotation.RestController;
-
+    //@Slf4j
     @RestController
     public class MappingController {
 
@@ -3555,7 +3549,7 @@
         * 둘다 허용 /hello-basic, /hello-go/
         * HTTP 메서드 모두 허용 GET, HEAD, POST, PUT, PATCH, DELETE
         */
-        @RequestMapping({"/hello-basic", "/hello-go"})
+        @RequestMapping("/hello-basic")
         public String helloBasic() {
             log.info("helloBasic");
 
@@ -3563,23 +3557,19 @@
         }
     }
     ```
-    * ##### 매핑 정보
+    * 매핑 정보(한번 더)
       * `@RestController`
-        * `@Controller` 는 반환 값이 String 이면 뷰 이름으로 인식된다. 그래서 뷰를 찾고 뷰가 랜더링 된다.
-        * `@RestController` 는 반환 값으로 뷰를 찾는 것이 아니라, HTTP 메시지 바디에 바로 입력한다. 따라서 실행 결과로 ok 메세지를 받을 수 있다. @ResponseBody 와 관련이 있는데, 뒤에서 더 자세히 설명한다.
-      * `@RequestMapping("/hello-basic")`
+        * `@Controller`는 반환 값이 `String`이면 뷰 이름으로 인식된다. 그래서 `뷰를 찾고 뷰가 랜더링`된다.
+        * `@RestController`는 반환 값으로 뷰를 찾는 것이 아니다, `HTTP Message Body에 바로 입력`한다.
+          * 따라서 실행 결과로 ok 메세지를 받을 수 있다. `@ResponseBody`와 관련이 있는데, 뒤에서 더 자세히 설명한다.
+      * `@RequsetMapping("/hello-basic")`
         * `/hello-basic` URL 호출이 오면 이 메서드가 실행되도록 매핑한다.
         * 대부분의 속성을 `배열[]`로 제공하므로 다중 설정이 가능하다
-          * `{"/hello-basic", "/hello-go"}`
-      * Postman으로 테스트
-        * 둘다 허용
-          * 다음 두가지 요청은 다른 URL이지만, 스프링은 다음 URL 요청들을 같은 요청으로 매핑한다.
-          * 매핑: /hello-basic
-          * URL 요청: /hello-basic, /hello-basic/
+          * `{"/hello-basic". "/hello-go"}`  //Postman으로 테스트
+            * 다음 두가지 요청은 다른 URL이지만, 스프링은 다음 URL 요청들을 같은 요청으로 매핑한다.
   * ##### HTTP 메서드
-    * `@RequestMapping` 에 `method` 속성으로 HTTP 메서드를 지정하지 않으면 HTTP 메서드와 무관하게 호출된다.
-      * 모두 허용 GET, HEAD, POST, PUT, PATCH, DELETE
-  * ##### HTTP 메서드 매핑
+    * `@RequestMapping`에 `method`속성으로 HTTP 메서스를 지정하지 않으면 HTTP 메서드와 무관하게 호출된다
+      * 모두 허용 GET, POST, PUT, PATCH, DELET
     ```Java
     /**
      * method 특정 HTTP 메서드 요청만 허용
@@ -3589,28 +3579,32 @@
     public String mappingGetV1() {
         log.info("mappingGetV1");
 
-        return "ok";
+        return "mappingGetV1";
     }
     ```
-    * 여기에 만약 POST 요청을 하면 스프링 MVC는 HTTP 405 상태코드(Method Not Allowed)를 반환한다.
-  * ##### HTTP 메서드 매핑 축약
+    * 만약 여기에 POST 요청을 하면 스프링 MVC는 HTTP 405 상태코드(Method Not Allowed)를 반환한다
+  * ##### HTTP 메서드 축약
     ```Java
     /**
-     * 편리한 축약 애노테이션 (코드보기) * @GetMapping
-     *
+     * 편리한 축약 애노테이션 (코드보기)
+     * @GetMapping
      * @PostMapping
      * @PutMapping
      * @DeleteMapping
      * @PatchMapping
      */
-    @GetMapping(value = "/mapping-get-v2")
+    @GetMapping("mapping-get-v2")
     public String mappingGetV2() {
         log.info("mappingGetV2");
 
-        return "ok";
+        return "mappingGetV2";
     }
     ```
-    * HTTP 메서드를 축약하는 애노테이션을 사용하는 것이 더 직관적이다. 코드를 보면 내부에서 `@RequestMapping`과 `method`를 지정해서 사용하는 것을 확인할 수 있다.
+    * HTTP 메서드를 축약한 애노테이션을 사용하는 것이 더 직관적이다. 코드를 보면 내부에 `@RequestMapping`과 `method`를 지정해서 사용하는 것을 확인한 수 있다.
+      ```
+      @RequestMapping(method = RequestMethod.GET)
+      public @interface GetMapping{}
+      ```   
   * ##### PathVariable(경로 변수) 사용
     ```Java
     /**
@@ -3620,22 +3614,1834 @@
      * @PathVariable("userId") String userId -> @PathVariable userId
      */
     @GetMapping("/mapping/{userId}")
-    public String mappingPath(@PathVariable("userId") String data) {
-        log.info("mappingPath userId={}", data);
+    public String mappingGetV3(@PathVariable("userId") String data) {
+        log.info("mappingGetV3");
+
+        return "mappingPath userId: " + data;
+    }
+    ```
+    * 최근 HTTP API는 다음과 같이 리소스 경로에 식별자를 넣는 스타일을 선호한다
+      * `/mapping/userA`
+      * `/user/1`
+    * `@RequestMapping`은 URL 경로로 템플릿화 할 수 있는데, `@PathVariable`을 사용하면 매칭 되는 부분을 편리하게 조회할 수 있다.
+    * `@PathVariable`의 이름과 파라미터 이름이 같으면 생량할 수 있다.
+  * ##### PathVariable 사용 - 다중
+    ```Java
+    /**
+     * PathVariable 사용 다중
+     */
+    @GetMapping("/mapping/users/{userId}/orders/{orderId}")
+    public String mappingPath(@PathVariable String userId, @PathVariable String orderId) {
+        log.info("mappingPath userId={}, orderId={}", userId, orderId);
+
+        return "mappingPath userId: " + userId + ", mappingPath orderId: " + orderId;
+    }
+    ```
+  * #### 특정 파라미터 조건 매핑
+    ```Java
+    /**
+     * 파라미터로 추가 매핑
+     * params="mode",
+     * params="!mode"
+     * params="mode=debug"
+     * params="mode!=debug" (! = )
+     * params = {"mode=debug","data=good"}
+     */
+    @GetMapping(value = "/mapping-param", params = "mode=debug")
+    public String mappingParam() {
+        log.info("mappingParam");
+
+        return "mappingParam";
+    }
+    ``` 
+    * 특정 파라미터가 있거나 없는 조건을 추가할 수 있다. 잘 사용하지는 않는다
+  * ##### 특정 헤더 조건 매핑
+    ```Java
+    /**
+     * 특정 헤더로 추가 매핑
+     * headers="mode",
+     * headers="!mode"
+     * headers="mode=debug"
+     * headers="mode!=debug" (! = )
+     */
+    @GetMapping(value = "mapping-header", headers = "mode=debug")
+    public String mappingHeader() {
+        log.info("mappingHeader");
+
+        return "mappingHeader";
+    }
+    ```
+    * 파라미터 매핑과 비슷하지만, HTTP 헤더를 사용한다
+    * Postman으로 테스트 해야 한다
+  * ##### 미디어 타입 조건 매핑 - HTTP 요청 Content-Type, consume
+    ```Java
+    /**
+     * Content-Type 헤더 기반 추가 매핑 Media Type * consumes="application/json"
+     * consumes="!application/json"
+     * consumes="application/*"
+     * consumes="*\/*"
+     * MediaType.APPLICATION_JSON_VALUE
+     */
+    @PostMapping(value = "/mapping-consume", consumes = "application/json")
+    public String mappingConsume() {
+        log.info("mappingConsume");
+
+        return "mappingConsume";
+    }
+    ```
+    * HTTP 요청의 Content-Type 헤더를 기반으로 미디어 타입을 매핑한다
+    * 만약 맞지 않으면 HTTP 415 상태코드(Unsupported Mdia Type)을 반환한다
+    * 예시) consumes
+      ```
+      consumes = "text/plain"
+      consumes = {"text/plain", "application/*"}
+      consumes = MediaType.TEXT_PLAIN_VALUE
+      ``` 
+  * ##### 미디어 타입 조건 매핑 - HTTP 요청 Accept, produce
+    ```Java
+    /**
+     * Accept 헤더 기반 Media Type
+     * produces = "text/html"
+     * produces = "!text/html" * produces = "text/*"
+     * produces = "*\/*"
+     */
+    @PostMapping(value = "/mapping-produce", produces = "text/html")
+    public String mappingProduce() {
+        log.info("mappingProduce");
+
+        return "mappingProduce";
+    } 
+    ```
+    * HTTP 요청이 Aceept 헤더를 기반으로 미디어 타입으로 매핑한다
+    * 만약 만지 않으면 HTTP 406 상태코드(Not Acceptable)을 반환한다
+    * 예시)
+      ```
+      produces = "text/plain"
+      produces = {"text/plain", "application/*"}
+      produces = MediaType.TEXT_PLAIN_VALUE
+      produces = "text/plain;charset=utf-8"
+      ```  
+* #### 요청 매핑 - API 예시
+  * 회원 관리를 HTTP API로 만든다 생각하고 매핑을 어떻게 하는지 알아보자
+    * 실제 데이터가 넘어가는 부분은 생략하고 URL 매핑만
+  * ##### 회원 관리 API
+    * 회원 목록 조회: GET /users
+    * 회원 등록    : POST /users
+    * 회원 조회    : GET /users/{userId}
+    * 회원 수정    : PATCH /users/{userId}
+    * 회원 삭제    : DELETE /users/{userId}
+  * ##### MappingClassController
+    ```Java
+    package hello.springmvc.basic.requestmapping;
+
+    import org.springframework.web.bind.annotation.*;
+
+    @RestController
+    @RequestMapping("/mapping/users")
+    public class MappingClassController {
+
+        /**
+        * GET /mapping/users
+        */
+        @GetMapping
+        public String users() {
+
+            return "get users";
+        }
+
+        /**
+        * POST /mapping/users
+        */
+        @PostMapping
+        public String addUser() {
+
+            return "post user";
+        }
+
+        /**
+        * GET /mapping/users/{userId}
+        */
+        @GetMapping("/{userId}")
+        public String findUser(@PathVariable String userId) {
+
+            return "get userId = " + userId;
+        }
+
+        /**
+        * PATCH /mapping/users/{userId}
+        */
+        @PatchMapping("/{userId}")
+        public String updateUser(@PathVariable String userId) {
+
+            return "update userId = " + userId;
+        }
+
+        /**
+        * DELETE /mapping/users/{userId}
+        */
+        @DeleteMapping("/{userId}")
+        public String deleteUser(@PathVariable String userId) {
+
+            return "delete userId = " + userId;
+        }
+    }
+    ``` 
+    * `/mapping`는 강의의 다른 예제들과 구분하기 위해 사용했다.
+    * `@RequestMapping("/mapping/users")`
+      * 클래스 레벨에 매핑 정보를 두면 메서드 레벨에서 해당 정보를 조합해서 사용한다
+    * Postman으로 테스트
+    * 매핑 방법을 이해했으니, 이제부터 HTTP 요청이 보내는 데이터들을 스프링 MVC로 어떻게 조회하는지 알아보자
+* #### HTTP 요청 - 기본, 헤더 조회
+  * 애노테이션 기반의 스프링 컨트롤러는 다양한 파라미터를 지원한다
+  * ##### RequestHeaderController
+    ```Java
+    package hello.springmvc.basic.request;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.http.HttpMethod;
+    import org.springframework.util.MultiValueMap;
+    import org.springframework.web.bind.annotation.CookieValue;
+    import org.springframework.web.bind.annotation.RequestHeader;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.util.Locale;
+
+    @Slf4j
+    @RestController
+    public class RequestHeaderController {
+
+        @RequestMapping("/headers")
+        public String headers(HttpServletRequest request,
+                              HttpServletResponse response,
+                              HttpMethod httpMethod,
+                              Locale locale,
+                              @RequestHeader MultiValueMap<String, String> headerMap,
+                              @RequestHeader("host") String host,
+                              @CookieValue(value = "myCookie", required = false) String cookie) {
+
+            log.info("request={}", request);
+            log.info("response={}", response);
+            log.info("httpMethod={}", httpMethod);
+            log.info("locale={}", locale);
+            log.info("headerMap={}", headerMap);
+            log.info("host={}", host);
+            log.info("cookie={}", cookie);
+
+            return "ok";
+        }
+    }
+    ```  
+    * `HttpServletReqest`
+    * `HttpServletResponse`
+    * `HttpMethod`: HTTP 메서드를 조회한다, `org.springframework.http.HttpMethod`
+    * `Loclae`: Locale 정보를 조회한다
+    * `@RequestHeader MultiValueMap<String, String> headerMap`
+      * 모든 HTTP 헤더를 MultiValueMap 형식으로 조회한다
+    * `@RequestHeader("host") String host`
+      * 특정 HTTP 헤더를 조회한다
+      * 속성
+        * 필수 값 여부: `required`
+        * 기본 값 속성: `defaultValue`
+    * `MultiValueMap`
+      * MAP과 유사한데, 하나의 키에 여러 값을 받을 수 있다.
+      * HTTP header, HTTP 쿼리 파라미터와 같이 하나의 키에 여러 값을 받을 때 사용한다.
+        * `keyA=value1&keyA=value2`
+          ```Java
+          MultiValueMap<String, String> map = new LinkedMultiValueMap();
+          map.add("keyA", "value1");
+          map.add("keyA", "value2");
+
+          //[value1, vlaue2]
+          Lisg<String> values = map.get("keyA");
+          ``` 
+  * ##### Slf4j
+    * 다음 코드를 자동으로 생성해서 로그를 선언해준다. 개발자는 편리하게 `log`라고 사용하면 된다.
+      ```
+      private static final org.slf4j.Logger log = 
+        org.slf4j.LoggerFactory.getLogger(RequestHeaderController.class);
+      ``` 
+      * 참고
+        * `@Controller`의 사용 가능한 파라미터 목록은 다음 공식 메뉴얼에서 확인할 수 있다.
+          * https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-ann-arguments 
+        * `@Controller`의 사용 가능한 응답 값 목록은 다음 공식 메뉴엘에서 확인할 수 있다.
+          *  https://docs.spring.io/spring-framework/docs/current/reference/html/web.html#mvc-ann-return-types 
+* #### HTTP 요청 파라미터 - 쿼리 파라미터, HTML Form
+  * 서블릿에서 학습했던 HTTP 요청 데이터를 조회 하는 방법을 다시 떠올려보자. 그리고 서블릿으로 학습했던 내용을 스프링이 얼마나 깔끔하고 효율적으로 바꾸어주는지 알아보자
+  * HTTP 요청 메세지를 통해 클라이언트에서 서버로 데이터를 전달하는 방법을 알아보자
+  * ##### GET - 쿼리 파라미터
+    * /url`?username=hello&age=20`
+    * 메세지 바디 없이, URL의 쿼리 파라미터에 데이터를 포함해서 전달
+    * 검색, 필터, 페이징등에서 많이 사용하는 방식
+  * ##### POST - HTML Form
+    * Content-Type: application/w-xxx-form-urlencoded
+    * 메세지 바디에 쿼리 파라미터 형식으로 전달
+      * username=hello&age=20
+    * 회원 가입, 상품 주문, HTML Form사용
+  * ##### HTTP Message Body에 데이터를 직접 담아서 요청
+    * HTTP API에서 주로 사용, JSON, XML, TEXT
+    * 데이터 형식은 주로 JSON
+    * POST, PUT, PATCH
+  * `HttpServleteRequest`의 `request.getParameter()`를 사용하면 다음 두가지 요청 파라미터를 조회할 수 있다.
+  * ##### GET, 쿼리 파라미터 전송
+    ```
+    http://localhost:8080/request-param?username=hello&age=20
+    ``` 
+  * ##### POST, HTML Form 전송
+    ```
+    POST /request-param ...
+    Content-Type: application/w-xxx-form-urlencoded
+
+    username=hello&age=20
+    ``` 
+    * GET 쿼리 파라미터 전송 방식이든, POST HTML Form 전송 방식이든 둘다 형식이 같으므로 구분없이 조회할 수 있다.
+    * 이것을 간단히 `요청 파라미터(request parameter)조회`라 한다.
+  * 지금부터 스프링으로 요청 파라미터를 조회하는 방법을 단계적으로 알아보자
+    ```Java
+    package hello.springmvc.basic.request;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.RequestMapping;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.io.IOException;
+
+    @Slf4j
+    @Controller
+    public class RequestParamController {
+
+        /**
+        * 반환 타입이 없으면서 이렇게 응답에 값을 직접 집어넣으면, view 조회X
+        */
+        @RequestMapping("/request-param-v1")
+        public void requestParamV1(HttpServletRequest request, HttpServletResponse response) throws IOException {
+            String username = request.getParameter("username");
+            int age = Integer.parseInt(request.getParameter("age"));
+
+            log.info("username={}, age={}", username, age);
+
+            response.getWriter().write("ok");
+        }
+    }
+    ```
+    * ###### request.getParameter()
+      * 여기서는 단순히 HttpServletRequest가 제공하는 방식으로 요청 파라미터를 조회했다.
+    * ###### GET 실행
+      * http://localhost:8080/request-param-v1?username=hello&age=20
+  * ##### Post Form 페이지 생성
+    * 먼저 테스트용 HTML Form을 만들어야 한다
+    * 리소스는 `/resource/static`아래 두면 스프링 부트가 자동으로 인식한다
+  * `main/resource/static/basic/hello-form.html`
+    ```HTML
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+    <body>
+    <form action="/request-param-v1" method="post">
+        username: <input type="text" name="username"/>
+        age: <input type="text" name="age"/>
+        <button type="submit">전송</button>
+    </form>
+    </body>
+    </html>
+    ```
+    * Postman 실행
+      * http://localhost:8080/basic/hello-form.html
+    * 참고
+      * `Jar`를 사용하면 `webapp`경로를 사용할 수 없다. 이제부터 정적 리소스도 클래스 경로에 함께 포함해야 한다.   
+* #### HTTP 요청 파라미터 - @RequestParam
+  * 스프링이 제공하는 `@RequestParam`을 사용하면 요청 파라미터를 매우 편리하게 사용할 수 있다.
+  * ##### requestParamV2
+    ```Java
+    /**
+     * @RequestParam 사용
+     * - 파라미터 이름으로 바인딩
+     * @ResponseBody 추가
+     * - View 조회를 무시하고, HTTP message body에 직접 해당 내용 입력
+     */
+    @ResponseBody
+    @RequestMapping("/request-param-v2")
+    public String requestParamV2(@RequestParam("username") String memberName,
+                               @RequestParam("age") int memberAge) {
+
+        log.info("username={}, age={}", memberName, memberAge);
 
         return "ok";
     }
     ```
-    * 최근 HTTP API는 다음과 같이 리소스 경로에 식별자를 넣는 스타일을 선호한다 
-* #### 요청 매핑 - API 예시
-* #### HTTP 요청 - 기본, 헤더 조회
-* #### HTTP 요청 파라미터 - 쿼리 파라미터, HTML Form
-* #### HTTP 요청 파라미터 - @RequestParam
-* #### HTTP 요청 파라미더 - @ModelAttribute
-* #### HTTP 요청 메시지 - 단순 텍스트
-* #### HTTP 요청 메시지 - JSON
+    * `@RequestParma`: 파라미터 이름으로 바인딩
+    * `@ResponseBody`: View 조회를 무시하고, HTTP Message Body에 직접 해당 내용 입력
+    * `@RequestParam`의 `name(value)`속성이 파라미터 이름으로 사용
+    * @RequestParam("`username`") String `memberName`
+      * request.getParameter("`username`")  
+  * ##### requestParamV3
+    ```Java
+    /**
+     * @RequestParam 사용
+     * HTTP 파라미터 이름이 변수 이름과 같으면 @RequestParam(name="xx") 생략 가능
+     */
+    @ResponseBody
+    @RequestMapping("request-param-v3")
+    public String requestParamV3(@RequestParam String username,
+                                 @RequestParam int age) {
+
+        log.info("username={}, age={}", username, age);
+
+        return "ok";
+    }
+    ```
+    * HTTP 파라미터 이름이 변수 이름과 같으면 `@RequestParam(name="xxx")`생량 가능
+  * ##### requestParamV4
+    ```Java
+    /**
+     * @RequestParam 사용
+     * String, int 등의 단순 타입이면 @RequestParam 도 생략 가능
+     */
+    @ResponseBody
+    @RequestMapping("/request-param-v4")
+    public String requestParamV4(String username, int age) {
+        log.info("username={}, age={}", username, username);
+
+        return "ok";
+    }
+    ```
+    * `String`, `int`, `Integer`등의 단순 타입이면, `@RequestParam`도 생량 가능
+    * 주의  
+      * `@RequestParam`애노테이션을 생량하면 스프링 MVC는 내부에서 `required=false`를 적용한다. `required`옵션은 바로 다음에 설명한다.
+    * 참고
+      * 이렇게 애노테이션을 완전히 생량해도 되는데, 너무 없는 것도 약간 과하다는 주관적인 생각이 있다. `@RequestParam`이 있으면 명확하게 요청 파라미터에서 데이터를 읽는 다는 것을 알 수 있다.
+  * ##### 파라미터 필수 여부 - requestParamRequired
+    ```Java
+    /**
+     * @RequestParam.required /request-param -> username이 없으므로 예외 *
+     * 주의!
+     * /request-param?username= -> 빈문자로 통과 *
+     * 주의!
+     * /request-param
+     * int age -> null을 int에 입력하는 것은 불가능, 따라서 Integer 변경해야 함(또는 다음에 나오는
+     * defaultValue 사용)
+     */
+    @ResponseBody
+    @RequestMapping("/request-param-required")
+    public String requestRequired(@RequestParam(required = true) String username,
+                                  @RequestParam(required = false) Integer age) {
+
+        log.info("username={}, age={}", username, age);
+
+        return "ok";
+    }
+    ```
+    * `@RequetParam.required`
+      * 파라미터 필수 여부
+      * 기본 값이 파라미터 필수(`true`)이다.
+    * `/request-param`요청
+      * `username`이 없으므로 400예외가 발생한다
+    * 주의! - 기본형(primitive)에 null 입력
+      * `/request-param`요청
+      * `@RequestParam(required = false) int age`
+      * `null`을 `int`에 입력하는 것은 불가능(500 예외 발생)
+      * 따라서 `null`을 받을 수 있는 `Integer`로 변경하거나, 또는 다음에 나오는 `defaultValue` 사용
+  * ##### 기본 값 적용 - requestParamDefault
+    ```Java
+    /**
+     * @RequestParam - defaultValue 사용 *
+     * 참고: defaultValue는 빈 문자의 경우에도 적용 * /request-param?username=
+     */
+    @ResponseBody
+    @RequestMapping("/request-param-default")
+    public String requestParamDefault(@RequestParam(required = true, defaultValue = "guest") String username,
+                                      @RequestParam(required = false, defaultValue = "-1") int age) {
+
+        log.info("username={}, age={}", username, age);
+
+        return "ok";
+    }
+    ```
+    * 파라미터에 값이 없는 경우 `defaultValue`를 사용하면 기본 값을 적용할 수 있디.
+    * 이미 기본 값이 있기 때문에 `required`는 의미가 없다.
+    * `defaultValue`는 빈 문자의 경우도 성정한 기본 값이 적용된다
+      * `/request-param?username=`
+  * ##### 파라미터를 Map으로 조회하기 - requestParamMap
+    ```Java
+    /**
+     * @RequestParam Map, MultiValueMap
+     * Map(key=value)
+     * MultiValueMap(key=[value1, value2, ...] ex) (key=userIds, value=[id1, id2])
+     */
+    @ResponseBody
+    @RequestMapping("/request-param-map")
+    public String requestParamMap(@RequestParam Map<String, Object> paramMap) {
+
+        log.info("username={}, age={}", paramMap.get("username"), paramMap.get("age"));
+
+        return "ok";
+    }
+    ```
+    * `@RequestParam Map`
+      * `Map(key = value)`
+    * `@RequestParam MultiValueMap`
+      * `MultiValueMap (key=[vlaue1, vlaue2, ...] ex) (key=usetIds, value=[id1, id2])`
+    * 파라미터의 값이 1개가 확실하다면 `Map`을 사용해도 되지만, 그렇지 않다면 `MultiValueMap`을 사용하자.  
+* #### HTTP 요청 파라미터 - @ModelAttribute
+  * 실제 개발을 하면 요철 파라미터를 받아서 필요한 객체를 만들고 그 객체에 값을 넣어주어야 한다. 보통 다음과 같이 코드를 작성할 것이다.
+    ```Java
+    @RequestParam String username;
+    @RequestParam int age;
+
+    HelloData data = new HelloData();
+    data.setUsername(username);
+    data.setAge(age);
+    ``` 
+    * 스프링은 이 과정을 완전히 자동하해주는 `@ModelAttribute`기능을 제공한다.
+    * 먼저 요청 파라미터를 바인딩 받을 객체를 만들자 
+  * ##### HelloData
+    ```Java
+    package hello.springmvc.basic;
+
+    import lombok.Data;
+
+    @Data
+    public class HelloBasic {
+
+        private String username;
+        private int age;
+    }
+    ```
+    * 롬복 `@Data`
+      * `@Getter`, `@Setter`, `@ToString`, `@EqualsAndHashCode`, `@RequiredArgsConstructor`를 자동으로 적용해준다.
+  * ##### @ModelAttribute 적용 - modelAttributeV1
+    ```Java
+    /**
+     * @ModelAttribute 사용
+     * 참고: model.addAttribute(helloData) 코드도 함께 자동 적용됨, 뒤에 model을 설명할 때 자세히 설명
+     */
+    @ResponseBody
+    @RequestMapping("/model-attribute-v1")
+    public String modelAttributeV1(@ModelAttribute HelloData helloData) {
+
+        log.info("username={}, age={}", helloData.getUsername(), helloData.getAge());
+
+        return "ok";
+    }
+    ```
+    * 마치 마법처럼 `HelloData`객체가 생성되고, 요청 파라미터의 값도 모두 들어가 있다.
+    * 스프링 MVC는 `@ModelAttribute`가 있으면 다음을 실행하다. 
+      * `HelloData`객체를 생성한다.
+      * 요청 파라미터의 이름으로 `HelloData`객체의 프로퍼티를 찾는다. 그래고 해당 프로퍼티의 stter를 호출해서 파라미터의 값을 입력(바인딩)한다.
+        * 예) 파라미터 이름이 `username`이면 `setUsername()`메서드를 찾아서 호출하면서 값을 입력한다.  
+  * ##### 프로퍼티 
+    * 객체에 `getUsetname()`, `setUsername()`메서드가 있으면, 이 객체는 `username`이라는 프로퍼티를 가지고 있다.
+    * `username`프로터이의 값을 변경하면 `setUsername()`이 호출되고, 조회하면 `getUsername()`이 호출된다
+      ```Java
+      class HelloData{
+        getUsername();
+        getUsername();
+      }
+      ``` 
+      * 바인딩 오휴
+        * `age=abc`처럼 숫자가 들어가야 할 곳에 문자를 넣으면 `BindException`이 발생한다. 이런 바인딩 오류를 처리하는 방법은 검증 부분에서 다룬다.
+  * ##### ModelAttribute 생량 - modelAttributeV2
+    ```Java
+    /**
+     * @ModelAttribute 생략 가능
+     * String, int 같은 단순 타입 = @RequestParam
+     * argument resolver 로 지정해둔 타입 외 = @ModelAttribute
+     */
+    @ResponseBody
+    @RequestMapping("/model-attribute-v2")
+    public String modelAttributeV2(HelloData helloData) {
+
+        log.info("username={}, age={}", helloData.getUsername(), helloData.getAge());
+
+        return "ok";
+    }
+    ```
+    * `@ModelAttrubtue`는 생략할 수 있다.
+    * 그런데 `@RequestParam`도 생량할 수 있으니 혼란이 발생할 수 있다.
+    * 스프링은 해당 생략시 다음과 같은 규칙을 적용한다.
+      * `String`, `int`, `Integer`같은 단순 타입 = `@RequeatParam`
+      * 나머지 = `@ModelAttribute`(argument resolver 로 지정해둔 타임 외)
+    * 참고) argument resolver는 뒤에서 학습한다.
+* #### HTTP 요청 메세지 - 단순 텍스트
+  * HTTP message body에 데이터를 직접 담아서 요청
+    * HTTP API에서 주로 사용, JSON, XML, TEXT
+    * 데이터 형식은 주로 JSON
+    * POST, PUT, PATCH
+  * 요청 파라미터와 다르게, HTTP 메세지 바디를 통해서 데이터가 직접 넘어오는 경우는 `@RrquestParam`, `@ModelAttribute`를 사용할 수 없다.(물론 HTML Form 형식으로 전달되는 경우는 요청 파라미터로 인정된다.)
+  * 먼저 가장 단순한 텍스트 메세지를 HTTP 메세지 바디에 담아서 전송하고, 읽어보자.
+  * HTTP 메세지 바디의 데이터를 `InputStream`을 사용해서 직접 읽을 수 있다.
+  * ##### RequestBodyStringController
+    ```Java
+    package hello.springmvc.basic.request;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.util.StreamUtils;
+    import org.springframework.web.bind.annotation.PostMapping;
+
+    import javax.servlet.ServletInputStream;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.io.IOException;
+    import java.nio.charset.StandardCharsets;
+
+    @Slf4j
+    @Controller
+    public class RequestBodyStringController {
+
+        @PostMapping("/request-body-string-v1")
+        public void requestBodyStringControllerV1(HttpServletRequest request, HttpServletResponse response) throws IOException {
+
+            ServletInputStream inputStream = request.getInputStream();
+            String messageBody = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+
+            log.info("messageBody={}", messageBody);
+
+            response.getWriter().write("ok");
+        }
+    }
+    ```
+    * Postman을 사용해서 테스트를 해보자
+      * POST http://localhost:8080/request-body-string-v1
+      * Body -> row, Text 선택 
+  * ##### Input, Output 스트림, Reader - requestBodyStringV2
+    ```Java
+    /**
+     * InputStream(Reader): HTTP 요청 메시지 바디의 내용을 직접 조회
+     * OutputStream(Writer): HTTP 응답 메시지의 바디에 직접 결과 출력
+     */
+    @PostMapping("/request-body-string-v2")
+    public void requestBodyStringControllerV2(InputStream inputStream, Writer responseWrite) throws IOException {
+
+        String messageBody = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+        log.info("messageBody={}", messageBody);
+
+        responseWrite.write("ok");
+    }
+    ```
+    * ###### 스프링 MVC는 다음 파라미터를 지원한다.
+      * InputStream(Reader): HTTP 요청 메세지 바디의 내용을 직접 조회
+      * OutputStream(Writer): HTTP 응답 메세지의 바디에 직접 결과 출력
+  * ##### HttpEntity - requestBodyStringV3
+    ```Java
+    /**
+     * HttpEntity: HTTP header, body 정보를 편라하게 조회
+     * - 메시지 바디 정보를 직접 조회(@RequestParam X, @ModelAttribute X)
+     * - HttpMessageConverter 사용 -> StringHttpMessageConverter 적용
+     * <p>
+     * 응답에서도 HttpEntity 사용 가능
+     * - 메시지 바디 정보 직접 반환(view 조회X)
+     * - HttpMessageConverter 사용 -> StringHttpMessageConverter 적용
+     */
+    @PostMapping("/request-body-string-v3")
+    public HttpEntity<String> requestBodyStringV3(HttpEntity<String> httpEntity) {
+
+        String messageBody = httpEntity.getBody();
+        log.info("messageBody={}", messageBody);
+
+        return new HttpEntity<>("ok");
+    }
+    ```
+    * 스프링 MVC는 다음 파라미터를 지원한다.
+      * `HttpEntity`: HTTP header, body 정보를 편리하게 조회
+        * 메세지 바디 정보를 직접 조회
+        * 요청 파라미터를 조회하는 기능과 관계 없음 `@RequestParam`X, `@ModelAttribute`X
+      * `HttpEntity는 응답에서도 사용 가능`
+        * 메세지 바디 정보 직접 변환
+        * 헤더 정보 포함 가능
+        * view 조회X
+        * `HttpEntity`를 상속받은 다음 객체들도 같은 기능을 제공한다.
+          * `RequestEntity`
+            * HttpMethod, url 정보가 추가, 요청에서 사용
+          * `ResponseEntity`
+            * HTTP 상태 코드 설정 가능, 응답에서 사용
+            * `return new ResponseEnetity<String>("Hello World", responseHeaders, HttpStatus.CREATED)`
+    * 참고
+      * 스프링 MVC 내부에서 HTTP 메세지 바디를 읽어서 문자나 객체로 변환해서 전달해주는데, 이때 HTTP 메세지 컨버터(`HttpMessageConverter`)라는 기능을 사용한다. 이것은 조금 뒤에 HTTP 메세지 컨버터에서 자세히 설명한다.
+  * ##### @RequestBody - requestBodyStringV4
+    ```Java
+    /**
+     * @RequestBody - 메시지 바디 정보를 직접 조회(@RequestParam X, @ModelAttribute X)
+     * - HttpMessageConverter 사용 -> StringHttpMessageConverter 적용 *
+     * @ResponseBody - 메시지 바디 정보 직접 반환(view 조회X)
+     * - HttpMessageConverter 사용 -> StringHttpMessageConverter 적용
+     */
+    @ResponseBody
+    @PostMapping("/request-body-string-v4")
+    public String requestBodyStringV4(@RequestBody String messageBody) {
+        log.info("messageBody={}", messageBody);
+
+        return "ok";
+    }
+    ```
+    * ###### @RequestBody
+      * `@RequestBody`를 사용하면 HTTP 메세지 바디 정보를 편리하게 조회할 수 있다. 참고로 헤더 정보가 필요하다면 `HttpEntity`를 사용하거나 `@RequestHeader`를 사용하면 된다.
+      * 이렇게 메세지 바디를 직접 조회하는 기낭은 요청 파라미터를 조회하는 `@RequestParam`, `@ModelAttribute`와는 전화 관계가 없다.
+  * ##### 요청 파라미터 vs HTTP 메세지 바디
+    * 요청 파라미터를 조회하는 기능: `@RequestParam`, `@ModelAttribute`
+    * HTTP 메세지 바디를 직접 조회하는 기능: `@RequestBody`    
+  * ##### @ResponseBody
+    * `@ResponseBody`를 사용하면 응답 결과를 HTTP 메세지 바디에 직접 담아서 전달할 수 있다. 물론 이 경우에도 View를 사용하지 않는다.
+* #### HTTP 요청 메세지 - JSON
+  * 이번에는 HTTP API에서 주로 사용하는 JSON 데이터 형식을 조회해보다.
+  * 기존 서블릿에서 사용했던 방식과 비슷하게 시작해보자
+  * ##### RequestBodyJsonController
+    ```Java
+    package hello.springmvc.basic.request;
+
+    import com.fasterxml.jackson.databind.ObjectMapper;
+    import hello.springmvc.basic.HelloData;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.util.StreamUtils;
+    import org.springframework.web.bind.annotation.PostMapping;
+
+    import javax.servlet.ServletInputStream;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.io.IOException;
+    import java.nio.charset.StandardCharsets;
+
+    /**
+    * {"username":"hello", "age":20}
+    * content-type: application/json
+    */
+    @Slf4j
+    @Controller
+    public class RequestBodyJsonController {
+        private ObjectMapper objectMapper = new ObjectMapper();
+
+        @PostMapping("/request-body-json-v1")
+        public void requestBodyJsonV1(HttpServletRequest request, HttpServletResponse response) throws IOException {
+
+            ServletInputStream inputStream = request.getInputStream();
+            String messageBody = StreamUtils.copyToString(inputStream, StandardCharsets.UTF_8);
+            log.info("messageBody={}", messageBody);
+
+            HelloData data = objectMapper.readValue(messageBody, HelloData.class);
+            log.info("username={}, age={}", data.getUsername(), data.getAge());
+
+            response.getWriter().write("ok");
+        }
+    }
+    ```
+    * HttpServletRequest를 사용해서 직접 HTTP 메세지 바디에서 데이터를 읽어와서, 문자로 변환한다.
+    * 문자로 된 JSON 데이터를 jackson 라이브러리인 `objectMapper`를 사용해서 자바 객체로 변환한다.
+    * Postman으로 테스트
+      * POST http://localhost:8080/request-body-json-v1
+      * raw, JSON, content-type: application/json
+      * {"username":"hello", "age":20}
+  * ##### requestBodyJsonV2 - @RequestBody 문자 변환
+    ```Java
+    /**
+     * @RequestBody HttpMessageConverter 사용 -> StringHttpMessageConverter 적용 *
+     * @ResponseBody - 모든 메서드에 @ResponseBody 적용
+     * - 메시지 바디 정보 직접 반환(view 조회X)
+     * - HttpMessageConverter 사용 -> StringHttpMessageConverter 적용
+     */
+    @ResponseBody
+    @PostMapping("/request-body-json-v2")
+    public String requestBodyJsonV2(@RequestBody String messageBody) throws IOException {
+
+        HelloData data = objectMapper.readValue(messageBody, HelloData.class);
+        log.info("username={}, age={}", data.getUsername(), data.getAge());
+
+        return "ok";
+    }
+    ```
+    * 이전에 학습했던 `@RequestBody`를 사용해서 HTTP 메세지에서 데이터를 꺼내고 messageBody에 저장한다.
+    * 문자로 된 JSON 데이터만 `messageBody`를 `objectMapper`를 통해서 자바 객체로 변환한다.
+    * 문자를 변환하고 다시 json으로 변환하는 과정이 불편한다. @ModelAttribute처럼 한번에 객체로 변환할 수는 없을까?
+  * ##### requestBodyJsonV3 - @RequestBody 객체 변환
+    ```Java
+    /**
+     * @RequestBody 생략 불가능(@ModelAttribute 가 적용되어 버림)
+     * HttpMessageConverter 사용 -> MappingJackson2HttpMessageConverter (content-
+     * type: application/json)
+     */
+    @ResponseBody
+    @PostMapping("/request-body-json-v3")
+    public String requestBodyJsonV3(@RequestBody HelloData helloData) {
+
+        log.info("username={}, age={}", helloData.getUsername(), helloData.getAge());
+        return "ok";
+    }
+    ```
+    * @RequestBody 객체 파라미터
+      * `@RequestBody HelloData helloData`
+      * `@RequestBody`에 직접 만든 객체를 지정할 수 있다.
+    * `HttpEntity`, `@RequestBody`를 사용하면 HTTP 메세지 컨버터가 HTTP 메세지 바디의 내용을 우리가 원하는 문자나 객체 등으로 변환해준다
+    * HTTP 메세지 컨버터는 문자 뿐만 아니라 JSON도 객체로 변환해주는데, 우리가 방금 V2에서 했던 작업을 대신 처리해준다
+    * 자세한 내용은 뒤어 HTTP 메세지 컨버더에서 다룬다.
+    * @RequestBody는 생량 불가능
+      * `@ModelAttribute`에서 학습한 내용을 떠올려보다
+        * 스프링은 `@ModelAttribute`, `@RequestParam`해당 생략시 다음과 같은 규칙을 적용한다.
+          * `String`, `int`, `Integer`같은 단순 타입 = `@RequestParma`
+          * 나머지 = `@ModelAttribute`(argument resolver로 지정해둔 타입 외)
+        * 따라서 이 경우 HelloData에 `@RequestBody`를 생략하면 `@ModelAttribute`가 적용되어버린다.
+        * `HelloData data` -> `@ModelAttribute HelloData data`
+          * 따라서 생략하면 HTTP  메세지 바디가 아닌 요청 파라미터를 처리하게 된다.
+    * 주의
+      * HTTP 요청시에 Content-Type이 application/json인지 꼭! 확인해야 한다. 그래야 JSON을 처리할 수 있는 HTTP 메세지 컨버터가 실행된다.
+      * 물론 앞서 배운 것돠 같이 HttpEntity를 사용해도 된다.
+  * ##### requestBodyJsonV4 - HttpEntity
+    ```Java
+    @ResponseBody
+    @PostMapping("/request-body-json-v4")
+    public String requestBodyJsonV4(HttpEntity<HelloData> httpEntity) {
+
+        HelloData data = httpEntity.getBody();
+        log.info("username={}, age={}", data.getUsername(), data.getAge());
+
+        return "ok";
+    }
+    ```
+  * ##### requestBodyJsonV5
+    ```Java
+    /**
+     * @RequestBody 생략 불가능(@ModelAttribute 가 적용되어 버림)
+     * HttpMessageConverter 사용 -> MappingJackson2HttpMessageConverter (content-
+     * type: application/json)
+     * @ResponseBody 적용
+     * - 메시지 바디 정보 직접 반환(view 조회X)
+     * - HttpMessageConverter 사용 -> MappingJackson2HttpMessageConverter 적용
+     * (Accept: application/json)
+     */
+    @ResponseBody
+    @PostMapping("/request-body-json-v5")
+    public HelloData requestBodyJsonV5(@RequestBody HelloData data) {
+
+        log.info("username={}, age={}", data.getUsername(), data.getAge());
+
+        return data;
+    }
+    ```
+    * `@ResponseBody`
+      * 응답의 경우에도 `@ResponseBody`를 사용하면 해당 객체를 HTTP 메세지 바디에 직접 넣어줄 수 있다. 물론 이 경우에도 `HttpEntity`를 사용해도 된다.
+      * `@RequestBody` 요청
+        * JSON요청 -> HTTP 메세지 컨버터 -> 객체
+      * `@ResponseBody` 응답
+        * 객체 -> HTTP 메세지 컨버터 -> JSON 응답
 * #### HTTP 응답 - 정적 리소스, 뷰 템플릿
+  * 응답 데이터는 이미 앞에서 일부 다룬 내용들이지만, 응답 부분에 초점을 맞추어서 정리해보자.
+  * 스프링(서버)에서 응답 데이터를 만드는 방법은 크게 3가지 이다.
+  * 정적 리소스
+    * 예) 웹 브라우저에 정적인 HTML, css, js을 제공할 때는, `정적 리소스`를 사용한다.
+  * 뷰 템플릿 사용
+    * 예) 웹 브라우저에 동적인 HTML을 제공할 때는 뷰 템플릿을 사용한다.
+  * HTTP 메세지 사용
+    * HTTP API를 제공하는 경우에는 HTML이 아니라 데이터를 전달해야 하므로, HTTP 메세지 바디에 JSON같은 형식으로 데이터를 실어 보낸다
+  * ##### 정적 리소스
+    * 스프링 부트는 클래스패스의 다음 디렉토리에 있는 정적 리소스를 제공한다
+      * `/static`, `/public`, `/META-INF/resources`
+    * `src/main/resource`는 리소스를 보관하는 곳이고, 또 클래스의 시작 경로이다.
+    * 따라서 다음 디렉토리에 리소스를 넣어두면 스프링 부트가 정적 리소스로 서비스를 제공한다.
+    * ###### 정적 리소스 경로
+      * `src/main/resources/static`
+      * 다음 경로에 파일이 들어있으면
+        * `src/main/resources/basic/hello-form.html`
+      * 웹 브라우저에 다음과 같이 실행하면 된다.
+        * `http://localhost:8080/basic/hello-form.html`
+      * 정적 리소스는 해당 파일을 변경 없이 그대로 서비스하는 것이다.
+  * ##### 뷰 템플릿
+    * 뷰 템플릿을 거쳐 HTML이 생성되고, 뷰가 응답을 만들어서 전달한다
+    * 일반적으로 HTML을 동적으로 생성하는 용도로 사용하지만, 다른 것들도 가능하다. 뷰 템플릿이 만들 수 있는 것이라면 뭐든지 가능하다
+    * 스프링 부트는 기본 뷰 템플릿 경로를 제공한다
+      * ###### 뷰 템플릿 경로
+        * `src/main/resources/templates`
+      * ###### 뷰 템플릿 생성
+        * `src/main/resources/templates/response/hello.html`
+          ```HTML
+          <!DOCTYPE html>
+            <html xmlns:th="http://www.thymeleaf.org">
+            <head>
+                <meta charset="UTF-8">
+                <title>Title</title>
+            </head>
+            <body>
+            <p th:text="${data}">empty</p>
+            </body>
+            </html>
+            ```` 
+  * ##### ResponseViewController - 뷰 템플릿을 호출하는 컨트롤러
+    ```Java
+    package hello.springmvc.basic.response;
+
+    import org.springframework.stereotype.Controller;
+    import org.springframework.ui.Model;
+    import org.springframework.web.bind.annotation.RequestMapping;
+    import org.springframework.web.servlet.ModelAndView;
+
+    @Controller
+    public class ResponseViewController {
+
+        @RequestMapping("/response-view-v1")
+        public ModelAndView responseViewV1() {
+
+            ModelAndView mav = new ModelAndView("response/hello")
+                    .addObject("data", "hello!");
+
+            return mav;
+        }
+
+        @RequestMapping("/response-view-v2")
+        public String responseViewV2(Model model) {
+
+            model.addAttribute("data", "hello!");
+
+            return "response/hello";
+        }
+
+        @RequestMapping("/response-view-v3")
+        public void responseViewV3(Model model) {
+            model.addAttribute("data", "hello!");
+        }
+    }
+    ```
+    * ###### String을 반환하는 경우 - View or HTTP 메세지
+      * `@ResponseBody`가 없으면 `response/hello`로 뷰 리졸버가 실행되어 뷰틑 찾고, 렌더링 한다.
+      * `@ResponseBody`가 있으면 뷰 리졸버를 실핼하지 않고, HTTP 메세지 바디에 직접 `response/hell`라는 문자가 입력된다.
+      * 여기서는 뷰의 놀리 이름인 `response/htll`를 반환하면 다음 경로의 뷰 템플릭이 렌더링 되는 것을 확인할 수 있다.
+        * 실행: `templates/response/hello.html`
+    * ###### Void를 반환하는 경구
+      * `@Contorller`를 사용하고, `HttpServletResponse`, `OutputStream(Writer)`같은 HTTP 메세지 바디를 처리하는 파라미터가 없으면 요청 URL을 참고해서 논리 뷰 이름으로 사용
+        * 요청 URL: `/response/hello`
+        * 실행: `templates/response/hello.html`
+      * 참고로 이 방식은 명시성이 너무 떨어지고 이렇게 딱 맞는 경우도 많이 없어서, 권장하지 않는다.
+    * ###### HTTP 메세지
+      * `@ResponseBody`, `HttpEntity`를 사용하면 뷰 템플릿을 사용하는 것이 아니라, HTTP 메세지 바디에 직접 응답 데이터를 출력할 수 있다.
+  * ##### Tymeleaf 스프링 부트 설정
+    * 다음 라이브러리를 추가하면(이미 추가되어 있다)
+      * `build.gradle`
+        ```
+        `implementation 'org.springframework boot:spring-boot-starter-thymeleaf'`
+        ```  
+        * 스프링 부트가 자동으로 `ThymeleafViewResolver`와 필요한 스프링 빈들을 등록한다. 그리고 아므 설정도 사용한다. 이 설정은 기본 값 이기 때문에 변경이 필요할 때만 설정하면 된다.
+          * `application.properies`
+            ```
+            spring.thymeleaf.prefix=classpath:/templates/
+            spring/thymeleaf.suffix=.html
+            ```  
 * #### HTTP 응답 - HTTP API, 메시지 바디에 직접 입력
-* #### HTTP 메시지 컨버터
+* #### HTTP 메세지 컨버터
 * #### 요청 매핑 헨들러 어댑터 구조
+* #### 정리
+
 ---
+* ### 스프링 MVC - 웹 페이지 만들기
+* #### 프로젝트 생성
+  * 프로젝트 선택
+    * Project: Gradle 
+    * Project Language: Java 
+    * Spring Boot: 2.4.x
+    * Project Metadata 
+    * Group: hello
+    * Artifact: item-service
+    * Name: item-service
+    * Package name: hello.itemservice 
+    * Packaging: Jar (주의!)
+    * Java: 11
+    * Dependencies: Spring Web, Thymeleaf, Lombok
+  * ##### Welcome 페이지 추가
+    ```HTML
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+    <body>
+    <ul>
+        <li>상품 관리
+            <ul>
+                <li><a href="/basic/items">상품 관리 - 기본</a></li>
+            </ul>
+        </li>
+    </ul>
+    </body>
+    </html>
+    ``` 
+* #### 요구사항 분석
+  * ##### 상품 도메인 모델
+    * 상품 ID 
+    * 상품명 
+    * 가격 
+    * 수량
+  * ##### 상품 관리 기능
+    * 상품 목록 
+    * 상품 상세 
+    * 상품 등록 
+    * 상품 수정
+  * ##### 서비스 제공 흐름
+    ![](img/img245.png)
+    * 요구사항이 정리되고 디자이너, 웹 퍼블리셔, 백엔드 개발자가 업무를 나누어 진행한다.
+      * `디자이너`: 요구사항에 맞도록 디자인하고, 디자인 결과물을 웹 퍼블리셔에게 넘겨준다.
+      * `웹 퍼블리셔`: 다자이너에서 받은 디자인을 기반으로 HTML, CSS를 만들어 개발자에게 제공한다. 
+      * `백엔드 개발자`: 디자이너, 웹 퍼블리셔를 통해서 HTML 화면이 나오기 전까지 시스템을 설계하고, 핵심 비즈니스 모델을 개발한다. 이후 HTML이 나오면 이 HTML을 뷰 템플릿으로 변환해서 동적으로 화면을 그리고 또, 웹 화면의 흐름을 제어한다
+    * 참고
+      * React, Vue.js 같은 웹 클라이언트 기술을 사용하고, 웹 프론트엔드 개발자가 별도로 있으면, 웹 프론트엔드 개발자가 웹 퍼블리셔 역할까지 포함해서 하는 경우도 있다. 웹 클라이언트 기술을 사용하면, 웹 프론트엔드 개발자가 HTML을 동적으로 만드는 역할과 웹 화면의 흐름을 담당한다. 이 경우 백엔드 개발자는 HTML 뷰 템플릿을 직접 만지는 대신에, HTTP API를 통해 웹 클라이언트가 필요로 하는 데이터와 기능을 제공하면 된다.
+* #### 상품 도메인 개발
+  * ##### Item - 상품 객체
+    ```Java
+    package hello.itemservice01.domain.item;
+
+    import lombok.Data;
+
+    @Data
+    public class Item {
+
+        private Long id;
+        private String itemName;
+        private Integer price;
+        private Integer quantity;
+
+        public Item() {
+        }
+
+        public Item(String itemName, Integer price, Integer quantity) {
+            this.itemName = itemName;
+            this.price = price;
+            this.quantity = quantity;
+        }
+    }
+    ```
+  * ##### ItemRepositroy - 상품 저장소
+    ```Java
+    package hello.itemservice01.domain.item;
+
+    import org.springframework.stereotype.Repository;
+
+    import java.util.ArrayList;
+    import java.util.HashMap;
+    import java.util.List;
+    import java.util.Map;
+
+    @Repository
+    public class ItemRepository {
+
+        private static final Map<Long, Item> store = new HashMap<>();
+        private static Long sequence = 0L;
+
+        //상품 등록
+        public Item save(Item item) {
+            item.setId(++sequence);
+            store.put(item.getId(), item);
+
+            return item;
+        }
+
+        //상품 조회
+        public Item findById(Long itemId) {
+            return store.get(itemId);
+        }
+        
+        //상품 목록
+        public List<Item> findAll() {
+            return new ArrayList<>(store.values());
+        }
+
+        //상품 수정
+        public void update(Long itemId, Item updateParam) {
+            Item findItem = store.get(itemId);
+
+            findItem.setItemName(updateParam.getItemName());
+            findItem.setPrice(updateParam.getPrice());
+            findItem.setQuantity(updateParam.getQuantity());
+        }
+
+        public void clearStore() {
+            store.clear();
+        }
+
+    }
+    ```  
+  * ##### ItemRepositoryTest - 상품 저장소 테스트
+    ```Java
+    package hello.itemservice01.domain.item;
+
+    import org.junit.jupiter.api.AfterEach;
+    import org.junit.jupiter.api.DisplayName;
+    import org.junit.jupiter.api.Test;
+
+    import java.util.List;
+
+    import static org.assertj.core.api.Assertions.assertThat;
+
+    class ItemRepositoryTest {
+
+        ItemRepository itemRepository = new ItemRepository();
+
+        @AfterEach
+        void afterEach() {
+            itemRepository.clearStore();
+        }
+
+        @Test
+        @DisplayName("상품 조회 테스트")
+        void save() {
+            //given
+            Item itemA = new Item("itemA", 10000, 10);
+
+            //when
+            Item savedItem = itemRepository.save(itemA);
+
+            //then
+            Item findItem = itemRepository.findById(itemA.getId());
+            assertThat(findItem).isEqualTo(savedItem);
+        }
+
+        @Test
+        @DisplayName("상품 목록 테스트")
+        void findAll() {
+            //given
+            Item itemA = new Item("itemA", 10000, 10);
+            Item itemB = new Item("itemB", 20000, 20);
+
+            itemRepository.save(itemA);
+            itemRepository.save(itemB);
+
+            //when
+            List<Item> result = itemRepository.findAll();
+
+            //then
+            assertThat(result.size()).isEqualTo(2);
+            assertThat(result).contains(itemA, itemB);
+        }
+
+        @Test
+        @DisplayName("상품 수정 테스트")
+        void update() {
+            //given
+            Item itemA = new Item("itemA", 10000, 10);
+            Item savedItem = itemRepository.save(itemA);
+            Long itemId = savedItem.getId();
+
+            //when
+            Item updateParam = new Item("itemB", 20000, 20);
+            itemRepository.update(itemId, updateParam);
+
+            Item updateItem = itemRepository.findById(itemId);
+
+            //then
+            assertThat(updateItem.getItemName()).isEqualTo(updateParam.getItemName());
+            assertThat(updateItem.getPrice()).isEqualTo(updateParam.getPrice());
+            assertThat(updateItem.getQuantity()).isEqualTo(updateParam.getQuantity());
+        }
+    }
+    ``` 
+* #### 상품 서비스 HTML
+  * 핵심 비즈니스 로직을 개발하는 동안, 웹 퍼블리셔는 HTML 마크업을 완료했다. 다음 파일들을 경로에 넣고 잘 동작하는지 확인해보자.
+  * ##### 부트스트랩
+    * 참고로 HTML을 편리하게 개발하기 위해 부트스트랩 사용했다. 먼저 필요한 부트스트랩 파일을 설치하자
+    * 부트스트랩 공식 사이트: https://getbootstrap.com 
+    * 부트스트랩을 다운로드 받고 압축을 풀자.
+      * 이동: https://getbootstrap.com/docs/5.0/getting-started/download/ 
+      * Compiled CSS and JS 항목을 다운로드하자.
+      * 압축을 출고 bootstrap.min.css 를 복사해서 다음 폴더에 추가하자
+      * resources/static/css/bootstrap.min.css
+    * 참고
+      * 부트스트랩(Bootstrap)은 웹사이트를 쉽게 만들 수 있게 도와주는 HTML, CSS, JS 프레임워크이다. 하나의 CSS로 휴대폰, 태블릿, 데스크탑까지 다양한 기기에서 작동한다. 다양한 기능을 제공하여 사용자가 쉽게 웹사이트를 제작, 유지, 보수할 수 있도록 도와준다. - 출처: 위키백과
+  * ##### HTML, css파일
+    * /resources/static/css/bootstrap.min.css -> 부트스트랩 다운로드
+    * /resources/static/html/items.html -> 아래 참조 
+    * /resources/static/html/item.html 
+    * /resources/static/html/addForm.html 
+    * /resources/static/html/editForm.html
+    * 참고로 /resources/static 에 넣어두었기 때문에 스프링 부트가 정적 리소스를
+    * 제공한다. 
+      * http://localhost:8080/html/items.html
+    * 그런데 정적 리소스여서 해당 파일을 탐색기를 통해 직접 열어도 동작하는 것을 확인할 수 있다.
+    * 참고
+      * 이렇게 정적 리소스가 공개되는 /resources/static 폴더에 HTML을 넣어두면, 실제 서비스에서도 공개된다. 서비스를 운영한다면 지금처럼 공개할 필요없는 HTML을 두는 것은 주의하자.
+  * ##### 상품 목록 HTML(resource/static/html/items.html)
+    ```HTML
+    <!DOCTYPE HTML>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>상품 목록</h2></div>
+        <div class="row">
+            <div class="col">
+                <button class="btn btn-primary float-end" onclick="location.href='addForm.html'" type="button">상품
+                    등록
+                </button>
+            </div>
+        </div>
+        <hr class="my-4">
+        <div>
+            <table class="table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>상품명</th>
+                    <th>가격</th>
+                    <th>수량</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr>
+                    <td><a href="item.html">1</a></td>
+                    <td><a href="item.html">테스트 상품1</a></td>
+                    <td>10000</td>
+                    <td>10</td>
+                </tr>
+                <tr>
+                    <td><a href="item.html">2</a></td>
+                    <td><a href="item.html">테스트 상품2</a></td>
+                    <td>20000</td>
+                    <td>20</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+  * ##### 상품 상세 HTML(resource/static/html/item.html)
+    ```HTML
+    <!DOCTYPE HTML>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <style>         .container {
+            max-width: 560px;
+        } </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>상품 상세</h2></div>
+        <div>
+            <label for="itemId">상품 ID</label>
+            <input type="text" id="itemId" name="itemId" class="form-control"
+                  value="1" readonly>
+        </div>
+        <div><label for="itemName">상품명</label>
+            <input type="text" id="itemName" name="itemName" class="form-control"
+                  value="상품A" readonly></div>
+        <div>
+            <label for="price">가격</label>
+            <input type="text" id="price" name="price" class="form-control"
+                  value="10000" readonly>
+        </div>
+        <div>
+            <label for="quantity">수량</label>
+            <input type="text" id="quantity" name="quantity" class="form-control"
+                  value="10" readonly>
+        </div>
+        <hr class="my-4">
+        <div class="row">
+            <div class="col">
+                <button class="w-100 btn btn-primary btn-lg" onclick="location.href='editForm.html'" type="button">상품 수정
+                </button>
+            </div>
+            <div class="col">
+                <button class="w-100 btn btn-secondary btn-lg"
+                        onclick="location.href='items.html'" type="button">목록으로
+                </button>
+            </div>
+        </div>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+  * ##### 상품 등록 폼 HTML(resource/static/html/addForm.html)
+    ```HTML
+    <!DOCTYPE HTML>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            .container {
+                max-width: 560px;
+            } </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>상품 등록 폼</h2></div>
+        <h4 class="mb-3">상품 입력</h4>
+        <form action="item.html" method="post">
+            <div><label for="itemName">상품명</label>
+                <input type="text" id="itemName" name="itemName" class="form-control" placeholder="이름을 입력하세요"></div>
+            <div>
+                <label for="price">가격</label>
+                <input type="text" id="price" name="price" class="form-control" placeholder="가격을 입력하세요">
+            </div>
+            <div>
+                <label for="quantity">수량</label>
+                <input type="text" id="quantity" name="quantity" class="form-control" placeholder="수량을 입력하세요"></div>
+            <hr class="my-4">
+            <div class="row">
+                <div class="col">
+                    <button class="w-100 btn btn-primary btn-lg" type="submit">상품
+                        등록
+                    </button>
+                </div>
+                <div class="col">
+                    <button class="w-100 btn btn-secondary btn-lg"
+                            onclick="location.href='items.html'" type="button">취소
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+  * ##### 상품 수정 폼 HTML(resource/static/html/editForm.html)
+    ```Java
+    <!DOCTYPE HTML>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <link href="../css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            .container {
+                max-width: 560px;
+            } </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>상품 수정 폼</h2>
+        </div>
+        <form action="item.html" method="post">
+            <div>
+                <label for="id">상품 ID</label>
+                <input type="text" id="id" name="id" class="form-control" value="1" readonly></div>
+            <div>
+                <label for="itemName">상품명</label>
+                <input type="text" id="itemName" name="itemName" class="form-control" value="상품A">
+            </div>
+            <div>
+                <label for="price">가격</label>
+                <input type="text" id="price" name="price" class="form-control" value="10000">
+            </div>
+            <div>
+                <label for="quantity">수량</label>
+                <input type="text" id="quantity" name="quantity" class="form-control" value="10">
+            </div>
+            <hr class="my-4">
+            <div class="row">
+                <div class="col">
+                    <button class="w-100 btn btn-primary btn-lg" type="submit">저장
+                    </button>
+                </div>
+                <div class="col">
+                    <button class="w-100 btn btn-secondary btn-lg" onclick="location.href='item.html'" type="button">취소
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ``` 
+* #### 상품 목록 - 타임리프
+  * ##### BasicItemController
+    ```Java
+    package hello.itemservice01.domain.web.basic;
+
+    import hello.itemservice01.domain.item.Item;
+    import hello.itemservice01.domain.item.ItemRepository;
+    import lombok.RequiredArgsConstructor;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.ui.Model;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.PostMapping;
+    import org.springframework.web.bind.annotation.RequestMapping;
+
+    import java.util.List;
+
+    @Controller
+    @RequestMapping("/basic/items")
+    @RequiredArgsConstructor
+    public class BasicItemController {
+
+        private final ItemRepository itemRepository;
+
+        @GetMapping
+        public String items(Model model) {
+
+            List<Item> items = itemRepository.findAll();
+            model.addAttribute("items", items);
+
+            return "basic/items";
+        }
+
+        /**
+        * 테스트 데이터 추가
+        */
+        @PostMapping
+        public void init() {
+            itemRepository.save(new Item("itemA", 10000, 10));
+            itemRepository.save(new Item("itemB", 20000, 20));
+        }
+    }
+    ``` 
+    * 컨트롤러 로직은 itemRepository에서 모든 상품을 조회한 다음에 모델에 담는다. 그리고 뷰 템플릿을 호출한다.
+    * @RequiredArgsConstructor
+      * inal 이 붙은 멤버변수만 사용해서 생성자를 자동으로 만들어준다.
+        ```Java
+        public BasicItemController(ItemRepository itemRepository) 
+        {this.itemRepository = itemRepository;}
+        ``` 
+        * 이렇게 생성자가 딱 1개만 있으면 스프링이 해당 생성자에 @Autowired 로 의존관계를 주입해준다.
+        * 따라서 final 키워드를 빼면 안된다!, 그러면 ItemRepository 의존관계 주입이 안된다. 
+        * 스프링 핵심원리 - 기본편 강의 참고
+    * 테스트용 데이터 추가
+      * 테스트용 데이터가 없으면 회원 목록 기능이 정상 동작하는지 확인하기 어렵다.
+      * @PostConstruct : 해당 빈의 의존관계가 모두 주입되고 나면 초기화 용도로 호출된다.
+      * 여기서는 간단히 테스트용 테이터를 넣기 위해서 사용했다.
+  * ##### items.html 정적 HTML을 뷰 템플릿(templates) 영역으로 복사하고 다음과 같이 수정하자
+    * /resource/static/basic/items.html -> /resource/templates/basic/items.html
+      ```HTML
+      <!DOCTYPE HTML>
+      <html xmlns:th="http://www.thymeleaf.org">
+      <head>
+          <meta charset="utf-8">
+          <link href="../css/bootstrap.min.css"
+                th:href="@{/css/bootstrap.min.css}"
+                rel="stylesheet">
+      </head>
+      <body>
+      <div class="container" style="max-width: 600px">
+          <div class="py-5 text-center">
+              <h2>상품 목록</h2></div>
+          <div class="row">
+              <div class="col">
+                  <button class="btn btn-primary float-end"
+                          onclick="location.href='addForm.html'"
+                          th:onclick="|location.href='@{/basic/items/add}'|"
+                          type="button">상품 등록
+                  </button>
+              </div>
+          </div>
+          <hr class="my-4">
+          <div>
+              <table class="table">
+                  <thead>
+                  <tr>
+                      <th>ID</th>
+                      <th>상품명</th>
+                      <th>가격</th>
+                      <th>수량</th>
+                  </tr>
+                  </thead>
+                  <tbody>
+                  <tr th:each="item : ${items}">
+                      <td><a href="item.html" th:href="@{/basic/items/{itemId}(itemId=${item.id})}"
+                            th:text="${item.id}">회원id</a></td>
+                      <td><a href="item.html" th:href="@{|/basic/items/${item.id}|}" th:text="${item.itemName}">테스트 상품1</a>
+                      </td>
+                      <td th:text="${item.price}">10000</td>
+                      <td th:text="${item.quantity}">10</td>
+                  </tr>
+                  </tbody>
+              </table>
+          </div>
+      </div> <!-- /container -->
+      </body>
+      </html>
+      ```
+  * ##### 타임리프
+    * ###### 타임리프 사용 선언
+      * `<html xmlns:th="http://www.thyemleaf.org">`
+    * ###### 속성 변경 - th:href
+      * `th:href="@{/css/bootstrap.min.css}"`
+      * `href="value1"`을 `th:href="value2"`의 값으로 변경한다
+      * 타임리프 뷰 템플릿을 거치게 되면 원래 값은 `th:xxx`값으로 변경한다. 만약 값이 없다면 새로 생성한다.
+      * HTML을 그래도 볼 떄는 `href`속성이 사용되고, 뷰 템플릿을 거치면 `th:href`의 값이 `href`로 대체되면서 동적으로 변경할 수 있다.
+      * 대부분의 HTML속성을 `th:xxx`로 변경할 수 있다.
+    * ###### 타임리프 핵심
+      * 핵심은 `th:xxx`가 붙은 부분은 서버사이드에서 렌더링 되고, 기존 것을 대체한다. `th:xxx`이 없으면 기존 html의 `xxx`속성이 그대로 사용된다.
+      * HTML을 파일로 직접 열었을 때, `th:xxx`가 있어도 웹 브라우저는 `th:`속성을 알지 못하므로 무시한다.
+      * 따라서 HTML을 파일 보기를 유지하면서 템플릿 기능도 할 수 있다.
+    * ##### URL 링크 표현식 - @{...}
+      * `th:href="@{/css/bootstrap.min.css}"`
+        * `@{...}`: 타임리프는 URL 링크를 사용하는 경우 `@{...}`를 사용한다. 이것을 URL링크 표현식이라 한다.
+        * URL 링크 표현식을 사용하면 서블릿 컨텍스트를 자동으로 포함한다
+    * ##### 상품 등록 폼으로 이동
+      * ##### 속성 변경 - th:onclick
+        * `onclick="location.href='addForm.html'"`
+        * `th:onclicek="|location.href='@{/basic/items/add}'|"`
+          * 여기에는 다음에 설명하는 리터럴 대체 문법이 사용되었다. 자세히 알아보자
+    * ###### 리터럴 대체 - |...|
+      * 타임리프에서 문자와 표현식 등은 분리되어 있기 때문에 더해서 사용해야 한다
+        * `<span th:text="'Welcom to our application, ' + ${user.name} + '!'">`
+      * 다음과 같이 리터럴 대체 문법을 사용하면, 더하기 없이 편리하게 사용할 수 있다.
+        * `<spna th:text="|Wencom to our application, ${user.name}!|">`
+      * 결과를 다음과 같이 만들어야 하는데
+        * `location.href='/basic/items/add'`
+      * 그냥 사용하면 문자와 표현식을 각각 따로 더해서 사용해야 하므로 다음과 같이 복작해진다.
+        * `th:onclick="'location.href=' + '\'' + @{/basic/items/add| + '\'"`
+      * 리터럴 대체 문법을 사용하면 다음과 같이 편리하게 사용할 수 있다.
+        * `th:onclice="|location.hred='@{/basic/items/add}'|"`
+    * ###### 반복 출력 - th:each
+      * `<tr th:each="item : ${items}">`
+      * 반복은 `th:each`를 사용한다. 이렇게 하면 모델에 포함된 `items`컬렉션 데이터가 `item`변수에 하나씩 포함되고, 반복문 앞에서 `item`변수를 사용할 수 있다.
+      * 컬렉션의 수 만큼`<tr>...</tr>`이 하위 테그를 포함해서 생성된다
+    * ###### 변수 표현식 = ${...}
+      * `<td th:text="${item.price}">10000</td>`
+      * 모델에 포함된 값이나, 타임리프 변수로 선언한 값을 조회할 수 있다.
+      * 프로퍼티 접근법을 사용한다.(`item.getPrice()`)
+    * ###### 내용 변경 - th:text
+      * `<td th:text="${item.price}">10000</td>`
+      * 내용의 값을 `th:thext`의 값으로 변경한다
+      * 여기서는 10000을 `${item.price}의 값으로 변경한다`
+    * ###### URL 링크 표현식2 - @{...}
+      * `th:href="@{/basic/items/{itemId}(itemId=${item.id})}"`
+      * 상품 ID를 선택하는 링크를 확인해보자
+      * URL링크 표현식을 사용하면 경로를 템플릿처럼 편리하게 사용할 수 있다.
+      * 경로 변수(`{itemId}`)뿐만 아니라 쿼리 파라미터도 생성한다
+      * 예) `th:href="@{/basic/items/{itemId}(itemId=${item.id}, query='test')}"`
+        * 생성 링크: http://localhost:8080/basic/items/1?query=test
+    * ###### URL 링크 간단히
+      * `th:href="@{|/basic/items/${item.id}|}"`
+      * 상품 이름을 선택하는 링크를 확인해보자
+      * 리터럴 대체 문법을 활용해서 간단히 사용할 수도 있다
+    * 참고
+      *  타임리프는 순수 HTML을 파일을 웹 브라우저에서 열어도 내용을 확인할 수 있고, 서버를 통해 뷰 템플릿을 거치면 동적으로 변경된 결과를 확인할 수 있다. JSP를 생각해보면, JSP 파일은 웹 브라우저에서 그냥 열면 JSP 소스코드와 HTML이 뒤죽박죽 되어서 정상적인 확인이 불가능하다. 오직 서버를 통해서 JSP를 열어야 한다.이렇게 순수 HTML을 그대로 유지하면서 뷰 템플릿도 사용할 수 있는 타임리프의 특징을 네츄럴 템플릿 (natural templates)이라 한다.
+* #### 상품 상세
+  * 상품 상세 컨트롤러와 뷰를 개발하자
+  * ##### BasicItemController에 추가
+    ```Java
+    @GetMapping("/{itemId}")
+    public String item(@PathVariable Long itemId, Model model) {
+        Item item = itemRepository.findById(itemId);
+        model.addAttribute("item", item);
+
+        return "basic/item";
+    }
+    ```
+    * `PathVariable`로 넘어온 상품 ID로 상품을 조회하고, 모델에 담아둔다. 그리고 뷰 템플릿을 호출한다
+  * ##### 상품 상세 뷰
+    * 정적 HTML을 뷰 템플릭(templates)영역으로 복사하고 다음와 같이 수정하자
+    * `/resources/static/item.html` -> 복사 -> `/resources/templates/basic/item.html`
+      ```HTML
+      <!DOCTYPE HTML>
+      <html xmlns:th="http://www.thymeleaf.org">
+      <head>
+          <meta charset="utf-8">
+          <link href="../css/bootstrap.min.css"
+                th:href="@{/css/bootstrap.min.css}"
+                rel="stylesheet">
+          <style>         .container {
+              max-width: 560px;
+          } </style>
+      </head>
+      <body>
+      <div class="container">
+          <div class="py-5 text-center">
+              <h2>상품 상세</h2></div>
+          <div>
+              <label for="itemId">상품 ID</label>
+              <input type="text" id="itemId" name="itemId" class="form-control"
+                    value="1" th:value="${item.id}" readonly>
+          </div>
+          <div><label for="itemName">상품명</label>
+              <input type="text" id="itemName" name="itemName" class="form-control"
+                    value="상품A" th:value="${item.itemName}" readonly></div>
+          <div>
+              <label for="price">가격</label>
+              <input type="text" id="price" name="price" class="form-control"
+                    value="10000" th:value="${item.price}" readonly>
+          </div>
+          <div>
+              <label for="quantity">수량</label>
+              <input type="text" id="quantity" name="quantity" class="form-control"
+                    value="10" th:value="${item.quantity}" readonly>
+          </div>
+          <hr class="my-4">
+          <div class="row">
+              <div class="col">
+                  <button class="w-100 btn btn-primary btn-lg"
+                          onclick="location.href='editForm.html'"
+                          th:onclick="|location.href='@{/basic/items/{itemId}(itemId=${item.id})}'|"
+                          type="button">상품 수정
+                  </button>
+              </div>
+              <div class="col">
+                  <button class="w-100 btn btn-secondary btn-lg"
+                          onclick="location.href='items.html'"
+                          th:onclick="|location.href='@{/basic/items}'|"
+                          type="button">목록으로
+                  </button>
+              </div>
+          </div>
+      </div> <!-- /container -->
+      </body>
+      </html>
+      ```  
+  * ##### 속성 변경 - th:value
+    * `th:value="${item.id}"`
+    * 모델이 있는 item 정보를 획득하고 프로퍼티 접근법으로 출력한다. (`item.getId()`)
+    * `value`속성을 `th:value`속성으로 변경한다.
+* #### 상품 등록 폼
+  * ##### BasicItemController에 추가
+    ```Java
+    @GetMapping("/add")
+    public String addForm() {
+        return "basic/addForm";
+    }
+    ```
+    * 상품 등록 폼은 단순시 뷰 템플릿만 호출한다
+  * ##### 상품 등록 폼 뷰
+    * 정적 HTML을 뷰 템플릿(templates) 영역으로 복사하고 다음과 같이 수정하자.
+      * `/resources/static/addForm.html` -> 복사 -> `/resources/templates/basic/addForm.html`
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+        <link href="../css/bootstrap.min.css"
+              th:href="@{/css/bootstrap.min.css}" rel="stylesheet">
+        <style>
+            .container {
+                max-width: 560px;
+            } </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>상품 등록 폼</h2></div>
+        <h4 class="mb-3">상품 입력</h4>
+        <form action="item.html" th:action method="post">
+            <div><label for="itemName">상품명</label>
+                <input type="text" id="itemName" name="itemName" class="form-control" placeholder="이름을 입력하세요"></div>
+            <div>
+                <label for="price">가격</label>
+                <input type="text" id="price" name="price" class="form-control" placeholder="가격을 입력하세요">
+            </div>
+            <div>
+                <label for="quantity">수량</label>
+                <input type="text" id="quantity" name="quantity" class="form-control" placeholder="수량을 입력하세요"></div>
+            <hr class="my-4">
+            <div class="row">
+                <div class="col">
+                    <button class="w-100 btn btn-primary btn-lg" type="submit">상품
+                        등록
+                    </button>
+                </div>
+                <div class="col">
+                    <button class="w-100 btn btn-secondary btn-lg"
+                            onclick="location.href='items.html'"
+                            th:onclick="|location.href='@{/basic/items}'|"
+                            type="button">취소
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```  
+    * ##### 속성 변경 - th:action
+      * `th:action`
+      * HTML form에서 `action`에 값이 없으면 현재 URL에 데이터를 전송한다
+      * 상품 등록 폼의 URL과 실제 상품 등록을 처리하는 URL을 똑같이 맞추고 HTTP 메서드로 두 기능을 구분한다
+        * 상품 등록 폼: `GET /basic/items/add`
+        * 상품 등록 처리: `POST /basic/items/add`
+      * 이렇게 하면 하나의 URL로 등록 폼과, 등록 처리를 깔끔하게 처리할 수 있다.
+* #### 상품 등록 처리 - @ModelAttribute
+  * 이제 상품 등록 폼에서 전달된 데이터로 실제 상품을 등록 처리해보자
+  * 상품 등록 폼은 다음 방식으로 서버에 데이터를 전당한다
+    * `POST-HTML Form`
+    * `Content-Type: application/x-www-form-urlencoded`
+    * 메세지 바디에 쿼리 바라미터 형식으로 전달 `itemName=itemA&price=10000&quantity=10`
+  * 요청 파라미터 형식을 처리해야 하므로 `@RequestParam`을 사용하자
+  * ##### addItemV1 - BasicItemController에 추가
+    ```Java
+    @PostMapping("/add")
+    public String addItemV1(@RequestParam String itemName,
+                            @RequestParam Integer price,
+                            @RequestParam Integer quantity,
+                            Model model) {
+
+        Item item = new Item();
+        item.setItemName(itemName);
+        item.setPrice(price);
+        item.setQuantity(quantity);
+
+        itemRepository.save(item);
+
+        model.addAttribute("item", item);
+
+        return "/basic/item";
+    }
+    ```
+    * 먼저 `@RequestParam String itemNaem`: itemName 요청 파라미터 데이터를 해당 변수에 받는다.
+    * `Item`객체를 생성하고 `itemRepository`를 통해서 저장한다
+    * 저장된 `item`을 모델에 담아서 뷰에 전달한다
+    * 여기서는 상품 상세에서 적용한 `item.html`뷰 템플릿을 그대로 재활용한다
+  * ##### 상품 등록 처리 - @ModelAttribute
+    * `@RequestParam`으로 변수를 하나하나 받아서 `Item`을 생성하는 과정은 불편하다
+    * 이번에는 `@ModelAttribute`를 사용해서 한번에 처리해보자
+  * ##### addItemV2 - 상품 등록 처리 - ModelAttribute
+    ```Java
+    /**
+     * @ModelAttribute("item") Item item
+     * model.addAttribute("item", item);  //자동 추가
+     */
+
+    @PostMapping("/add")
+    public String addItemV2(@ModelAttribute("item") Item item, Model model) {
+        itemRepository.save(item);
+        //model.addAttribute("item", item);
+
+        return "/basic/item";
+    }
+    ```
+    * ###### ModelAttribute - 요청 파라미터 처리
+      * `@ModelAttribute`는 `Item`객체를 생성하고, 요청 파라미어의 값을 프로퍼티 접근법(setXxx)으로 입력해준다
+    * ###### ModelAttribute - Model 추가
+      * `@ModelAttribute`는 중요한 한가지 지능이 더 있는데, 바로 모델(Model)에 `@ModelAttribute`로 지정한 객체를 자동으로 넣어준다. 지금 코드를 보면 `model.addAttribute("item", item)`가 주석처리 되어 있어도 잘 동작하는 것을 확인할 수 있다.
+      * 모델에 데이터를 담을 때는 이름이 필요하다. 이름은 `@ModetAttribute`에 지정한 `name(value)`속성을 사용한다. 만약 다음과 같이 `@ModelAttribute`의 이름을 다르게 지정한다면 다른 이름으로 모델에 포함된다
+        * `@ModelAttribute("hello") Item item` -> 이름을 `hello`로 지정
+        * `model.addAttribute("hello", item)` -> 모델에 `hello`이름으로 저장
+      * 주의
+        * 실행전에 이전 버전의 `addItemV1`에 `@PostMapping("/add")`를 꼭 주석처리 해주어야 한다. 그렇지 않으면 중복 매핑으로 오류가 발생한다
+  * ##### addItemV3 - 상품 등록 처리 - ModelAttribute 이름 생략
+    ```Java
+    /**
+     * @ModelAttribute name 생략 가능
+     * model.addAttribute(item); 자동 추가, 생략 가능
+     * 생략시 model에 저장되는 name은 클래스명 첫글자만 소문자로 등록 Item -> item
+     */
+    @PostMapping("/add")
+    public String addItemV3(@ModelAttribute Item item) {
+        itemRepository.save(item);
+
+        return "/basic/item";
+    }
+    ```
+    * 주의
+      * `@ModelAttribute`의 이름을 생략하면 모델에 저장될 때 클래스명을 사용한다. 이때 `클래스의 첫글자만 소문자로 변경`해서 등록한다
+      * 예) `@ModelAttribute` 클래스명 -> 모델에 자동 추가되는 이름
+      * `Item` -> `item`
+      * `HelloWorld` -> `helloWorld`
+  * ##### addItemV4 - 상품 등록 처리 - ModelAttribute 전체 생량
+    ```Java
+    /**
+     * @ModelAttribute 자체 생량 가능
+     * model.addAttribute(item) 자동 추가
+     */
+    @PostMapping("/add")
+    public String addItemV4(Item item) {
+        itemRepository.save(item);
+
+        return "/basic/item";
+    }
+    ```
+    * `@ModelAttribute`자체도 생략이 가능하다. 대상 객체는 모델에 자동 등록된다. 나머지 사항은 기존과 동일하다  
+* #### 상품 수정
+  * ##### BasicItemController에 추가
+    ```Java
+    @GetMapping("/{itemId}/edit")
+    public String editForm(@PathVariable Long id, Model model) {
+        Item item = itemRepository.findById(id);
+        model.addAttribute("item", item);
+
+        return "/basic/editForm";
+    }
+    ```
+    * 수정에 필요한 정보를 조회하고, 수정용 폼 뷰를 호출한다
+  * ##### 상품 수정 폼 뷰
+    * 정적 HTML을 뷰 템플릿(templates) 영역으로 복사하고 다음과 같이 수정하자.
+      *  `/resources/static/editForm.html` -> 복사 -> `/resources/templates/basic/editForm.html`
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+        <link href="../css/bootstrap.min.css"
+              th:href="@{/css/bootstrap.min.css}"
+              rel="stylesheet">
+        <style>
+            .container {
+                max-width: 560px;
+            } </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>상품 수정 폼</h2>
+        </div>
+        <form action="item.html" th:action method="post">
+            <div>
+                <label for="id">상품 ID</label>
+                <input type="text" id="id" name="id" class="form-control" value="1"  th:value="${item.id}" readonly></div>
+            <div>
+                <label for="itemName">상품명</label>
+                <input type="text" id="itemName" name="itemName" class="form-control" value="상품A" th:value="${item.itemName}">
+            </div>
+            <div>
+                <label for="price">가격</label>
+                <input type="text" id="price" name="price" class="form-control" value="10000" th:value="${item.price}">
+            </div>
+            <div>
+                <label for="quantity">수량</label>
+                <input type="text" id="quantity" name="quantity" class="form-control" value="10" th:value="${item.quantity}">
+            </div>
+            <hr class="my-4">
+            <div class="row">
+                <div class="col">
+                    <button class="w-100 btn btn-primary btn-lg" type="submit">저장
+                    </button>
+                </div>
+                <div class="col">
+                    <button class="w-100 btn btn-secondary btn-lg"
+                            onclick="location.href='item.html'"
+                            th:href="|location.href='@{/basic/items/{itemId}(itemId=${item.id})}'|"
+                            type="button">취소
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```    
+  * ##### 상품 수정 개발
+    ```Java
+    @PostMapping("/{itemId}/edit")
+    public String edit(@PathVariable Long itemId, @ModelAttribute Item item) {
+
+        itemRepository.update(itemId, item);
+        return "redirect:/basic/items/{itemId}";
+    }
+    ```
+    * 상품 수정은 상품 등록과 전체 프로세스가 유사하다
+      * `GET /items/{itemId}/edit`:상품수정폼 
+      * `POST /items/{itemId}/edit` : 상품 수정 처리 
+  * ##### 리다이렉트
+    * 상품 주성은 마지막 뷰 템플릿을 호출하는 대신에 상품 상세 화면으로 이동하도록 리다이렉트를 호풀한다.
+    * 스프링은 `redirect:/....`으로 편리하게 리다이텍트를 지원한다.
+    * `redircet:/basic/items/{itemId}`
+      * 컨트롤러에 매핑된 `@PathVariable`의 값은 `redirect`에도 사용할 수 있다.
+      * `redirect:/basic/items/{itemId}` -> `{itemId}`는 `@PathVariable Long itemId`의 값을 그대로 사용한다
+    * 참고
+      * HTML Form 전송은 PUT, PATCH를 지원하지 않는다. GET, POST만 사용할 수 있다. PUT, PATCH는 HTTP API 전송시에 사용 스프링에서 HTTP POST로 Form 요청할 때 히든 필드를 통해서 PUT, PATCH 매핑을 사용하는 방법이 있지만, HTTP 요청상 POST 요청이다.
+* #### PRG(Post/Redirect/Get)
+  * 사실 지금까지 진행한 상품 등록 처리 컨트롤러는 심각한 문제가 있다. (addItemV1 ~  addItemV4) 상품 등록을 완료하고 웹 브라우저의 새로고침 버튼을 클릭해보자. 상품이 계속해서 중복 등록되는 것을 확인할 수 있다.
+    ![](img/img246.png) 
+  * 그 이유는 다음 그림을 통해서 확인할 수 있다
+    ![](img/img247.png)  
+    
+* #### RedirectAttribute
