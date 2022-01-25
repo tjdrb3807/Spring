@@ -9069,3 +9069,763 @@
     * 참고
       * `HttpMessageConverter`단계에서 실패하면 예외가 발생한다. 예외 발생시 원하는 모양으로 예외를 처리하는 방법은 예외 처리 부분에서 다룬다.
 ---
+* ### 로그인 처리1 - 쿠키, 세션
+* #### 로그인 요구사항
+  * 홈 화면 - 로그인 전
+    * 회원 가입
+    * 로그인
+  * 홈 화면 - 로그인 후
+    * 본인 이름(누구님 환영합니다.)
+    * 상품 관리
+    * 로그 아웃
+  * 보안 요구사항
+    * 로그인 사용자만 상품에 접근하고, 관리할 수 있음
+    * `로그인 하지 않은 사용자가 상품 관리에 접근하면 로그인 화면으로 이동`
+  * 회원 가입, 상품 관리
+* #### 프로젝트 생성
+  * ##### 패키지 구조 설계
+    * hello.login
+      * domain
+        * item
+        * member
+        * login
+      * web
+        * item
+        * member
+        * login
+  * ##### 도메인이 가장 중요하다.
+    * 도메인: 화면, UI, 기술 인프라 등등의 영역을 제외한 시스템이 구현해야 하는 핵심 비즈니스 업무 영역을 말한다.
+    * 향후 web을 다은 기술로 바꾸어도 도메인은 그대로 유지할 수 있어야 한다.
+    * 이렇게 하려면 web은 domain을 알고있지만 domain은 web을 모르도록 설계해야 한다. 
+      * 이것을 `web은 domain을 의존하지만, domain은 web을 의존하지 않는다.`라고 표현한다.
+      * 예를들어 web 패키지를 모두 삭제해도 domain에는 전혀 영향이 없도록 의존관계를 설계하는 것이 중요하다. 반대로 이야기하면 `domain은 web을 참조하면 안된다.`
+* #### 홈 화면
+  * ##### HomeController-home() 수정
+    ```Java
+    package hello.login.web;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.GetMapping;
+
+    @Slf4j
+    @Controller
+    public class HomeController {
+
+        @GetMapping("/")
+        public String home() {
+            return "home";
+        }
+    }
+    ```
+  * ##### templatees/home.html 추가
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+        <link th:href="@{/css/bootstrap.min.css}"
+              href="css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>홈 화면</h2></div>
+        <div class="row">
+            <div class="col">
+                <button class="w-100 btn btn-secondary btn-lg" type="button"
+                        th:onclick="|location.href='@{/members/add}'|">
+                    회원 가입
+                </button>
+            </div>
+            <div class="col">
+                <button class="w-100 btn btn-dark btn-lg"
+                        onclick="location.href='items.html'"
+                        th:onclick="|location.href='@{/login}'|" type="button">
+                    로그인
+                </button>
+            </div>
+        </div>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```  
+  * ##### 회원 가입
+    * ###### Member
+      ```Java 
+      package hello.login.domain.member;
+
+      import lombok.Data;
+
+      import javax.validation.constraints.NotEmpty;
+
+      @Data
+      public class Member {
+
+          private Long id;
+          @NotEmpty
+          private String loginId; //로그인 ID
+          @NotEmpty
+          private String name; //사용자 이름
+          @NotEmpty
+          private String password;
+      }
+      ```
+    * ###### MemberRespository
+      ```Java
+      package hello.login.domain.member;
+
+      import lombok.extern.slf4j.Slf4j;
+      import org.springframework.stereotype.Repository;
+
+      import java.util.*;
+
+      /**
+      * 동시성 문제가 고려되어 있지 않음, 실무에서는 ConcurrentHashMap, AtomicLong 사용 고려
+      */
+      @Slf4j
+      @Repository
+      public class MemberRepository {
+
+          private static Map<Long, Member> store = new HashMap<>();
+          private static Long sequence = 0L;
+
+          public Member save(Member member) {
+
+              member.setId(++sequence);
+              log.info("save: member={}", member);
+              store.put(member.getId(), member);
+
+              return member;
+          }
+
+          public Member finById(Long id) {
+
+              return store.get(id);
+          }
+
+          public Optional<Member> findByLoginId(String loginId) {
+              return findAll().stream()
+                      .filter(m -> m.getLoginId().equals(loginId))
+                      .findFirst();
+          }
+
+          public List<Member> findAll() {
+              return new ArrayList<Member>(store.values());
+          }
+
+          public void clearStore() {
+              store.clear();
+          }
+      }
+      ```
+    * ###### MemberController
+      ```Java
+      package hello.login.web.member;
+
+      import hello.login.domain.member.Member;
+      import hello.login.domain.member.MemberRepository;
+      import lombok.RequiredArgsConstructor;
+      import org.springframework.stereotype.Controller;
+      import org.springframework.validation.BindingResult;
+      import org.springframework.web.bind.annotation.GetMapping;
+      import org.springframework.web.bind.annotation.ModelAttribute;
+      import org.springframework.web.bind.annotation.PostMapping;
+      import org.springframework.web.bind.annotation.RequestMapping;
+
+      import javax.validation.Valid;
+
+      @Controller
+      @RequiredArgsConstructor
+      @RequestMapping("/members")
+      public class MemberController {
+
+          private static MemberRepository memberRepository;
+
+          @GetMapping("/add")
+          public String addForm(@ModelAttribute("member") Member member) {
+
+              return "members/addMemberForm";
+          }
+
+          @PostMapping("/add")
+          public String save(@Valid @ModelAttribute Member member, BindingResult bindingResult) {
+
+              if (bindingResult.hasErrors()) {
+                  return "members/addMemberForm";
+              }
+
+              memberRepository.save(member);
+              return "redirect:/";
+          }
+      }
+      ```
+      * `@ModelAttribute("member")` 를 `@ModelAttribute` 로 변경해도 결과는 같다. 여기서는 IDE에서 인식 문제가 있어서 적용했다.    
+    * ###### 회원 가입 뷰 템플릭 - templates/members/addMemberForm.html
+      ```HTML
+      <!DOCTYPE HTML>
+      <html xmlns:th="http://www.thymeleaf.org">
+      <head>
+          <meta charset="utf-8">
+          <link th:href="@{/css/bootstrap.min.css}"
+                href="../css/bootstrap.min.css" rel="stylesheet">
+          <style>
+              .container {
+                  max-width: 560px;
+              }
+
+              .field-error {
+                  border-color: #dc3545;
+                  color: #dc3545;
+              }
+          </style>
+      </head>
+      <body>
+      <div class="container">
+          <div class="py-5 text-center"><h2>회원 가입</h2>
+          </div>
+          <h4 class="mb-3">회원 정보 입력</h4>
+          <form action="" th:action th:object="${member}" method="post">
+              <div th:if="${#fields.hasGlobalErrors()}">
+                  <p class="field-error" th:each="err : ${#fields.globalErrors()}"
+                    th:text="${err}">전체 오류 메시지</p></div>
+              <div>
+                  <label for="loginId">로그인 ID</label>
+                  <input type="text" id="loginId" th:field="*{loginId}" class="form-control"
+                        th:errorclass=" field-error">
+                  <div class="field-error" th:errors="*{loginId}"/>
+              </div>
+              <div>
+                  <label for="password">비밀번호</label>
+                  <input type="password" id="password" th:field="*{password}"
+                        class="form-control"
+                        th:errorclass="field-error">
+                  <div class="field-error" th:errors="*{password}"/>
+              </div>
+              <div>
+                  <label for="name">이름</label>
+                  <input type="text" id="name" th:field="*{name}" class="form-control"
+                        th:errorclass=" field-error">
+                  <div class="field-error" th:errors="*{name}"/>
+              </div>
+              <hr class="my-4">
+              <div class="row">
+                  <div class="col">
+                      <button class="w-100 btn btn-primary btn-lg" type="submit">회원
+                          가입
+                      </button>
+                  </div>
+                  <div class="col">
+                      <button class="w-100 btn btn-secondary btn-lg"
+                              onclick="location.href='items.html'"
+                              th:onclick="|location.href='@{/}'|" type="button">취소
+                      </button>
+                  </div>
+              </div>
+          </form>
+      </div> <!-- /container -->
+      </body>
+      </html>
+      ```  
+    * ##### 회원용 테스트 데이터 추가
+      ```Java
+      package hello.login;
+
+      import hello.login.domain.item.Item;
+      import hello.login.domain.item.ItemRepository;
+      import hello.login.domain.member.Member;
+      import hello.login.domain.member.MemberRepository;
+      import lombok.RequiredArgsConstructor;
+      import org.springframework.stereotype.Component;
+
+      import javax.annotation.PostConstruct;
+
+      @Component
+      @RequiredArgsConstructor
+      public class TestDataInit {
+
+          private final ItemRepository itemRepository;
+          private final MemberRepository memberRepository;
+
+          /**
+          * 테스트용 데이터 추가
+          */
+          @PostConstruct
+          public void init() {
+              itemRepository.save(new Item("itemA", 10000, 10));
+              itemRepository.save(new Item("itemB", 20000, 20));
+
+              Member member = new Member();
+              member.setLoginId("junsung3807");
+              member.setName("전성규");
+              member.setPassword("^^qkdrmt1386");
+
+              memberRepository.save(member);
+          }
+      }
+      ```
+      ```
+      save: member=Member(id=1, loginId=junsung3807, name=전성규, password=^^qkdrmt1386)
+      ```
+* #### 로그인 기능
+  * ##### LoginService
+    ```Java
+    package hello.login.domain.login;
+
+    import hello.login.domain.member.Member;
+    import hello.login.domain.member.MemberRepository;
+    import lombok.RequiredArgsConstructor;
+    import org.springframework.stereotype.Service;
+
+    @Service
+    @RequiredArgsConstructor
+    public class LoginService {
+
+        private final MemberRepository memberRepository;
+
+        /**
+        * @return null 이면 로그인 실패
+        */
+        public Member login(String loginId, String password) {
+
+            return memberRepository.findByLoginId(loginId)
+                    .filter(m -> m.getPassword().equals(password))
+                    .orElse(null);
+        }
+    }
+    ``` 
+    * 로그인의 핵심 비즈니스 로직은 회원을 조회한 다음에 파라미터로 넘어온 password와 비교해서 같으면 회원을 반환하고, 만약 password가 다르면 null 을 반환한다.
+  * ##### LoginForm
+    ```Java
+    package hello.login.web.login;
+
+    import lombok.Data;
+
+    import javax.validation.constraints.NotEmpty;
+
+    @Data
+    public class LoginForm {
+
+        @NotEmpty
+        private String loginId;
+        @NotEmpty
+        private String password;
+    }
+    ```
+  * ##### LoginController
+    ```Java
+    package hello.login.web.login;
+
+    import hello.login.domain.login.LoginService;
+    import hello.login.domain.member.Member;
+    import lombok.RequiredArgsConstructor;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.validation.BindingResult;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.ModelAttribute;
+    import org.springframework.web.bind.annotation.PostMapping;
+
+    import javax.validation.Valid;
+
+    @Slf4j
+    @Controller
+    @RequiredArgsConstructor
+    public class LoginController {
+
+        private final LoginService loginService;
+
+        @GetMapping("/login")
+        public String loginForm(@ModelAttribute("loginForm") LoginForm form) {
+
+            return "login/loginForm";
+        }
+
+        @PostMapping("/login")
+        public String login(@Valid @ModelAttribute LoginForm form, BindingResult bindingResult) {
+
+            if (bindingResult.hasErrors()) {
+                return "login/loginForm";
+            }
+
+            Member loginMember = loginService.login(form.getLoginId(), form.getPassword());
+            log.info("login? {}", loginMember);
+            if (loginMember == null) {
+                bindingResult.reject("loginFail", "아이디 또는 비밀번호가 맞지 않습니다.");
+                return "login/loginForm";
+            }
+
+            //로그인 성공 처리 TODO
+            return "redirect:/";
+        }
+    }
+    ```
+    * 로그인 컨트롤러는 로그인 서비스를 호출해서 로그인에 성공하면 홈 화면으로 이동하고, 로그인에 실패하면 `bindingResult.reject()` 를 사용해서 글로벌 오류(`ObjectError`)를 생성한다. 그리고 정보를 다시 입력하도록 로그인 폼을 뷰 템플릿으로 사용한다.  
+  * ##### 로그인 폼 뷰 템플릿 - templates/login/loginFrom.html
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+        <link th:href="@{/css/bootstrap.min.css}"
+              href="../css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            .container {
+                max-width: 560px;
+            }
+
+            .field-error {
+                border-color: #dc3545;
+                color: #dc3545;
+            }
+        </style>
+    </head>
+    <body>
+    <div class="container">
+        <div class="py-5 text-center">
+            <h2>로그인</h2></div>
+        <form action="item.html" th:action th:object="${loginForm}" method="post">
+            <div th:if="${#fields.hasGlobalErrors()}">
+                <p class="field-error" th:each="err : ${#fields.globalErrors()}"
+                  th:text="${err}">전체 오류 메시지</p></div>
+
+            <div>
+                <label for="loginId">로그인 ID</label>
+                <input type="text" id="loginId" th:field="*{loginId}" class="form-control"
+                      th:errorclass=" field-error">
+                <div class="field-error" th:errors="*{loginId}"/>
+            </div>
+            <div>
+                <label for="password">비밀번호</label>
+                <input type="password" id="password" th:field="*{password}"
+                      class="form-control"
+                      th:errorclass="field-error">
+                <div class="field-error" th:errors="*{password}"/>
+            </div>
+            <hr class="my-4">
+            <div class="row">
+                <div class="col">
+                    <button class="w-100 btn btn-primary btn-lg" type="submit">
+                        로그인
+                    </button>
+                </div>
+                <div class="col">
+                    <button class="w-100 btn btn-secondary btn-lg"
+                            onclick="location.href='items.html'" th:onclick="|location.href='@{/}'|" type="button">취소
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ``` 
+    * 실행
+      * 실행해보면 로그인이 성공하면 홈으로 이동하고, 로그인에 실패하면 "아이디 또는 비밀번호가 맞지 않습니다."라는 경고와 함께 로그인 폼이 나타난다.
+      * 그런데 아직 로그인이 되면 홈 화면에 고객 이름이 보여야 한다는 요구사항을 만족하지 못한다. 로그인의 상태를 유지하면서, 로그인에 성공한 사용자는 홈 화면에 접근시 고객의 이름을 보여주려면 어떻게 해야할까?
+* #### 로그인 처리하기 - 쿠키 사용
+  * 쿠키를 사용해서 로그인, 로그아웃 기능을 구현해보자.
+  * 로그인 상태 유지하기
+    * 로그인의 상태를 어떻게 유지할 수 있을까?
+    * HTTP 강의에서 일부 설명했지만, 쿼리 파라미터를 계속 유지하면서 보내는 것은 매우 어렵고 번거로운 작업이다. 쿠키를 사용해보자.
+  * ##### 쿠키
+    * 서버에서 로그인에 성공하면 HTTP 응답에 쿠키를 담아서 브라우저에 전달하자. 그러면 브라우저는 앞으로 해당 쿠키를 지속해서 보내준다.
+    * 쿠키 생성
+      ![](img/img252.png)
+    * 클라이언트 쿠키 전달1
+      ![](img/img253.png)
+    * 클라이언트 쿠키 전달2
+      ![](img/img254.png)   
+    * 쿠키에는 영속성 쿠키와 세션 쿠키가 있다.
+      * 영속성 쿠키: 만료 날짜를 입력하면 해당 날짜까지 유지
+      * 세션 쿠키: 만료 날짜를 생략하면 브라우저 종료시 까지만 유지
+  * ##### LoginController-login()_로그인 성공시 세션 쿠리를 생성
+    ```Java
+    @PostMapping("/login")
+    public String login(@Valid @ModelAttribute LoginForm form, BindingResult bindingResult, HttpServletResponse response) {
+
+        Member loginMember = loginService.login(form.getLoginId(), form.getPassword());
+        log.info("login? {}", loginMember);
+        if (loginMember == null) {
+            bindingResult.reject("loginFail", "아이디 혹은 비밀번호가 맞지 않습니다.");
+
+            return "login/loginForm";
+        }
+
+        //로그인 성공 처리
+
+        //쿠키에 시간 정보를 주지 않으면 세션 쿠키(브라우저 종료시 모두 종료)
+        Cookie idCookie = new Cookie("memberId", String.valueOf(loginMember.getId()));
+        response.addCookie(idCookie);
+
+        return "redirect:/";
+    }
+    ```
+    * ###### 쿠키 생성 로직
+      ```Java
+      Cookie idCookie = new Cookie("memberId", String.valueOf(loginMember.getId()));
+      response.addCookie(idCookie);
+      ``` 
+      * 로그인에 성공하면 쿠키를 생성하고 `HttpServletResponse` 에 담는다. 쿠키 이름은 `memberId` 이고, 값은 회원의 id를담아둔다.웹브라우저는종료전까지회원의 id를서버에계속보내줄것이다.
+  * ##### 홈 - 로그인 처리
+    ```Java
+    package hello.login.web;
+
+    import hello.login.domain.member.Member;
+    import hello.login.domain.member.MemberRepository;
+    import lombok.RequiredArgsConstructor;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.ui.Model;
+    import org.springframework.web.bind.annotation.CookieValue;
+    import org.springframework.web.bind.annotation.GetMapping;
+
+    @Slf4j
+    @Controller
+    @RequiredArgsConstructor
+    public class HomeController {
+
+        private final MemberRepository memberRepository;
+
+        @GetMapping("/")
+        public String homeLogin(@CookieValue(name = "memberId", required = false) Long memberId, Model model) {
+
+            if (memberId == null) {
+                return "home";
+            }
+
+            Member loginMember = memberRepository.finById(memberId);
+            if (loginMember == null) {
+                return "home";
+            }
+
+            model.addAttribute("member", loginMember);
+            return "loginHome";
+        }
+    }
+    ```
+    * `@CookieValue` 를 사용하면 편리하게 쿠키를 조회할 수 있다.
+    * 로그인 하지 않은 사용자도 홈에 접근할 수 있기 때문에 `required = false` 를 사용한다.
+    * ###### 로직 분석
+      * 로그인 쿠키(`memberId`)가 없는 사용자는 기존 `home` 으로 보낸다. 추가로 로그인 쿠키가 있어도 회원이 없으면 `home` 으로 보낸다.
+      * 로그인 쿠키(`memberId`)가 있는 사용자는 로그인 사용자 전용 홈 화면인 `loginHome` 으로 보낸다. 추가로 홈 화면에 화원 관련 정보도 출력해야 해서 `member` 데이터도 모델에 담아서 전달한다.
+  * ##### 홈 - 로그인 사용자 전용 _ templates/loginHome.html
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+        <link th:href="@{/css/bootstrap.min.css}"
+              href="../css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>홈 화면</h2></div>
+        <h4 class="mb-3" th:text="|로그인: ${member.name}|">로그인 사용자 이름</h4>
+        <hr class="my-4">
+        <div class="row">
+            <div class="col">
+                <button class="w-100 btn btn-secondary btn-lg" type="button"
+                        th:onclick="|location.href='@{/items}'|">
+                    상품 관리
+                </button>
+            </div>
+            <div class="col">
+                <form th:action="@{/logout}" method="post">
+                    <button class="w-100 btn btn-dark btn-lg"
+                            onclick="location.href='items.html'" type="submit"> 로그아웃
+                    </button>
+                </form>
+            </div>
+        </div>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+    * `th:text="|로그인: ${member.name}|"` : 로그인에 성공한 사용자 이름을 출력한다.
+    *  상품 관리, 로그아웃 버튼을 노출한다.
+    *  실행
+       * 로그인에 성공하면 사용자 이름이 출력되면서 상품 관리, 로그아웃 버튼을 확인할 수 있다. 로그인에 성공시 세션 쿠키가 지속해서 유지되고, 웹 브라우저에서 서버에 요청시 `memberId` 쿠키를 계속 보내준다.
+  * ##### 로그아웃 기능
+    * 세션 쿠키이므로 웹 브라우저 종료시
+    * 서버에서 해당 쿠키의 종료 날짜를 0으로 지정
+  * ##### LoginController-logout 기능 추가 
+    ```Java
+    package hello.login.web.login;
+
+    import hello.login.domain.login.LoginService;
+    import hello.login.domain.member.Member;
+    import lombok.RequiredArgsConstructor;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.validation.BindingResult;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.ModelAttribute;
+    import org.springframework.web.bind.annotation.PostMapping;
+
+    import javax.servlet.http.Cookie;
+    import javax.servlet.http.HttpServletResponse;
+    import javax.validation.Valid;
+
+    @Slf4j
+    @Controller
+    @RequiredArgsConstructor
+    public class LoginController {
+
+        private final LoginService loginService;
+
+        @PostMapping("/logout")
+        public String logout(HttpServletResponse response) {
+
+            expireCookie(response, "memberId");
+            return "redirect:/";
+        }
+
+        private void expireCookie(HttpServletResponse response, String cookieName) {
+
+            Cookie cookie = new Cookie(cookieName, null);
+            cookie.setMaxAge(0);
+            response.addCookie(cookie);
+        }
+    }
+    ``` 
+* #### 쿠키와 보안 문제
+  * 쿠키를 사용해서 로그인Id를 전달해서 로그인을 유지할 수 있었다. 그런데 여기에는 심각한 보안 문제가 있다.
+  * ##### 보안 문제
+    * 쿠키 값은 임의로 변경할 수 있다
+      * 클라이언트가 쿠키를 강제로 변경하면 다른 사용자가 된다.
+      * 실제 웹 브라우저 개발자모드 -> Application -> Cookie 변경으로 확인
+      * `Cookie: memberId=1` -> `Cookie: memberId=2`(다른 사용자의 이름이 보임)
+    * 쿠키에 보관된 정보는 훔쳐갈 수 있다.
+      * 만약 쿠키에 개인정보나, 신용카드 정보가 있다면?
+      * 이 정보가 웹 브라우저에도 보관되고, 네트워크 요청마다 계속 클라이언트에서 서버로 전달된다.
+      * 쿠키의 정보가 나의 로컬PC가 털릴 수 있고, 네트워크 전송 구간에서 털릴 수 있다.
+    * 헤커가 쿠키를 한번 훔쳐가면 평생 사용할 수 있다.
+      * 헤커가 쿠키를 훔쳐가서 크 쿠키로 악의적인 요청을 계속 시도할 수 있다.
+  * #### 대안
+    * 쿠키에 중요한 값을 노출하지 않고, 사용자 별로 예측 불가능한 임의의 토큰(랜덤 값)을 노출하고, 서버에서 토큰과 사용자 id를 매핑해서 인식한다. 그리고 서버에서 토큰을 관리한다.
+    * 토큰은 해커가 임의의 값을 넣어도 찾을 수 없도록 예상 불가능 해야 한다
+    * 해커가 토큰을 털어가도 시간이 지나면 사용할 수 없도록 서버에서 해당 토큰의 만료시간을 짧게(예: 30분)유지한다. 또는 해킹이 의심되는 경우 서버에서 해당 토큰을 강제로 제거하면 된다.
+* #### 로그인 처리하기 - 세션 동작 방식
+  * 목표
+    * 앞서 쿠키에 중요한 정보를 보관하는 방법은 여러가지 보안 이슈가 있었다. 이 문제를 해결하려면 결국 중요한 정보를 모두 서버에 저장해야 한다. 그리고 클라이언트와 서버는 추정 불가능한 임의의 식별자 값으로 연결해야 한다.
+    * 이렇게 서버에 중요한 정보를 보관하고 연결을 유지하는 방법을 `세션`이라 한다.
+    * 로그인
+      ![](img/img255.png)
+      * 사용자가 `loginId`, `password`정보를 전달하면 서버에서 해당 사용자가 맞는지 확인한다.
+    * 세션 생성
+      ![](img/img256.png)
+      * 세션 ID를 생성하는데, 추정 불가능해야 한다.
+      * `UUID는 추정이 불가능하다.`
+        * `Cookie: mySessionId=zsdfasd-123asds-asdfa-3fdasdf`
+      * 생성된 세선 ID와 세션에 보관할 값(memberA)을 서버의 세션 저장소에 보관한다.
+    * 세션 id를 응답 쿠키로 전달
+      ![](img/img257.png)
+      * 클라이언트와 서버는 결국 쿠키로 연결이 되어야 한다.
+      * 서버는 클라이언트에 `mySessionId`라는 이름으로 세션ID만 쿠키에 담아서 전달한다.
+      * 클라이언트는 쿠키 저장소에 `mySessionId`쿠키를 보관한다.
+    * 중요
+      * 여기서 중요한 포인트는 회원과 관련된 정보는 전혀 클라이언트에 전달하지 않는다는 것이다.
+      * 오직 추정 불가능한 세션ID만 쿠키를 통해서 클라이언트에 전달한다
+    * 클라이언트의 세션id 쿠키 전달
+      ![](img/img258.png)  
+      * 클라이언트는 요청시 항상 `mySessionId`쿠키를 전달한다.
+      * 서버에서는 클라이언트가 전달한 `mySessionId`쿠키 정보로 세션 저장소를 조회해서 로그인시 보관한 세션 정보를 사용한다
+    * 정리
+      * 세션을 사용해서 서버에서 중요한 정보를 관리하게 되었다. 덕분에 다음과 같은 보안 문제를 해경할 수 있다.
+        * 쿠키 값을 변조 가능 -> 예상 불가능한 복잡한 세션id를 사용한다
+        * 쿠키에 보관하는 정보는 클라이언트 해킹시 털릴 가능성이 있다. -> 세셩id가 털려도 여기에는 중요한 정보가 없다
+        * 쿠키 탈취 후 사용 -> 해커가 토큰을 털어가도 시간이 지나면 사용할 수 없도록 서버에서 세션의 만료시간을 짧게(예:30분)유지한다. 또는 해킹이 의심되는 경우 서버에서 해당 세션을 강제로 제거하면 된다.
+* #### 로그인 처리하기 - 세션 직접 만들기
+  * 세션 관리는 크게 다음 3가지 기능을 제공하면 된다.
+    * 세션 생성
+      * sessionId 생성 (임의의 추정 불가능한 랜덤 값)
+      * 세션 저장소에 sessionId와 보관할 값 저장
+      * sessionId로 응답 쿠키를 생성해서 클라이언트에 전달
+    * 세션 조회
+      * 클라이언트가 요청한 sessionId 쿠키의 값으로, 세션 저장소에 보관한 값 조회
+    * 세션 만료
+      * 클라이언트가 요청한 sessionId 쿠키의 값으로, 세션 저장소에 보관한 sessionId와 값 제거
+  * ##### SessionManager - 세션 관리
+    ```Java
+    package hello.login.web.session;
+
+    import org.springframework.stereotype.Component;
+
+    import javax.servlet.http.Cookie;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.util.Arrays;
+    import java.util.Map;
+    import java.util.UUID;
+    import java.util.concurrent.ConcurrentHashMap;
+
+    @Component
+    public class SessionManager {
+
+        public final String SESSION_COOKIE_NAME = "mySessionId";
+        private Map<String, Object> sessionStore = new ConcurrentHashMap<>();
+
+        /**
+        * 세션 생성
+        */
+        public void createSession(Object value, HttpServletResponse response) {
+
+            //세션 id를 생성하고, 값을 세션에 저장
+            String sessionId = UUID.randomUUID().toString();
+            sessionStore.put(sessionId, value);
+
+            //쿠키 생성
+            Cookie mySessionCookie = new Cookie(SESSION_COOKIE_NAME, sessionId);
+            response.addCookie(mySessionCookie);
+        }
+
+        /**
+        * 세션 조회
+        */
+        public Object getSession(HttpServletRequest request) {
+
+            Cookie sessionCookie = findCookie(request, SESSION_COOKIE_NAME);
+            if (sessionCookie == null) {
+                return null;
+            }
+            return sessionStore.get(sessionCookie);
+
+        }
+
+        /**
+        * 세션 말료
+        */
+        public void expire(HttpServletRequest request) {
+            Cookie sessionCookie = findCookie(request, SESSION_COOKIE_NAME);
+            if (sessionCookie != null) {
+                sessionStore.remove(sessionCookie.getValue());
+            }
+        }
+
+        private Cookie findCookie(HttpServletRequest request, String cookName) {
+
+            if (request == null) {
+                return null;
+            }
+            return Arrays.stream(request.getCookies())
+                    .filter(cookie -> cookie.getName().equals(cookName))
+                    .findAny()
+                    .orElse(null);
+        }
+    }
+    ``` 
+    * `@Component`: 스프링 빈으로 자동 등록
+    * `ConcurrentHasMap`: `HashMap`은 동시 요청에 안전하지 않다. 동시 요청에 안전한 `ConcurrentHasMap`를 사용했다.
+  * ##### SessionManagerTest
+    ```Java
+
+
+* #### 로그인 처리하기 - 직접 만든 세션 적용
+* #### 로그인 처리하기 - 서블릿 HTTP 세션1
+* #### 로그인 처리하기 - 서블릿 HTTP 세션2
+* #### 세션 정보와 타임아웃 설정
+---
