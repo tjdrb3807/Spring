@@ -9822,10 +9822,126 @@
     * `ConcurrentHasMap`: `HashMap`은 동시 요청에 안전하지 않다. 동시 요청에 안전한 `ConcurrentHasMap`를 사용했다.
   * ##### SessionManagerTest
     ```Java
+    package hello.login.web.session;
 
+    import hello.login.domain.member.Member;
+    import org.junit.jupiter.api.Test;
+    import org.springframework.mock.web.MockHttpServletRequest;
+    import org.springframework.mock.web.MockHttpServletResponse;
 
+    import static org.assertj.core.api.Assertions.assertThat;
+
+    class SessionManagerTest {
+
+        SessionManager sessionManager = new SessionManager();
+
+        @Test
+        void sessionTest() {
+
+            //세션 생성
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            Member member = new Member();
+            sessionManager.createSession(member, response);
+
+            //요청에 응답 쿠키 저장
+            MockHttpServletRequest request = new MockHttpServletRequest();
+            request.setCookies(response.getCookies());
+
+            //세션 조회
+            Object result = sessionManager.getSession(request);
+            assertThat(result).isEqualTo(member);
+
+            //세션 만료
+            sessionManager.expire(request);
+            Object expired = sessionManager.getSession(request);
+            assertThat(expired).isNull();
+        }
+    }
+    ```
+    * 간단하게 테스트를 진행해보자. 여기서는 `HttpServletRequest`, `HttpServletResponse`객체를 직접 사용할 수 없기 때문에 테스트에서 비슷한 역할을 해주는 가까 `MockHttpServletRequest`, `MockHttpServletRespose`를 사용했다.
 * #### 로그인 처리하기 - 직접 만든 세션 적용
+  * ##### LoginControoler - loginV2()
+    ```Java
+    private final SessionManager sessionManager;
+
+    @PostMapping("/login")
+    public String loginV2(@Valid @ModelAttribute LoginForm form, BindingResult bindingResult, HttpServletResponse response) {
+
+        if (bindingResult.hasErrors()) {
+            return "login/loginForm";
+        }
+
+        Member loginMember = loginService.login(form.getLoginId(), form.getPassword());
+        if (loginMember == null) {
+            bindingResult.reject("loginFail", "아이디 또는 비밀번호가 맞지 않습니다.");
+            return "login/loginForm";
+        }
+
+        //로그인 성공 처리
+        //세션 관리를 통해 세션을 생성하고, 회원 데이터 보관
+        sessionManager.createSession(loginMember, response);
+        return "redirect:/";
+    }
+    ``` 
+    * `private final SessionManager sessionManager;`주입
+    * `sessionManager.createSession(loginMember, response);`
+      * 로그인 성공시 세션을 등록한다. 세션에 `loginMember`를 저장해두고, 쿠키도 함께 발행한다.
+  * ##### LoginController-logoutV2()
+    ```Java
+    @PostMapping("/logout")
+    public String logoutV2(HttpServletRequest request) {
+        sessionManager.expire(request);
+
+        return "redirect:/";
+    }
+    ``` 
+  * ##### HomeController-homeLoginV2()
+    ```Java
+    private final SessionManager sessionManager;
+
+    @GetMapping("/")
+    public String homeLoginV2(HttpServletRequest request, Model model) {
+
+        //세션 관리자에 저장된 회원 정보 조회
+        Member member = (Member) sessionManager.getSession(request);
+        if (member == null) {
+            return "home";
+        }
+
+        //로그인
+        model.addAttribute("member", member);
+        return "loginHome";
+    }
+    ``` 
+    * `private final SessionManager sessionManager;`주입
+    * 세션 관리자에서 저장된 회원 정보를 조회한다. 만약 회원 정보가 없으면, 쿠키나 세션이 없는 것 이므로 로그인 되지 않은 것으로 처리한다.
+  * 정리
+    * 사실 세션이라는 것이 뭔가 특별한 것이 아니라 단지 쿠키를 사용하는데, 서버에서 데이터를 유지하는 방법일 뿐이라는 것을 이해했을 것이다.
+    * 그런데 프로젝트마다 이러한 세션 개념을 개발하는 것은 사앙히 불편할 것이다. 그래서 서블릿도 세션 개념을 지원한다.
+    * 이제 직접 만든 세션 말고, 서블릿이 공식 지원하는 세셩을 알아보자. 서블릿이 공식 지원하는 세션은 우리가 직접 만든 세션과 동작 방식이 거의 같다. 추가로 세션을 일정시간 사용하지 않으면 해당 세션을 삭제하는 기능을 제공한다.
 * #### 로그인 처리하기 - 서블릿 HTTP 세션1
+  * 세션이라는 개념은 대부분의 웹 애플리케이션에 필요할 것이다. 어쩌면 웹이 등장하면서 부터 나온 문제이다.
+  * 서블릿은 세션을 위해 `HttpSession`이라는 기능을 제공하는데, 지금까지 나온 문제들을 해경해준다.
+  * 우리가 직접 구현한 세션의 개념이 이미 구현되어 있고, 더 잘 구현되어 있다.
+  * ##### HttpSession 소개
+    * 서블릿이 제공하는 `HttpSession`도 결국 우리가 직접 만든 `SessionManager`와 같은 방식으로 동작한다.
+    * 서블릿을 통해 `HttpSession`을 생성하면 다음과 같은 쿠키를 생성할 수 있다.
+      * 쿠키 이름이 `JSESSIONID`이고 값은 추정 불가능한 랜덤 값이다.
+      * `Cookie: JSESSIONID=121j12312kj312jkh3k12jhk31jk23`
+  * ##### SessionConst
+    ```Java
+    package hello.login.web;
+
+    public class SessionConst {
+
+        public static final String LOGIN_MEMBER = "loginMember";
+    }
+    ```
+    * `HttpSession`에 데이터를 보관하고 조회할 때, 같은 이름이 중복되어 사용되므로, 상수를 하나 정의한다.
+  * ##### LoginController-loginV3()
+    ```Java
+
+  
 * #### 로그인 처리하기 - 서블릿 HTTP 세션2
 * #### 세션 정보와 타임아웃 설정
 ---
