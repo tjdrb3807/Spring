@@ -9735,7 +9735,7 @@
       * 클라이언트는 요청시 항상 `mySessionId`쿠키를 전달한다.
       * 서버에서는 클라이언트가 전달한 `mySessionId`쿠키 정보로 세션 저장소를 조회해서 로그인시 보관한 세션 정보를 사용한다
     * 정리
-      * 세션을 사용해서 서버에서 중요한 정보를 관리하게 되었다. 덕분에 다음과 같은 보안 문제를 해경할 수 있다.
+      * 세션을 사용해서 서버에서 중요한 정보를 관리하게 되었다. 덕분에 다음과 같은 보안 문제를 해결할 수 있다.
         * 쿠키 값을 변조 가능 -> 예상 불가능한 복잡한 세션id를 사용한다
         * 쿠키에 보관하는 정보는 클라이언트 해킹시 털릴 가능성이 있다. -> 세셩id가 털려도 여기에는 중요한 정보가 없다
         * 쿠키 탈취 후 사용 -> 해커가 토큰을 털어가도 시간이 지나면 사용할 수 없도록 서버에서 세션의 만료시간을 짧게(예:30분)유지한다. 또는 해킹이 의심되는 경우 서버에서 해당 세션을 강제로 제거하면 된다.
@@ -9917,31 +9917,302 @@
     * 세션 관리자에서 저장된 회원 정보를 조회한다. 만약 회원 정보가 없으면, 쿠키나 세션이 없는 것 이므로 로그인 되지 않은 것으로 처리한다.
   * 정리
     * 사실 세션이라는 것이 뭔가 특별한 것이 아니라 단지 쿠키를 사용하는데, 서버에서 데이터를 유지하는 방법일 뿐이라는 것을 이해했을 것이다.
-    * 그런데 프로젝트마다 이러한 세션 개념을 개발하는 것은 사앙히 불편할 것이다. 그래서 서블릿도 세션 개념을 지원한다.
+    * 그런데 프로젝트마다 이러한 세션 개념을 개발하는 것은 사당히 불편할 것이다. 그래서 서블릿도 세션 개념을 지원한다.
     * 이제 직접 만든 세션 말고, 서블릿이 공식 지원하는 세셩을 알아보자. 서블릿이 공식 지원하는 세션은 우리가 직접 만든 세션과 동작 방식이 거의 같다. 추가로 세션을 일정시간 사용하지 않으면 해당 세션을 삭제하는 기능을 제공한다.
 * #### 로그인 처리하기 - 서블릿 HTTP 세션1
-  * 세션이라는 개념은 대부분의 웹 애플리케이션에 필요할 것이다. 어쩌면 웹이 등장하면서 부터 나온 문제이다.
-  * 서블릿은 세션을 위해 `HttpSession`이라는 기능을 제공하는데, 지금까지 나온 문제들을 해경해준다.
+  * 세션이라는 개념은 대부분의 웹 애플리케이션에 필요한 것이다. 어쩌면 웹이 등장하면서 부터 나온 문제이다.
+  * 서블릿은 세션을 위해 `HttpSession`이라는 기능을 제공하는데, 지금까지 나온 문제들을 해결해준다.
   * 우리가 직접 구현한 세션의 개념이 이미 구현되어 있고, 더 잘 구현되어 있다.
   * ##### HttpSession 소개
     * 서블릿이 제공하는 `HttpSession`도 결국 우리가 직접 만든 `SessionManager`와 같은 방식으로 동작한다.
-    * 서블릿을 통해 `HttpSession`을 생성하면 다음과 같은 쿠키를 생성할 수 있다.
+    * 서블릿을 통해 `HttpSession`을 생성하면 다음과 같은 쿠키를 생성한다.
       * 쿠키 이름이 `JSESSIONID`이고 값은 추정 불가능한 랜덤 값이다.
-      * `Cookie: JSESSIONID=121j12312kj312jkh3k12jhk31jk23`
-  * ##### SessionConst
-    ```Java
-    package hello.login.web;
+      * `Cookie: JSESSIONID=123KASDF324234rASDF2342SDF`
+  * ##### HttpSession 사용
+    * ###### SessionConst
+      ```Java
+      package hello.login.web;
 
-    public class SessionConst {
+      public class SessionConst {
 
-        public static final String LOGIN_MEMBER = "loginMember";
+          public static final String LOGIN_MEMBER = "loginMember";
+      }
+      ```
+      * `HttpSession`에 데이터를 보관하고 조회할 때, 같은 이름이 종종 같은 이름이 중복 되어 사용되므로, 상수를 하나 정의한다
+    * ##### LoginController-loginV3()
+      ```Java
+      package hello.login.web.login;
+
+      @Slf4j
+      @Controller
+      @RequiredArgsConstructor
+      public class LoginController {
+
+          private final LoginService loginService;
+          private final SessionManager sessionManager;
+
+          @PostMapping("/login")
+          public String loginV3(@Valid @ModelAttribute LoginForm form, BindingResult bindingResult, HttpServletRequest request) {
+
+              if (bindingResult.hasErrors()) {
+                  return "login/loginForm";
+              }
+
+              Member loginMember = loginService.login(form.getLoginId(), form.getPassword());
+              log.info("login? member={}", loginMember);
+              if (loginMember == null) {
+                  bindingResult.reject("loginFail", "아이디 혹은 비밀번호가 맞지 않습니다.");
+              }
+
+              //로그인 성공 처리
+              //세션이 있으면 있는 세션 반환, 없으면 신규 세션 생성
+              HttpSession session = request.getSession();
+              session.setAttribute(SessionConst.LOGIN_MEMBER, loginMember);
+              return "redirect:/";
+          }
+        } 
+      ```
+      * 세션 생성과 조회
+        * 세션을 생성하려면 `request.getSession(true)`를 사용하면 된다.
+        * `public HttpSession getSession(boolean create);`
+        * `request.getSession(true)`
+          * 세션이 있으면 기존 세션을 반환한다.
+          * 세션이 없으면 새로운 세션을 생성해서 반환한다.
+        * `request.getSession(fales)`
+          * 세션이 있으면 기존 세션을 반환한다.
+          * 세션이 없으면 개로운 세션은 생성하기 않는다. `null`을 반환한다.
+        * `request.getSession()`: 신규 세션을 생성하는 `request.getSession(true)`와 동일하다.
+      * 세션에 로그인 회원 정보 보관
+        `session.setAttribuet(SessionConst.LOGIN_MEMBER, loginMember);`
+        * 세션에 데이터를 보관하는 방법은 `request.setAttribute(...)`와 비슷하다. 하나의 세션에 여러 값을 저장할 수 있다.
+    * ##### LoginController-logoutV3()
+      ```Java 
+      package hello.login.web.login;
+
+      @Slf4j
+      @Controller
+      @RequiredArgsConstructor
+      public class LoginController {
+
+          private final LoginService loginService;
+          private final SessionManager sessionManager;
+
+          @PostMapping("/logout")
+              public String logoutV3(HttpServletRequest request) {
+
+                  HttpSession session = request.getSession(false);
+                  if (session != null) {
+                      session.invalidate();
+                  }
+
+                  return "redirect:/";
+              }
+          }
+        } 
+      ```
+      * `session.invalidate()`: 세션을 제거한다
+    * ##### HomeController - homeLoginV3()
+      ```Java
+      package hello.login.web;
+
+      @Slf4j
+      @Controller
+      @RequiredArgsConstructor
+      public class HomeController {
+
+          private final MemberRepository memberRepository;
+          private final SessionManager sessionManager;
+
+          //    @GetMapping("/")
+          public String home() {
+              return "home";
+          }
+
+          @GetMapping("/")
+          public String homeLoginV3(HttpServletRequest request, Model model) {
+
+              HttpSession session = request.getSession(false);
+              if (session == null) {
+                  return "home";
+              }
+
+              Member loginMember = (Member) session.getAttribute(SessionConst.LOGIN_MEMBER);
+              if (loginMember == null) {
+                  return "home";
+              }
+
+              model.addAttribute("member", loginMember);
+              return "loginHome";
+          }
+      }
+      ```
+      * `request.getSession(false)`: `request.getSession()`를 사용하면 기본 값이 `create:true`이므로, 로그인 하지 않은 사용자도 의미없는 세션이 만들어 진다. 따라서 세션을 찾아서 사용하는 시점에는 `create:false`옵션을 사용해서 세션을 생성하지 않아야 한다.
+      * `session.getAttribte(SessionConst.LOGIN_MEMBER)`: 로그인 시점에 세션에 보관할 회원 객체를 찾는다
+* #### 로그인 처리하기 - 서블릿 HTTP 세션2
+  * ##### SessionAttribute
+    * 스프링은 세션을 더 편리하게 사용할 수 있도록 `@SessionAttribute`을 지원한다.
+    * 이미 로그인 된 사용자를 찾을 때는 다음과 같이 사용하면 된다. 참고로 이 기능은 세션을 생성하지 않는다.
+    * `@SessionAttribute(name = "loginMember", required = false) Member loginMember`
+  * ##### HomeController - homeLoginV3Spring()
+    ```java
+
+    @Slf4j
+    @Controller
+    @RequiredArgsConstructor
+    public class HomeController {
+
+        private final MemberRepository memberRepository;
+        private final SessionManager sessionManager;
+
+        @GetMapping("/")
+        public String homeLoginV3Spring(@SessionAttribute(name = SessionConst.LOGIN_MEMBER, required = false)
+                                                Member loginMember, Model model) {
+
+            //세션에 회원 데이터가 없으면
+            if (loginMember == null) {
+                return "home";
+            }
+
+            //세션이 유지되면
+            model.addAttribute("member", loginMember);
+            return "loginHome";
+        }
     }
     ```
-    * `HttpSession`에 데이터를 보관하고 조회할 때, 같은 이름이 중복되어 사용되므로, 상수를 하나 정의한다.
-  * ##### LoginController-loginV3()
-    ```Java
-
-  
-* #### 로그인 처리하기 - 서블릿 HTTP 세션2
+    * 세션을 찾고, 세션에 들어있는 데이터를 찾는 번걸로운 과정을 스프링이 한번에 편리하게 처리해주는 것을 확인할 수 있다.
+  * ##### TrackingMode
+    * 로그인을 처음 시도하면 URL이 다음과 같이 `jsessionid`를 포함하고 있는 것을 확인할 수 있다
+      ```
+      http://localhost:8080/;jsessionid=F59911518B921DF62D09F0DF8F83F872
+      ``` 
+    * 이것은 웹 브라우저가 쿠키를 지원하지 않을 때 쿠키 대신 URL을 통해서 세션을 유지하는 방법이다. 이 방법을 사용하려면 URL에 이 값을 계속 포함해서 전달해야 한다. 타임리프 같은 템플릿은 엔진을 통해서 링크를 걸면 `jsession`를 URL에 자동으로 포함해준다. 서버 입장에서 웹 브라우저가 쿠키를 지원하는지 하지 않는지 최초에는 판단하지 못하므로, 쿠키 값도 전달하고, URL에 `jsession`도 함께 전달한다.
+    * URL 전달 방식을 끄고 항상 쿠키를 통해서만 세션을 유지하고 싶으면 다음 옵션을 넣어준면 된다. 이렇게 하면 URL에 `jssionId`가 노출되지 않는다.
+      ```
+      server.servlet.session.tracking-modes=cookie
+      ``` 
 * #### 세션 정보와 타임아웃 설정
+  * ##### SessionInfoCotroller
+    ```Java
+    package hello.login.web.session;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpSession;
+    import java.util.Date;
+
+    @Slf4j
+    @RestController
+    public class SessionInfoController {
+
+        @GetMapping("/session-info")
+        public String sessionInfo(HttpServletRequest request) {
+
+            HttpSession session = request.getSession();
+            if (session == null) {
+                return "세션이 없습니다.";
+            }
+
+            //세션 데이터 출력
+            session.getAttributeNames().asIterator()
+                    .forEachRemaining(name -> log.info("session name={}, value={}", name, session.getAttribute(name)));
+
+            log.info("sessionId={}", session.getId());
+            log.info("maxInactiveInterval={}", session.getMaxInactiveInterval());
+            log.info("creationTime={}", new Date(session.getCreationTime()));
+            log.info("lastAccessedTime", new Date(session.getLastAccessedTime()));
+            log.info("isNew={}", session.isNew());
+
+            return "세션 출력";
+        }
+    }
+    ``` 
+    * `sessionId`: 세션id, `JSESSIONID`의 값이다.
+    * `maxInactiveInterval`: 세션의 유효 시간
+    * `creationTiem`: 세션 생성 일시
+    * `lastAccessedTime`: 세션과 연결된 사용자가 최근에 서버에 접근한 시간, 클라이언트에서 서버로 `sessionId(JESSIONID)`를 요청한 경우에 갱신된다
+    * `isNew`: 새로 생성된 세션인지, 아니면 이미 과거에 만들어졌고, 클라이언트에서 서버로 `sessionID(JSESSIONID)`를 요청해서 조회된 세션인지 여부
+  * ##### 세션 타임아웃 설정
+    * 세션은 사용자가 로그아웃을 직접 호출해서 `session.invalidate()`가 호출되는 경우세 삭제된다.
+    * 그런데 대부분의 사용자는 로그아웃을 선택하지 않고, 그냥 웹 브라우저를 종료한다.
+    * 문제는 HTTP가 비연결성(ConnectionLess)이므로 서버 입장에서는 해당 사용자가 웹 브라우저를 종료한 것인지 아닌지를 인식할 수 없다. 따라서 서버에서 세션 데이터를 언제 삭제해야 하는지 판단하기가 어렵다
+    * 이 경우 남아있는 세션을 무한정 보관하면 다음과 같은 문제가 발생할 수 있다
+      * 세션과 관련된 쿠키(`JSESSIONID`)를 탈취 당했을 경우 오랜 시간이 지나도 해당 쿠키로 악의적인 요청을 할 수 있다
+      * 세션은 기본적으로 메모리에 생성된다. 메모리의 크기가 무한하지 않기 때문에 꼭 필요한 경우만 생성해서 사용해야 한다. 
+      * 10만명의 사용자가 로그인하면 10만개의 세션이 생성되는 것이다.
+  * ##### 세션의 종료 시점
+    * 세션의 종료 시점을 어떻게 정하면 좋을까? 가장 단순하게 생각해보면, 세션 생성 시점으로 부터 30분 정도로 잡으면 될 것 같다. 그런데 문제는 30분이 지나면 세션이 삭제되기 때문데, 열심히 사이트를 돌아다니다가 또 로그인을 해서 세션을 생성해야 한다.
+    * 그러니까 30분 마다 계속 로그인해야 하는 번거로움이 발생한다
+    * 더 나은 대안은 세션 생성 시점이 아니라 사용자가 서버에 최근 요청한 시간을 기준으로 30분 정도를 유지해주는 것이다. 이렇게 하면 사용자가 서시스를 사용하고 있으면, 세션의 생존 시간이 30분으로 계속 늘어나게 된다. 따라서 30분 마다 로그인히야 하는 번거로움이 사라진다.
+    * `HttpSession`은 이 방식을 사용한다.
+  * ##### 세션 타임아웃 설정
+    * 스프링 부트로 글로벌 설정
+    * `application.properties`
+    * `server.servlet.session.timeout=60`: 60초, 기본은 1800(30분)
+      * 글로벌 설정은 분 단위로 설정해야 한다
+    * 특정 세션 단위로 시간 설정
+      ```Java
+      session.setMaxInactiveInterval(1800);
+      ``` 
+  * ##### 세션 타임아웃 발생
+    * 세션의 타임아웃 시간은 해당 세션과 관련된 `JSESSIONID`를 전달하는 HTTP 요청이 있으면 현재 시간으로 다시 초기화 된다. 이렇게 초기화 되면 세션 타임아웃으로 설정한 시간동안 세션을 추가로 사용할 수 있다.
+    * `session.getLastAccessedTime()`: 최근 세션 접근 시간
+    * `LastAccessedTiem`이후로 timeout시간이 지나면, WAS가 내부에서 해당 세션을 제거한다.
+  * ##### 정리
+    * 서블릿의 `HttpSession`이 제공하는 타임아웃 기능 덕분에 세션을 안전하고 편리하게 사용할 수 있다.
+    * 실무에서 주의할 점은 세션에는 최소한의 데이터만 보관해야 한다는 점이다. 보관한 데이터 용량 * 사용자 수로 세션의 메모리 사용량이 급격하게 늘어나서 장애로 이어질 수 있다. 추가로 세션의 시간을 너무 길게 가져가면 메모리 사용량이 계속 누적 될 수 있으므로 적당한 시간을 선택하는 것이 필요하다. 기본이 30분이라는 것을 기준으로 고민하면 된다.
+---
+* ### 필터, 인터셉터
+* 공통 관심사항
+  * 요구사항을 보면 로그인 한 사용자만 상품 관리 페이지에 들어갈 수 있어야 한다. 앞에서 로그인을 하지 않은 사용자에게는 상품 관리 버튼이 보이지 않기 때문에 문제가 없어 보인다. 그런데 문제는 로그인 하지 않은 사용자도 다음 URL을 직접 호출하면 상품 관리 화면에 들어갈 수 있다는 점이다.
+      * `http://localhost:8080/items`
+    * 삼품 관리 컨트롤러에서 로그인 여부를 체크하는 로직을 하나하나 작성하면 되겠지만, 등록, 수정, 삭제, 조회 등등 상품관리의 모든 컨트롤러 로직에 공통으로 로그인 여부를 확인해야 한다. 더 큰 문제는 향후 로그인과 관련된 로직이 변경될 때 이다. 작성한 모든 로직을 다 수정해야 할 수 있다.
+    * 이렇게 애플리케이션 여러 로직에서 공토으로 관심이 있는 것을 공통 관심사(cross-cuttion concern)하고 한다. 여기서는 등록, 수정, 삭제, 조회 등등 여러 로직에서 공통으로 인증에 대해서 관심을 가지고 있다.
+    * 이러한 공통 관심사는 스프링이 AOP로도 해결할 수 있지만, 웹과 관련된 공통 관심사는 지금부터 설명할 서블릿 필터 또는 스프링 인터셉터를 사용하는 것이 좋다. 웹과 관련된 공통 관심사를 처리할 때는 HTTP의 해더나 URL의 정보들이 필요한데, 서블릿 필터나 스프링 인터셉터는 `HttpServletRequest`를 제공한다.
+* #### 서블릿 필터 - 소개
+  * 필터는 서블릿이 지원하는 수문장이다.  
+  * ##### 필터 흐름
+    ```
+    HTTP 요청 -> WAS -> 필터 -> 서블릿 -> 컨트롤러
+    ``` 
+    * 필터를 적용하면 필터가 호출 된 다음에 서블릿이 호출된다. 그래서 모든 고객의 요청 로그를 남기는 요구사항이 있다면 필터를 사용하면 된다. 참고로 필터는 특정 URL패턴에 적용할 수 있다. `/*`이라고 하면 모든 요청에 필터가 적용된다.
+    * 참고로 스프링을 사용하는 경우 여기서 말하는 서플릿은 스프링의 디스패처 서블릿으로 생각하면 된다.
+  * ##### 필터 제한
+    ```
+    HTTP 요청 -> WAS -> 필터 -> 서블릿 -> 컨트롤러 //로그인 사용자
+    HTTP 요청 -> WAS -> 필터(적절하지 않은 요청이라 판단, 서블릿 호출X) //비 로그인 사용자
+    ``` 
+    * 필터에서 적절하지 않은 요청이라고 판단하면 거기에서 끝을 낼 수 도 있다. 그래서 로그인 여부를 체크하기에 딱 좋다
+  * ##### 필터 체인
+    ```
+    HTTP 요청 -> WAS -> 필터1 -> 필터2 -> 필터3 -> 서블릿 -> 컨트롤러
+    ``` 
+    * 필터는 체인으로 구성되는데, 중간에 필터를 자유롭게 추가할 수 있다. 예를 들어서 로그를 남기는 필터를 먼저 적용할고, 그 다음에 로그인 여부를 체크하는 필터를 만들 수 있다.
+  * ##### 필터 인터페이스
+    ```Java
+    public interface Filter{
+
+      public default void init(FIlterConfig filterConfig) throws ServletException{}
+
+      public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServeletException;
+
+      public default void destroy(){}
+    }
+    ``` 
+    * 필터 인터페이스를 구현하고 등록하면서 서블릿 컨테이너가 필터를 `싱글톤 객체`로 생성하고, 관리한다.
+      * `init()`: 필터 초기화 메서드, 서블릿 컨테이너가 생성될 때 호출된다.
+      * `doFilter()`: 고객의 요청이 올 떄 마다 해당 메서드가 호출된다. 필터의 로직을 구현하면 된다.
+      * `destroy()`: 필터 종료 메서드, 서블릿 컨테이너가 종료될 떄 호출된다.
+* #### 서블릿 필터 - 요청 로그
+  * 필터가 정말 수문장 역할을 잘 하는지 확인하기 위해 가장 단순한 필터인, 모든 요청을 로그로 남기는 필터를 개발하고 적용해보자.
+  * ##### LogFilter - 로그 필터
+    ```Java
+ 
+* #### 서블릿 필터 - 인증 체크
+* #### 스프링 인터셉터 - 소개
+* #### 스프링 인터셉터 - 요청 로그
+* #### 스프링 인터셉터 - 인증 체크
+* #### ArgumentResolver 활용
 ---
