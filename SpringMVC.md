@@ -10167,10 +10167,10 @@
 * ### 필터, 인터셉터
 * 공통 관심사항
   * 요구사항을 보면 로그인 한 사용자만 상품 관리 페이지에 들어갈 수 있어야 한다. 앞에서 로그인을 하지 않은 사용자에게는 상품 관리 버튼이 보이지 않기 때문에 문제가 없어 보인다. 그런데 문제는 로그인 하지 않은 사용자도 다음 URL을 직접 호출하면 상품 관리 화면에 들어갈 수 있다는 점이다.
-      * `http://localhost:8080/items`
-    * 삼품 관리 컨트롤러에서 로그인 여부를 체크하는 로직을 하나하나 작성하면 되겠지만, 등록, 수정, 삭제, 조회 등등 상품관리의 모든 컨트롤러 로직에 공통으로 로그인 여부를 확인해야 한다. 더 큰 문제는 향후 로그인과 관련된 로직이 변경될 때 이다. 작성한 모든 로직을 다 수정해야 할 수 있다.
-    * 이렇게 애플리케이션 여러 로직에서 공토으로 관심이 있는 것을 공통 관심사(cross-cuttion concern)하고 한다. 여기서는 등록, 수정, 삭제, 조회 등등 여러 로직에서 공통으로 인증에 대해서 관심을 가지고 있다.
-    * 이러한 공통 관심사는 스프링이 AOP로도 해결할 수 있지만, 웹과 관련된 공통 관심사는 지금부터 설명할 서블릿 필터 또는 스프링 인터셉터를 사용하는 것이 좋다. 웹과 관련된 공통 관심사를 처리할 때는 HTTP의 해더나 URL의 정보들이 필요한데, 서블릿 필터나 스프링 인터셉터는 `HttpServletRequest`를 제공한다.
+    * `http://localhost:8080/items`
+  * 상품 관리 컨트롤러에서 로그인 여부를 체크하는 로직을 하나하나 작성하면 되겠지만, 등록, 수정, 삭제, 조회 등등 상품관리의 모든 컨트롤러 로직에 공통으로 로그인 여부를 확인해야 한다. 더 큰 문제는 향후 로그인과 관련된 로직이 변경될 때 이다. 작성한 모든 로직을 다 수정해야 할 수 있다.
+  * 이렇게 애플리케이션 여러 로직에서 공통으로 관심이 있는 것을 공통 관심사(cross-cuttion concern)라고 한다. 여기서는 등록, 수정, 삭제, 조회 등등 여러 로직에서 공통으로 인증에 대해서 관심을 가지고 있다.
+  * 이러한 공통 관심사는 스프링이 AOP로도 해결할 수 있지만, 웹과 관련된 공통 관심사는 지금부터 설명할 서블릿 필터 또는 스프링 인터셉터를 사용하는 것이 좋다. 웹과 관련된 공통 관심사를 처리할 때는 HTTP의 해더나 URL의 정보들이 필요한데, 서블릿 필터나 스프링 인터셉터는 `HttpServletRequest`를 제공한다.
 * #### 서블릿 필터 - 소개
   * 필터는 서블릿이 지원하는 수문장이다.  
   * ##### 필터 흐름
@@ -10209,10 +10209,1707 @@
   * 필터가 정말 수문장 역할을 잘 하는지 확인하기 위해 가장 단순한 필터인, 모든 요청을 로그로 남기는 필터를 개발하고 적용해보자.
   * ##### LogFilter - 로그 필터
     ```Java
- 
+    package hello.login.web.filter;
+
+    import lombok.extern.slf4j.Slf4j;
+
+    import javax.servlet.*;
+    import javax.servlet.http.HttpServletRequest;
+    import java.io.IOException;
+    import java.util.UUID;
+
+    @Slf4j
+    public class LogFilter implements Filter {
+
+        @Override
+        public void init(FilterConfig filterConfig) throws ServletException {
+            log.info("log filter init");
+        }
+
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            String requestURI = httpRequest.getRequestURI();
+
+            String uuid = UUID.randomUUID().toString();
+            try {
+                log.info("REQUEST [{}][{}]", uuid, requestURI);
+                chain.doFilter(request, response);
+            } catch (Exception e) {
+                throw e;
+            } finally {
+                log.info("RESPONSE [{}][{}]", uuid, requestURI);
+            }
+        }
+
+        @Override
+        public void destroy() {
+            log.info("log filter destroy");
+        }
+    }
+    ```
+    * `public class LogFilter implements Filter{}`
+      * 필터를 사용하려면 필터 인터페이스를 구현해야 한다.
+    * `doFilter(ServletRequest requets, ServletResponse response, FilterChain chain)`
+      * HTTP 요청이 오면 `doFilter`가 호출된다
+      * `ServletRequest request`는 HTTP 요청이 아닌 경우까지 고려해서 만든 인터페이스이다. HTTP를 사용하면 `HttpServletRequset httpRequest = (HttpServletRequest) request;`와 같이 다운 케스팅 하면 된다.
+    * `String uuid = UUID.radomUUID().toString();`
+      * HTTP 요청을 구분하기 위해 요청당 임의의 `uuid`를 생성해둔다. 
+    * `log.info("REQUEST [{}][{}]", uuid, requestURI);`
+      * `uuid`와 `requestURI`를 출력한다.
+    * `chain.doFilter(request, response);`
+      * 이 부분이 가장 중요하다. 다음 필터가 있으면 필터를 호출하고, 필터가 없으면 서블릿을 호출한다.
+      * 만약 이 로직을 호출하지 않으면 다음 단계로 진행되지 않는다.
+  * ##### WebConfig - 필터 설정
+    ```Java
+    package hello.login;
+
+    import hello.login.web.filter.LogFilter;
+    import org.springframework.boot.web.servlet.FilterRegistrationBean;
+    import org.springframework.context.annotation.Bean;
+    import org.springframework.context.annotation.Configuration;
+
+    import javax.servlet.Filter;
+
+    @Configuration
+    public class WebConfig {
+
+        @Bean
+        public FilterRegistrationBean logFilter() {
+            FilterRegistrationBean<Filter> filterFilterRegistrationBean = new FilterRegistrationBean<>();
+            filterFilterRegistrationBean.setFilter(new LogFilter());
+            filterFilterRegistrationBean.setOrder(1);
+            filterFilterRegistrationBean.addUrlPatterns("/*");
+
+            return filterFilterRegistrationBean;
+        }
+    }
+    ``` 
+    * 필터를 등록하는 방법은 여러가지가 있지만, 스프링 부트를 사용한다면 `FilterRegistrationBean`을 사용해서 등록하면 된다.
+      * `setFilter(new LogFilter());`: 등록할 필터를 지정한다.
+      * `setOrder(1);`: 필터는 체인으로 동작한다. 따라서 순서가 필요하다. 낮을 수록 먼저 동작한다.
+      * `addUrlPatterns("/*")`: 필터를 적용할 URL 패턴을 지정한다. 한번에 여러 패턴을 지정할 수 있다.
+    * 참고
+      * URL 패턴에 대한 룰은 필터도 서블릿과 동일하다. 자세한 내용은 서블릿 URL 패턴으로 검색해보자
+      * `@ServletComponentScan` `@WebFilter(filterName = "logFilter", urlPatterns ="/*")`로 필터 등록이 가능하지만 필터 순서 조절이 안된다. 따라서 `FilterRegistraionBean`을 사용하자
+    * 실행 로그
+      ```
+      hello.login.web.filter.LogFilter         : REQUEST [6faa626a-1977-4143-8caf-6116b50cc0ef][/login]
+      hello.login.web.login.LoginController    : login? member=Member(id=1, loginId=junsung3807, name=전성규, password=^^qkdrmt1386)
+      hello.login.web.filter.LogFilter         : RESPONSE [6faa626a-1977-4143-8caf-6116b50cc0ef][/login]
+      ``` 
+      * 필터를 등록할 때 `urlPattern`을 `/*`로 등록했기 때문에 모든 요청에 해당 필터가 적용된다.
+      * 참고
+        * 실무에서 HTTP 요청시 같은 요청의 로그에 모두 같은 식별자를 자동으로 남기는 방법은 logback mdc로 검색해보자
 * #### 서블릿 필터 - 인증 체크
+  * 로그인이 되지 않은 사용자는 상품 관리 뿐만 아니라 미래에 개발될 페이지에도 접근하지 못하도록 하자
+  * ##### LoginCheckFilter - 인증 체크 필터
+    ```Java
+    package hello.login.web.filter;
+
+    import hello.login.web.SessionConst;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.util.PatternMatchUtils;
+
+    import javax.servlet.*;
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import javax.servlet.http.HttpSession;
+    import java.io.IOException;
+
+    @Slf4j
+    public class LoginCheckFilter implements Filter {
+
+        private static final String[] whitelist = {"/", "/members/add", "/login", "/logout", "/css/*"};
+
+        @Override
+        public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+            HttpServletRequest httpRequest = (HttpServletRequest) request;
+            HttpServletResponse httpResponse = (HttpServletResponse) response;
+            String requestURI = httpRequest.getRequestURI();
+
+            try {
+                log.info("인증 체크 필터 시작 {}", requestURI);
+
+                if (isLoginCheckPath(requestURI)) {
+                    log.info("인증 체크 로직 실행 {}", requestURI);
+                    HttpSession session = httpRequest.getSession(false);
+                    if (session == null || session.getAttribute(SessionConst.LOGIN_MEMBER) == null) {
+                        log.info("미인증 사용자 요청 {}", requestURI);
+                        //로그인으로 redirect
+                        httpResponse.sendRedirect("/login?redirectURL=" + requestURI);
+                        return; //여기가 중요, 미인증 사용자는 다음으로 진행하지 않고 끝!
+                    }
+                }
+                chain.doFilter(request, response);
+            } catch (Exception e) {
+                throw e; //예외 로깅 가능하지만, 톰캣까지 예외를 보내주어야 한다
+            } finally {
+                log.info("인증 체크 필터 종료{}", requestURI);
+            }
+        }
+        
+        /**
+        * 화이트 리스트인 경우 인증 체크x
+        */
+        private boolean isLoginCheckPath(String requestURI) {
+            return !PatternMatchUtils.simpleMatch(whitelist, requestURI);
+        }
+    }
+    ```  
+    * `whitelist = {"/", "/members/add", "/login", "/logout", "/css/*"};`
+      * 인증 필터를 적용해도 홈, 회원가입, 로그인 화면, css같은 리소스에 접근할 수 있어야 한다. 이렇게 화이트 리스트 경로는 인증과 무관하게 항상 허용한다. 화이트 리스트를 제외한 나머지 모든 경로에는 인증 체크 로직을 적용한다.
+    * `isLoginCheckPath(requestURI)`
+      * 화이트 리스트를 제외한 모든 경우에 인증 체크 로직을 적용한다.
+    * `httpResponse.sendRedirect("/login?redirectURL=" + requestURI);`
+      * 미인증 사용자는 로그인 화면으로 리다이렉트 한다. 그런데 로그인 이후에 다시 홈으로 이동해버리면, 원하는 경로를 다시 찾아가야 하는 불편함이 있다. 예를 들어서 상품 관리 화면을 보려고 들어갔다가 로그인 화면으로 이동하면, 로그인 이후에 다시 상품 관리 화면으로 돌아가는 것이 좋다. 이런 부분이 개발자 입장에서는 좀 귀찮을 수 있어도 사용자 입장으로 보면 편리한 기능이다. 이러한 기능을 위해 현재 요청한 경로인 `requestURI`를 `/login`에 쿼리파라미터로 함꼐 전달한다. 물론 `/login`컨트롤러에서 로그인 성공시 해당 경로로 이동하는 기능은 추가로 개발해야 한다.
+    * `return;`
+      * 여기가 중요하다. 필터를 더는 징행하지 않는다. 이후 필터는 물론 서블릿, 컨트롤러가 더는 호출되지 않는다. 앞서 `redirect`를 사용했기 때문에 `redirect`가 응답으로 적용되고 요청이 끝난다.
+  * ##### WebConfig - loginCheckFilter() 추가
+    ```Java
+    package hello.login;
+
+    @Configuration
+    public class WebConfig {
+
+        @Bean
+        public FilterRegistrationBean loginCheckFilter() {
+            FilterRegistrationBean<Filter> filterFilterRegistrationBean = new FilterRegistrationBean<>();
+            filterFilterRegistrationBean.setFilter(new LoginCheckFilter());
+            filterFilterRegistrationBean.setOrder(2);
+            filterFilterRegistrationBean.addUrlPatterns("/*");
+            return filterFilterRegistrationBean;
+        }
+    }
+    ``` 
+    * `setFilter(new LoginCheckFilter(new LoginCheckFilter())`: 로그인 필터를 등록한다
+    * `setOrder(2)`: 순서를 2번으로 잡았다. 로그 필터 다음에 로그인 필터가 적용된다.
+    * `addUrlPatterns("/*")`: 모든 요청에 로그인 필터를 적용한다ㅏ
+  * ##### RedircetURL 처리
+    * 로그인에 성공하면 처음 요청한 URL로 이동하는 기능을 개발해보자
+  * ##### LoginController - loginV4()
+    ```Java
+    package hello.login.web.login;
+
+    @Slf4j
+    @Controller
+    @RequiredArgsConstructor
+    public class LoginController {
+
+        private final LoginService loginService;
+        private final SessionManager sessionManager;
+
+        /**
+        * 로그인 이후 redirect 처리
+        */
+        @PostMapping("/login")
+        public String loginV4(@Valid @ModelAttribute LoginForm form, BindingResult bindingResult,
+                              @RequestParam(defaultValue = "/") String redirectURL,
+                              HttpServletRequest request) {
+
+            if (bindingResult.hasErrors()) {
+                return "login/loginForm";
+            }
+
+            Member loginMember = loginService.login(form.getLoginId(), form.getPassword());
+            log.info("login? {}", loginMember);
+            if (loginMember == null) {
+                bindingResult.reject("loginFail", "아이디 또는 비밀번호가 맞지 않습니다.");
+                return "login/loginFrom";
+            }
+
+            //로그인 성공 처리
+
+            //세션이 있으면 있는 세션 반환, 업으면 신규 세션 새로 생성
+            HttpSession session = request.getSession();
+            //세션에 로그인 회원 정보 보관
+            session.setAttribute(SessionConst.LOGIN_MEMBER, loginMember);
+            //redirectURL 적용
+            return "redirect:" + redirectURL;
+        }
+    }   
+    ``` 
+    * 로그인 체크 필터에서, 미인증 사용자는 요청 경로로 포함해서 `/login`에 `redirectURL`요청 파라미터를 추가해서 요청했다. 이 값을 사용해서 로그인 성공시 해당 경로로 고객을 `redirect`한다.
+  * 정리
+    * 서블릿 필터를 잘 사용한 덕분에 로그인 하지 않은 사용자는 나머지 경로에 들어갈 수 없게 되었다. 공통 관심사를 서블릿 필터를 사용해서 해결한 덕분에 향후 로그인 관련 정책이 변경되어도 이 부분만 변경하면 된다.
+  * 참고
+    * 필터에는 다음에 설명할 스프링 인터셉터는 제공하지 않는, 아주 강력한 기능이 있는데 `chain.doFilter(request, response);`를 호출해서 다음 필터 또는 서블릿을 호출할 때 `requset`, `response`를 다른 객체로 바꿀 수 있다. `ServletRequest`, `SetvletResponse`를 구현한 다른 객체를 만들어서 넘기면 해당 객체가 다음 필터 또는 서블릿에서 사용된다. 잘 사용하는 기능은 아니니 참고만 해두자
 * #### 스프링 인터셉터 - 소개
+  * 스프링 인터셉터도 서블릿 필터와 같이 웹과 관련된 공통 관심 사항을 효과적으로 해결할 수 있는 기술이다.
+  * 서블릿 필터가 서블릿이 제공하는 기술이라면, 스프링 인터셉터는 스프링 MVC가 제공하는 기술이다. 둘다 웹과 관련된 공통 관심 사항을 처리하지만, 적용되는 순서와 범위, 그리고 사용 방법이 다르다.
+  * ##### 스프링 입터셉터 
+    ```
+    HTTP 요청 -> WAS -> 필터 -> 서블릿 -> 스프링 인터셉터 -> 컨트롤러
+    ``` 
+    * 스프링 인터셉터는 디스패처 서블릿과 컨트롤러 사이에서 컨트롤러 호출 직전에 호출 된다.
+    * 스프링 인터셉터는 스프링 MVC가 제공하는 기능이기 떄문에 결국 디스패처 서블릿 이후에 등장하게 된다.
+      * 스프링 MVC의 시작점이 디스패처 서블릿이라고 생각해보면 이해가 될 것이다.
+    * 스프링 인터셉터도 URL 패턴을 적용할 수 있는데, 서블릿 URL 패턴과는 다르고, 매우 정밀하게 설정할 수 있다.
+  * ##### 스프링 인터셉터 제한
+    ```
+    HTTP 요청 -> WAS -> 필터 -> 서블릿 -> 스프링 인터셉터 -> 컨트롤러 //로그인 사용자
+    HTTP 요청 -> WAS -> 필터 -> 서블릿 -> 스프링 인터셉터(적절하지 않은 요청이라 판단, 컨트롤러 호출X) //비 로그인 사용자
+    ``` 
+    * 인터셉터에서 적절하지 않은 요청이라고 판단하면 거기에서 끝을 낼 수도 있다. 그래서 로그인 여부를 체크하기에 딱 좋다
+  * ##### 스프링 인터셉터 체인
+    ```
+    HTTP 요청 -> WAS -> 필터 -> 서블릿 -> 인터셉터1 -> 인터셉터2 -> 컨트롤러
+    ``` 
+    * 스프링 인터셉터는 체인으로 구성되는데, 중간에 인터셉터를 자유롭게 추가할 수 있다. 예를 들어서 로그를 남기는 인터셉터를 먼저 적용하고, 그 다음에 로그인 여부를 체크하는 인터셉터를 만들 수 있다.
+  * 지금까지 내용을 보면 서블릿 필터와 호출 되는 순서만 다르고, 제공하는 기능은 비슷해 보인다. 앞으로 설명하겠지만, 스프링 인터셉터는 서블릿 필터보다 편리하고, 더 정교하고 다양한 기능을 지원한다.
+  * ##### 스프링 인터셉터 인터페이스
+    ```Java
+    public interface HandlerIntercepter{
+
+      default boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception{}
+
+      default void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, @Nullable ModelAndView modelAndView) throws Exception{}
+
+      default void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, @Nullable Expetrion ex) throws Exception{}
+    }
+    ``` 
+    * 서블릿 필터의 경우 단순하게 `doFilter()`하나만 제공된다. 인터셉터는 컨트롤러 호출 전(`preHandle`), 호출 후(`postHandle`), 요청 완료 이후(`afterCompletion`)와 같이 단계적으로 잘 세분화 되어 있다.
+    * 서블릿 필터의 경우 단순히 `request`, `response`만 제공했지만, 인터셉터는 어떤 컨트롤러(`handler`)가 호출되는지 호출 정보도 받을 수 있다. 그리고 어떤 `modelAndView`가 반환되는지 응답 정보도 받을 수 있다.
+  * ##### 스프링 인터셉터 호출 흐름
+    ![](img/img259.png)
+    * ###### 정상 흐름
+      * `preHandle`: 컨트롤러 호출 전에 호출된다. (더 정확히는 핸들러 어댑터 호출 전에 호출된다.)
+        * `preHandle`의 응답값이 `true`이면 다음으로 진행하고, `false`이면 더는 진행하지 않는다.
+        * `false`인 경우 나머지 인터셉터는 물론이고, 핸들어 어댑터도 호출되지 않는다. 그럼 1번에서 끝이 나버린다
+      * `postHandle`: 컨트롤러 호출 후에 호출된다.(더 정확히는 핸들러 어댑터 호출 후에 호출된다.) 
+      * `afterCompletion`: 뷰가 렌더링 된 이후에 호출된다.
+  * ##### 스프링 인터셉터 예외 상황
+    ![](img/img260.png) 
+    * ###### 예외가 발생시
+      * `preHandle`: 컨트롤러 호출 전에 호출된다
+      * `postHandle`: 컨트롤러에서 예외가 발생하면 `postHandle`은 호출되지 않는다.
+      * `afterCompletion`: `afterCompletion`은 항상 호출된다. 이 경우 예외 (`ex`)를 파라미터로 받아서 어떤 예외가 발생했는지 로그로 출력할 수 있다.
+    * ###### afterCompletion은 예외가 발생해도 호출된다.
+      * 예외가 발생하면 `postHandle()`는 호출되지 않으므로 예외와 무관하게 공통 처리를 하려면 `afterCompletion()`을 사용해야 한다.
+      * 예외가 발생하면 `afterCompletion()`에 예외 정보(`ex`)를 포함해서 호출된다
+  * ##### 정리
+    * 인터셉터는 스프링 MVC 구조에 특화된 필터 기능을 제공한다고 이해하면 된다. 스프링 MVC를 사용하고, 특별히 필터를 꼭 사용해야 하는 상황이 아니라면 인터셉터를 사용하는 것이 더 편리하다
 * #### 스프링 인터셉터 - 요청 로그
+  * ##### LogInterceptor - 요청 로그 인터셉터
+    ```Java
+    package hello.login.web.interceptor;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.web.method.HandlerMethod;
+    import org.springframework.web.servlet.HandlerInterceptor;
+    import org.springframework.web.servlet.ModelAndView;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.util.UUID;
+
+    @Slf4j
+    public class LogInterceptor implements HandlerInterceptor {
+
+        public static final String LOG_ID = "logId";
+
+        @Override
+        public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+            String requestURI = request.getRequestURI();
+
+            String uuid = UUID.randomUUID().toString();
+            request.setAttribute(LOG_ID, uuid);
+
+            //@RequestMapping: HandlerMethod
+            //정적 리소스: ResourceHttpRequestHandler
+            if (handler instanceof HandlerMethod) {
+                HandlerMethod hm = (HandlerMethod) handler; //호출할 컨트롤러 메서드의 모든 정보가 포함되어 있다.
+            }
+            log.info("REQUEST [{}][{}][{}]", uuid, requestURI, handler);
+            return true; //false 진행X
+        }
+
+        @Override
+        public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+            log.info("postHandler [{}]", modelAndView);
+        }
+
+        @Override
+        public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+            String requestURI = request.getRequestURI();
+            String logId = (String) request.getAttribute(LOG_ID);
+            log.info("RESPONSE [{}][{}]", logId, requestURI);
+            if (ex != null) {
+                log.error("afterCompletion error!!", ex);
+            }
+        }
+    }
+    ```
+    * `String uuid = UUID.randomUUID().toString()`
+      * 요청 로그를 구분하기 위한 `uuid`를 생성한다.
+    * `request.setAttribute(LOG_ID, uuid)`
+      * 서블릿 필터의 경우 지역변수로 해결이 가능하지만, 스프링 인터셉터는 호출 시점이 완전히 분리되어 있다. 따라서 `preHandle`에서 지정한 값을 `postHandle`, `afterCompletion`에 함께 사용하려면 어딘가 담아두어야 한다. 
+      * `LogInterceptor`도 싱글톤 처럼 사용되기 때문에 맴버 변수를 사용하면 위험하다.
+      * 따라서 `request`에 담아두었다.
+      * 이 값은 `afterCompletion`에서 `request.getAttribute(LOG_ID)`로 찾아서 사용한다.
+    * `return true`
+      * `true`면 정상 호출이다. 다음 인터셉터나 컨트롤러가 호출된다.
+    * ###### HandlerMethod
+      ```Java
+      if(handler instanceof HandlerMethod){
+        HandlerMethod hm = (HandlerMethod) handler; //호출할 컨트롤러 메서드의 모든 정보가 포함되어 있다.
+      }
+      ```  
+      * 핸들러 정보는 어떤 핸들러 매핑을 사용하는가에 따라 달라진다. 스프링을 사용하면 일반적으로 `@Controller`, `@RequestMapping`을 활용한 핸들러 매핑을 사용하는데, 이 경우 핸들러 정보로 `HandlerMethod`가 넘어온다.
+    * ###### ResourceHttpRequestHandler
+      * `@Controller`가 아니라 `/resource/static`와 같은 정적 리소스가 호출 되는 경우 `ResourceHttpRequestHandler`가 핸들러 정보로 넘어오기 떄문에 타입에 따라서 처리가 필요하다
+    * ###### postHandle, afterCompletion
+      * 종료 로그를 `postHandle`이 아니라 `afterCompletion`에서 실행한 이유는, 예외가 발생한 경우 `postHandle`가 호출되지 않기 때문이다. `afterCompletion`은 예외가 발생해도 호출되는 것을 보장한다. 
+  * ##### WebConfig - 인터셉터 등록
+    ```Java
+    package hello.login;
+
+    @Configuration
+    public class WebConfig implements WebMvcConfigurer {
+
+        @Override
+        public void addInterceptors(InterceptorRegistry registry) {
+            registry.addInterceptor(new LogInterceptor())
+                    .order(1)
+                    .addPathPatterns("/**")
+                    .excludePathPatterns("/css/**", "/*.ico", "/error");
+        }
+    }
+    ``` 
+    * 인터셉터와 필터가 중복되지 않도록 필터를 등록하기 위한 `logFilter()`의 `@Bean`은 주석처리한다.
+    * `WebMvcConfigurer`가 제공하는 `addInterceptors()`를 사용해서 인터셉터를 등록할 수 있다.
+      * `registry.addInterceptor(new LogInterceptor())`: 인터셉터를 등록한다.
+      * `order(1)`: 인터셉터의 호출 순서를 지정한다. 낮을 수록 먼저 호출된다.
+      * `addPathPatterns("/**")`: 인터셉터를 적용할 URL패턴을 지정한다.
+      * `excludePatterns("/css/**", "/*.ico", "/error")`: 인터셉터에서 제외할 패턴을 지정한다.
+    * 필터와 비교해보면 인터셉터는 `addPathPatterns`, `ecloudPathPatterns`로 메우 정밀하게 URL패턴을 지정할 수 있다.
+    * 실행 로그
+      ```
+      h.login.web.interceptor.LogInterceptor   : REQUEST [4b43a475-f584-4057-a434-968f3202c34d][/][hello.login.web.HomeController#homeLoginV3Spring(Member, Model)]
+      h.login.web.interceptor.LogInterceptor   : postHandle [ModelAndView [view="home"; model={}]]
+      h.login.web.interceptor.LogInterceptor   : RESPONSE [4b43a475-f584-4057-a434-968f3202c34d][/]
+      ```
+  * ##### 스프링 URL 경로
+    * 스프링이 제공하는 URL 경로는 서블릿 기술이 제공하는 URL 경로와 완전히 다르다. 더욱 자세하고, 세밀하게 설정할 수 있다.
+    * ##### PathPattern 공식 문서
+      ```
+      ? 한 문자 일치
+      경로(/) 안에서 0개 이상의 문자 일치
+      ** 경로 끝까지 0개 이상의 경로(/) 일치
+      {spring} 경로(/)와 일치하고 spring이라는 변수로 캡처
+      {spring:[a-z]+} matches the regexp [a-z]+ as a path variable named "spring" {spring:[a-z]+} regexp [a-z]+ 와 일치하고, "spring" 경로 변수로 캡처
+      {*spring} 경로가 끝날 때 까지 0개 이상의 경로(/)와 일치하고 spring이라는 변수로 캡처
+        /pages/t?st.html — matches /pages/test.html, /pages/tXst.html but not /pages/
+        toast.html
+        /resources/*.png — matches all .png files in the resources directory
+        /resources/** — matches all files underneath the /resources/ path, including /
+        resources/image.png and /resources/css/spring.css
+        /resources/{*path} — matches all files underneath the /resources/ path and
+        captures their relative path in a variable named "path"; /resources/image.png
+        will match with "path" → "/image.png", and /resources/css/spring.css will match
+        with "path" → "/css/spring.css"
+        /resources/{filename:\\w+}.dat will match /resources/spring.dat and assign the
+        value "spring" to the filename variable
+      ```  
+      * 링크: https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/ springframework/web/util/pattern/PathPattern.html
 * #### 스프링 인터셉터 - 인증 체크
+  * ##### LoginCheckInterceptor
+    ```Java
+    package hello.login.web.interceptor;
+
+    import hello.login.web.SessionConst;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.web.servlet.HandlerInterceptor;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import javax.servlet.http.HttpSession;
+
+    @Slf4j
+    public class LoginCheckInterceptor implements HandlerInterceptor {
+
+        @Override
+        public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+            String requestURI = request.getRequestURI();
+
+            log.info("인증 체크 인터셉터 실행 {}", requestURI);
+            HttpSession session = request.getSession(false);
+            if (session == null || session.getAttribute(SessionConst.LOGIN_MEMBER) == null) {
+                log.info("미인증 사용자 요청");
+                //로그인으로 redirect
+                response.sendRedirect("/login?redirectURL=" + requestURI);
+                return false;
+            }
+            return true;
+        }
+    }
+    ``` 
+    * 서블릿 필터와 비교해서 코드가 매우 간경하다. 인증이라는 것은 컨트롤러 호출 전에만 호출되면 된다. 따라서 `preHandle`만 구현하면 된다.
+  * ##### 순서 주의, 세밀한 설정 가능
+    ```Java
+    package hello.login;
+
+    @Configuration
+    public class WebConfig implements WebMvcConfigurer {
+
+        @Override
+        public void addInterceptors(InterceptorRegistry registry) {
+            registry.addInterceptor(new LogInterceptor())
+                    .order(1)
+                    .addPathPatterns("/**")
+                    .excludePathPatterns("/css/**", "/*.ico", "/error");
+
+            registry.addInterceptor(new LoginCheckInterceptor())
+                    .order(2)
+                    .addPathPatterns("/**")
+                    .excludePathPatterns("/", "/members/add", "/login", "/logout",
+                            "/css/**", "/*.ico", "/error");
+        }
+    }
+    ``` 
+    * 인터셉터와 필터가 중복되지 않도록 필터를 등록하기 위한 `logFilter()`, `loginCheckFilter()`의 `@Bean`은 주석처리 하자.
+    * 인터셉터를 적용하거나 하지 않을 부분은 `addPathPatterns`와 `excludePathPatterns`에 작성하면 된다. 기본적으로 모든 경로에 해당 인터셉터를 적용하되 (`/**`), 홈(`/`), 회원가입(`/members/add`), 로그인(`/login`), 로그아웃(`/logout`), 리소스 조회(`/css/**`), 오류(`/error`)와 같은 부분은 로그인 체크 인터셉터를 적용하지 않는다. 서블릿 필터와 비교해보면 매우 편리한 것을 알 수 있다.
+  * ##### 정리
+    * 서블릿 필터와 스프링 인터셉터는 웹과 관련된 공통 관시사를 해결하기 위한 기술이다.
+    * 서블릿 필터와 비교해서 스프링 인터셉터가 개발자 입장에서 훨씬 편리하다는 것을 코드로 이해했을 것이다. 특별한 문제가 없다면 인터셉터를 사용하는 것이 좋다.
 * #### ArgumentResolver 활용
+  * MVC1편 6.스프링 MVC - 기본기능 -> 요청 매핑 헨들어 어댑터 구조에서 `ArgumentResolver`를 학습했다.
+  * 이번 시간에는 해당 기능을 사용해서 로그인 회원을 조금 편리하게 찾아보자
+  * ##### HomeController - 추기
+    ```Java
+    package hello.login.web;
+
+    @Slf4j
+    @Controller
+    @RequiredArgsConstructor
+    public class HomeController {
+
+        private final MemberRepository memberRepository;
+        private final SessionManager sessionManager;
+
+        @GetMapping("/")
+        public String homeLoginV3ArgumentResolver(@Login Member loginMember, Model model) {
+
+            //세션에 회원 데이터가 없으면 home
+            if (loginMember == null) {
+                return "home";
+            }
+
+            //세션이 유지되면 로그인으로 이동
+            model.addAttribute("member", loginMember);
+            return "loginHome";
+        }
+    }
+    ```  
+    * `homeLoginV3Spring()`의 `@GetMapping`주석 처리
+    * 다음에 설명하는 `@Login`애노테이션을 만들어야 컴파일 오류가 사라진다
+    * `@Login`애노테이션이 있으면 직접 만든 `ArgumentResolver`가 동작해서 자동으로 세션에 있는 로그인 회원을 찾아주고, 만약 세션에 없다면 `null`을 반환하도록 개발해보자.
+  * ##### @Login 애노테이션 생성
+    ```Java
+    package hello.login.web.argumentresolver;
+
+    import java.lang.annotation.ElementType;
+    import java.lang.annotation.Retention;
+    import java.lang.annotation.RetentionPolicy;
+    import java.lang.annotation.Target;
+
+    @Target(ElementType.PARAMETER)
+    @Retention(RetentionPolicy.RUNTIME)
+    public @interface Login {
+    }
+    ``` 
+    * `@Target(ElementType.PARAMETER)`: 파라미어테만 사용
+    * `@Retention(RetentionPolicy.RUNTIME)`: 리플렉션 등을 활용할 수 있도록 런타임까지 애노테이션 정보가 남아있음
+  
+
+
+
+
 ---
+* ### 예외 처리와 오류 페이지
+* #### 프로젝트 생성
+  * 프로젝트 선택
+    * Project: Gradle 
+    * Project Language: Java 
+    * Spring Boot: 2.5.x
+  * Project Metadata 
+    * Group: hello
+    * Artifact: exception
+    * Name: exception
+    * Package name: hello.exception 
+    * Packaging: Jar
+    * Java: 11
+  * Dependencies
+    * Spring Web
+    * Lombok
+    * Thymeleaf
+    * Validation
+* #### 서블릿 예외 처리 - 시작
+  * ##### 서블릿은 다음 2가지 방식으로 예외 처리를 지원한다
+    * `Exception`(예외)
+    * `response.sendError(HTTP 상태코드, 오류 메세지)`
+  * ##### Exception(예외)
+    * ###### 자바가 직접 실행
+      * 자바의 메인 메서드를 직접 실행하는 경우 `main`이라는 이름의 쓰레드가 실행된다.
+      * 실행 도중에 예외를 잡지 못하고 처음 실행한 `main()`메서드를 넘어서 예외가 던져지면, 예외 정보를 남기고 해당 쓰레드는 종료된다.
+    * ##### 웹 애플리케이션
+      * 웹 애플리케이션은 사용자 요청별로 별도의 쓰레드가 할당되고, 서블릿 컨테이너 안에서 실행된다.
+      * 애플리케이션에서 예외가 발생했는데, 어디선가 try-catch로 예외를 잡아서 처리하면 아무런 문제가 없다.
+      * 그런데 만약 애플리케이션에서 예외를 잡지 못하고, 서블릿 밖으로 까지 예외가 전달되면 어떻게 동작할까?
+        ```
+        WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외 발생)
+        ``` 
+      * 결국 톰캣 같은 WAS 까지 예외가 전달된다. WAS는 예외가 올라오면 어떻게 처리해야 할까?
+      * 먼저 스프링 부터가 제공하는 기본 예외 페이지가 있는데 이건 꺼두자(뒤에서 설명)
+        * application.properites
+          ```
+          server.error.whitelabel.enabled=false
+          ``` 
+  * ##### ServletExController - 서블릿 예외 컨트롤러
+    ```Java
+    package hello.exception.servlet;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.GetMapping;
+
+    @Slf4j
+    @Controller
+    public class ServletExController {
+
+        @GetMapping("/error-ex")
+        public void errorEx() {
+            throw new RuntimeException("예외 발생");
+        }
+    }
+    ```
+    * 실행해보면 tomcat이 기본으로 제공하는 오류 화면을 볼 수 있다.
+    * 웹 브라우저에서 개발자 모드로 환인해보면 HTTP 상태 코드가 500으로 보인다.
+    * `Exception`의 경우 서버 내부에서 처리할 수 없는 오류가 발생한 것으로 생각해서 HTTP 상태 코드 500을 반환한다.
+    * 이번에는 아무 사이트나 호출해보자
+      * 톰캣이 기본으로 제공하는 404 오류 화면을 볼 수 있다.
+  * ##### response.sendError(HTTP 상태코드, 오류 메세지)
+    * 오류가 발생했을 떄 `HttpServletResponse`가 제공하는 `sendError`라는 메서드를 사용해도 된다.
+    * 이것을 호출한다고 당장 예외가 발생하는 것은 아니지만, 서블릿 컨테이너에게 오류가 발생했다는 점을 전달할 수 있다.
+    * 이 메서드를 사용하면 HTTP상태 코드와 오류 메세지도 추가할 수 있다.
+      * `response.sendError(HTTP 상태 코드)`
+      * `response.sendError(HTTP 상태 코드, 오류 메세지)`
+  * ##### ServletExController - 추기
+    ```Java
+    package hello.exception.servlet;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.GetMapping;
+
+    import javax.servlet.http.HttpServletResponse;
+
+    @Slf4j
+    @Controller
+    public class ServletExController {
+
+        @GetMapping("/error-404")
+        public void error404(HttpServletResponse response) throws Exception {
+            response.sendError(404, "404오류");
+        }
+
+        @GetMapping("/error-500")
+        public void error500(HttpServletResponse response) throws Exception {
+            response.sendError(500);
+        }
+    }
+    ```  
+  * ##### sendError 흐름
+    ```
+    WAS(sendError 호출 기록 확인) <- 필터 <- 서블릿 <- 컨트롤러(response.sendError())
+    ``` 
+    * `response.sendError()`를 호출하면 `response`내부에 오류가 발생했다는 상태를 지정해둔다.
+    * 그래고 서블릿 컨테이너는 고객에게 응답 전에 `response`에 `sendError()`가 호출되었는지 확인한다.
+    * 그리고 호출되었다면 설정한 오류 코드에 맞추어 기본 오류 페이지를 보여준다
+  * ##### 정리
+    * 서블릿 컨테이너가 제공하는 기본 예외 처리 화면은 사용자가 보기에 불편하다. 의미 있는 오류 화면을 제공해보자.
+* #### 서블릿 예외 처리 - 오류 화면 제공
+  * 서블릿 컨테이너가 제공하는 기본 예외 처리 화면은 고객 친화적이지 않다. 서블릿이 제공하는 오류 화면 기능을 사용해보자.
+  * 서블릿은 `Exception`(예외)가 발생해서 서블릿 밖으로 전달되거나 또는 `response.sendError()`가 호출되었을 때 각각의 상황에 맞춘 오류 처리 기능을 제공한다
+  * 이 기능을 사용하면 친절한 오류 처리 화면을 준비해서 고객에게 보여줄 수 있다.
+  * 스프링 부트는 통해서 서블릿 컨테이너를 실행하기 때문에, 스프링 부트가 제공하는 기능을 사용해서 서블릿 오류 페이지를 등록하면 된다.
+  * ##### 서블릿 오류 페이지 등록
+    ```Java
+    package hello.exception;
+
+    import org.springframework.boot.web.server.ConfigurableWebServerFactory;
+    import org.springframework.boot.web.server.ErrorPage;
+    import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+    import org.springframework.http.HttpStatus;
+
+    public class WebServerCustomizer implements WebServerFactoryCustomizer<ConfigurableWebServerFactory> {
+
+        @Override
+        public void customize(ConfigurableWebServerFactory factory) {
+            ErrorPage errorPage404 = new ErrorPage(HttpStatus.NOT_FOUND, "/error-page/404");
+            ErrorPage errorPage500 = new ErrorPage(HttpStatus.INTERNAL_SERVER_ERROR, "/error-page/500");
+            ErrorPage errorPageEx = new ErrorPage(RuntimeException.class, "/error-page/500");
+
+            factory.addErrorPages(errorPage404, errorPage500, errorPageEx);
+        }
+    }
+    ```
+    * `response.sendError(404)`: `errorPage404`호출
+    * `response.sendError(500)`: `errorPage500`호출
+    * `RuntimeException`또는 그 자식 타임의 예외: `errorPageEx`호출
+    * 500 예외가 서버 내부에서 발생한 오류라는 뜻을 포함하고 있기 때문에 여기서는 예외가 발생한 경우도 500 오류 화면으로 처리했다
+    * 오류 페이지는 예외를 다룰 때 해당 예외와 그 자식 타입의 오류를 함께 처리한다. 
+      * 예를 들어서 위의 경우 `RuntimeException`은 물론이도 `RuntimeException`의 자식도 함께 처리한다.
+    * 오류가 발생했을 때 처리할 수 있는 컨트롤러가 필요하다. 예를 들어서 `RuntimeException`예외가 발생하면 `errorPageEx`에 지정한 `error-page/500`이 호출된다.
+  * ##### 해당 오류를 처리할 컨트롤러
+    ```Java
+    package hello.exception.servlet;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.RequestMapping;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+
+    @Slf4j
+    @Controller
+    public class ErrorPageController {
+
+        @RequestMapping("/error-page/404")
+        public String errorPage404(HttpServletRequest request, HttpServletResponse response) {
+            log.info("errorPage404");
+            return "error-page/404";
+        }
+
+        @RequestMapping("/error-page/500")
+        public String errorPage500(HttpServletRequest request, HttpServletResponse response) {
+            log.info("errorPage500");
+            return "error-page/500";
+        }
+    }
+    ```
+  * ##### 오류 처리 View
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>404 오류 화면</h2></div>
+        <div>
+            <p>오류 화면 입니다.</p>
+        </div>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```   
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>500 오류 화면</h2></div>
+        <div>
+            <p>오류 화면 입니다.</p></div>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+* #### 서블릿 예외 처리 - 오류 페이지 작동 원리
+  * 서블릿은 `Exception`(예외)가 발생해서 서블릿 밖으로 전달되거나 또는 `response.sendError()`가 호출되었을 때 설정된 오류 페이지를 찾는다
+  * ##### 예외 발생 흐름
+    ```
+    WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(response.sendError())
+    ``` 
+    * WAS는 해당 예외를 처리하는 오류 페이지 정보를 확인하다.
+      `new ErrorPage(RuntimeException.class, "/error-page/500` 
+    * 예를 들어서 `RuntimeException`예외가 WAS까지 전달되면, WAS는 오류 페이지 정보를 확인한다.
+    * 확인해보니 `RuntimeException`의 오류 페이지로 `/error-page/500`이 지정되어 있다. 
+    * WAS는 오류 페이지를 출력하기 위해 `/error-page/500`를 다시 요청한다
+  * ##### 오류 페이지 요청 흐름
+    ```
+    WAS 'error-page/500' 다시 요청 -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러(/error-page/500) -> Viwe
+    ``` 
+    * 중요한 점은 웹 브라우저(클라이언트)는 서버 내부에서 이런 일이 일어나는지 전혀 모른다는 점이다. 오직 서버 내부에서 오류 페이지를 찾기 위해 추가적인 호출은 한다.
+    * 정리하면 다음과 같다
+      1. 예외가 발생해서 WAS까지 전파된다.
+      2. WAS는 오류 페이지 경로를 찾아서 내부에서 오류 페이지를 호출한다. 이때 오류 페이지 경로로 필터, 서블릿, 인터셉터, 컨트롤러가 모두 다시 호출된다.
+  * ##### 오류 정보 추가
+    * WAS는 오류 페이지를 단순히 다시 요청만 하는 것이 아니라, 오류 정보를 `request`의 `attribute`에 추가해서 넘겨준다
+    * 필요하면 오류 페이지에서 이렇게 전달된 오류 정보를 사용할 수 있다.
+  * ##### ErrorPageController - 오류 출력 
+    ```Java
+    package hello.exception.servlet;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.web.bind.annotation.RequestMapping;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+
+    @Slf4j
+    @Controller
+    public class ErrorPageController {
+
+        //RequestDispatcher 상수로 정의되어 있음
+        public static final String ERROR_EXCEPTION = "javax.servlet.error.exception";
+        public static final String ERROR_EXCEPTION_TYPE = "javax.servlet.error.exception_type";
+        public static final String ERROR_MESSAGE = "javax.servlet.error.message";
+        public static final String ERROR_REQUEST_URI = "javax.servlet.error.request_uri";
+        public static final String ERROR_SERVLET_NAME = "javax.servlet.error.servlet_name";
+        public static final String ERROR_STATUS_CODE = "javax.servlet.error.status_code";
+
+        @RequestMapping("/error-page/404")
+        public String errorPage404(HttpServletRequest request, HttpServletResponse response) {
+            log.info("errorPage404");
+            printErrorInfo(request);
+            return "error-page/404";
+        }
+
+        @RequestMapping("/error-page/500")
+        public String errorPage500(HttpServletRequest request, HttpServletResponse response) {
+            log.info("errorPage500");
+            printErrorInfo(request);
+            return "error-page/500";
+        }
+
+        private void printErrorInfo(HttpServletRequest request) {
+            log.info("ERROR_EXCEPTION: ex=", request.getAttribute(ERROR_EXCEPTION));
+            log.info("ERROR_EXCEPTION_TYPE: {}", request.getAttribute(ERROR_EXCEPTION_TYPE));
+            log.info("ERROR_MESSAGE: {}", request.getAttribute(ERROR_MESSAGE));
+            log.info("ERROR_REQUEST_URI: {}", request.getAttribute(ERROR_REQUEST_URI));
+            log.info("ERROR_SERVLET_NAME: {}", request.getAttribute(ERROR_SERVLET_NAME));
+            log.info("ERROR_STATUS_CODE: {}", request.getAttribute(ERROR_STATUS_CODE));
+            log.info("dispatcherType={}", request.getDispatcherType());
+        }
+    }
+    ```   
+    * request.attribute에 서버가 담아준 정보
+      * `javax.servlet.error.exception`: 예외
+      * `javax.servlet.error.exception_type`: 예외 타입
+      * `javax.servlet.error.message`: 오류 메세지
+      * `javax.servlet.error.request_uri`: 클라이언트 요청 URI
+      * `javax.servlet.error.servlet_name`: 오류가 발생한 서블릿 이름
+      * `javax.servlet.error.status_code`: HTTP 상태 코드
+* #### 서블릿 예외 처리 - 필터
+  * 목표
+    * 예외 처리에 따른 필터와 인터셉터 그리고 서블릿이 제공하는 `DispatchType`이해하기
+  * ##### 예외 발생과 오류 페이지 요청 흐름
+    ```
+    1. WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외발생)
+    2. WAS '/error-page/500' 다시 요청 -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러(/error-page/500) -> View
+    ``` 
+    * 오류가 발생하면 오류 페이지를 출력하기 위해 WAS 내부에서 다시 한번 호출이 발생한다. 
+    * 이때 필터, 서블릿, 인터셉터도 모두 다시 호출된다. 그런데 로그인 인증 체크 같은 경우 생각해보면, 이미 한번 필터나, 인터셉터에서 로그인 체크를 완료했다. 따라서 서버 내부에서 오류 페이지를 호출한다고 해서 해당 필터나 인터셉터가 한번 더 호출되는 것은 매우 비효율적이다.
+    * 결국 클라이언트로 부터 발생한 정상 요청인지, 아니면 오류 페이지를 출력하기 위한 내부 요청인지 구분할 수 있어야 한다.
+    * 서블릿은 이런 문제를 해결하기 위해 `DispatcherTpye`이라는 추가 정보를 제공한다
+  * ##### DispatcherType
+    * 필터는 이런 경우를 위해서 `dispatcherTpyes`라는 옵션을 제공한다.
+    * `log.info("dispatcherTpye={}", request.getDispatcherTpye())`
+      * 출력해보면 오류 페이지에서 `dispatchType=ERROR`로 나오는 것을 확인할 수 있다.
+    * 고객이 처음 요청하면 `dispatcuerTpye="REQUESET`이다.
+    * 이렇듯 서블릿 스펙은 실제 고객이 요청한 것인지, 서버가 내부에서 오류 페이지를 요청하는 것인지 `DispatcherType`으로 구분할 수 있는 방법을 제공한다
+    * javax.servlet.DispatcherType
+      ```Java
+      public enum DispatcherType{
+
+        FORWARD,
+        INCLUED,
+        REQUEST,
+        ASYNC,
+        ERROR
+      }
+      ``` 
+      * `FORWARD`: MVC에서 배웠던 서블릿에서 다른 서블릿이나 JSP를 호출할 때
+        * `RequestDispatcher.forward(request, response);`
+      * `INCLUDE`: 서블릿에서 다른 서블릿이나 JSP의 결과를 포함할 때
+        * `RequestDispatcher.include(request, response);`
+      * `ASYNC`: 서블릿 비동기 호출
+  * ##### 필터와 DispatcherType
+    * ###### LogFilter - DispatcherType 로그 추가
+      ```Java
+      package hello.exception.filter;
+
+      import lombok.extern.slf4j.Slf4j;
+
+      import javax.servlet.*;
+      import javax.servlet.http.HttpServletRequest;
+      import java.io.IOException;
+      import java.util.UUID;
+
+      @Slf4j
+      public class LogFilter implements Filter {
+
+          @Override
+          public void init(FilterConfig filterConfig) throws ServletException {
+              log.info("log filter init");
+          }
+
+          @Override
+          public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+              HttpServletRequest httpRequest = (HttpServletRequest) request;
+              String requestURI = httpRequest.getRequestURI();
+              String uuid = UUID.randomUUID().toString();
+
+              try {
+                  log.info("REQUEST [{}][{}][{}]", uuid, httpRequest.getDispatcherType(), requestURI);
+                  chain.doFilter(request, response);
+              } catch (Exception e) {
+                  throw e;
+              } finally {
+                  log.info("RESPONSE [{}][{}][{}]", uuid, request.getDispatcherType(), requestURI);
+              }
+          }
+
+          @Override
+          public void destroy() {
+              log.info("log filter destroy");
+          }
+      }
+      ``` 
+    * ###### WebConfig
+      ```Java
+      package hello.exception;
+
+      import hello.exception.filter.LogFilter;
+      import org.springframework.boot.web.servlet.FilterRegistrationBean;
+      import org.springframework.context.annotation.Bean;
+      import org.springframework.context.annotation.Configuration;
+      import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+      import javax.servlet.DispatcherType;
+
+      @Configuration
+      public class WebConfig implements WebMvcConfigurer {
+
+          @Bean
+          public FilterRegistrationBean logFilter() {
+              FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean();
+              filterRegistrationBean.setFilter(new LogFilter());
+              filterRegistrationBean.setOrder(1);
+              filterRegistrationBean.addUrlPatterns("/*");
+              filterRegistrationBean.setDispatcherTypes(DispatcherType.REQUEST, DispatcherType.ERROR);
+
+              return filterRegistrationBean;
+          }
+      }
+      ``` 
+      * `fiterRegistrationBean.setDispatcherType(DispatcherType.REQUSET, DispatcherType.ERROR);`
+        * 이렇게 두 가지 모두 넣으면 클라이언트 요청은 물론이고, 오류 페이지 요청에서도 필터가 호출된다.
+        * 아무것도 넣지 않으면 기본 값이 `DispatcherType.REQUEST`이다.
+        * 즉 클라이언트의 요청이 있는 경우에만 필터가 적용된다. 특별히 오류 페이지 경로도 필터를 적용할 것이 아니라면, 기본 값을 그대로 사용하면 된다.
+        * 물론 오류 페이지 요청 전용 필터를 적용하고 싶으면 `DispatcherType.ERROR`만 지정하면 된다.
+* #### 서블릿 예외 처리 - 인터셉터
+  * ##### 인터셉터 중복 호출 제거_LogIntercepter - DispatcherType 로그 추가
+    ```Java
+    package hello.exception.interceptor;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.web.servlet.HandlerInterceptor;
+    import org.springframework.web.servlet.ModelAndView;
+
+    import javax.servlet.http.HttpServletRequest;
+    import javax.servlet.http.HttpServletResponse;
+    import java.util.UUID;
+
+    @Slf4j
+    public class LogInterceptor implements HandlerInterceptor {
+
+        public static final String LOG_ID = "logId";
+
+        @Override
+        public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+            String requestURI = request.getRequestURI();
+            String uuid = UUID.randomUUID().toString();
+
+            request.setAttribute(LOG_ID, uuid);
+
+            log.info("REQUEST [{}][{}][{}][{}]", uuid, request.getDispatcherType(), requestURI, handler);
+            return true;
+        }
+
+        @Override
+        public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+            log.info("postHandle [{}]", modelAndView);
+        }
+
+        @Override
+        public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+            String requestURI = request.getRequestURI();
+            Object uuid = request.getAttribute(LOG_ID);
+
+            log.info("RESPONSE [{}][{}][{}]", uuid, request.getDispatcherType(), requestURI);
+            if (ex != null) {
+                log.error("afterCompletion error!", ex);
+            }
+        }
+    }
+    ```
+    * 앞서 필터의 경우에는 필터를 등록할 때 어떤 `DispatcherType`인 경우에 필터를 적용할 지 선택할 수 있었다. 그런데 인터셉터는 서블릿이 제공하는 기능이 아니라 스프링이 제공하는 기능이다. 따라서 `DispatcherType`과 무관하게 항상 호출된다
+    * 대신에 인터셉터는 다음과 같이 요청 경로에 따라서 추가하거나 제외하기 쉽게 되어 있기 때문에, 이러한 설정을 사용해서 요류 페이지 경로를 `excludePathPatterns`를 사용해서 빼주면 된다.
+      ```Java
+      package hello.exception;
+
+      @Configuration
+      public class WebConfig implements WebMvcConfigurer {
+
+          @Override
+          public void addInterceptors(InterceptorRegistry registry) {
+              registry.addInterceptor(new LogInterceptor())
+                      .order(1)
+                      .addPathPatterns("/**")
+                      .excludePathPatterns("/css/**", "/*.ico", "/error", "/error-page/**");
+          }
+      }
+      ``` 
+      * 여기에서 `/error-page/**`를 제거하면 `error-page/500`같은 내부 호출의 경우에도 인터셉터가 호출된다.
+  * ##### 전체 흐름 정리
+    * `/hello`정상 요청
+      ```
+      WAS(/hello, dispatcherType=REQUEST) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러 -> View
+      ``` 
+    * `/error-ex`오류 요청
+      * 필터는 `DispatchType`으로 중복 호출 제거(`dispatchType=REQUEST`)
+      * 인터셉터는 결로 정보로 중복 호출 제거(excludePathPatterns("/error-page/**"))
+        ```
+        1. WAS(/error-ex, dispatchType=REQUEST) -> 필터 -> 서블릿 -> 인터셉터 -> 컨트롤러
+        2. WAS(여기까지 전파) <- 필터 <- 서블릿 <- 인터셉터 <- 컨트롤러(예외 발생)
+        3. WAS 오류 페이지 확인
+        4. WAS(/error-page/500, dispatchType=ERROR) -> 필터(x) -> 서블릿 -> 인터셉터(x) -> 컨트롤러(/error-page/500) -> View
+        ``` 
+* #### 스프링 부트 - 오류 페이지1
+  * 지금까지 예외 처리 페이지를 만들기 위해서 다음과 같은 복잡한 과정을 거쳤다.
+    * `WebServerCustomizer`를 만들고
+    * 예외 종류에 따라서 `ErrorPage`를 추가하고
+    * 예외 처리용 컨트롤러 `ErrorPageController`를 만듬
+  * 스프링 부트는 이런 과정을 모두 기본적으로 제공한다.
+    * `ErrorPage`를 자동으로 등록한다. 이때 `/error`라는 경로로 기본 오류 페이지를 설정한다
+      * `new ErrorPage("/error")`, 상태코드와 예외를 설정하지 않으면 기본 오류 페이지로 사용된다.
+      * 서블릿 밖으로 예외가 발생하거나, `response.sendError(...)`가 호출되면 모든 오류는 `/error`를 호출하게 된다.
+    * `BasicErrorController`라는 스프링 컨트롤러를 자동으로 등록한다
+      * `ErrorPage`에서 등록한 `/error`를 매핑해서 처리하는 컨트롤러다.
+  * 참고
+    * `ErrorMvcAutoConfiguration`이라는 클래스가 오류 페이지를 자동으로 등록하는 역할을 한다.
+  * 주의
+    * 스프링 부트가 제공하는 기본 오류 메커니즘을 사용하도록 `WebServerCustomizer`에 있는 `@Component`를 수적 처리하자.
+  * 이제 오류가 발생했을 때 오류 페이지로 `/error`를 기본 요청한다. 스프링 부트가 자동 등록한 `BasicErrorController`는 이 경로를 기본으로 받는다.
+  * ##### 개발자는 오류 페이지만 등록
+    * `BasicErrorController`는 기본적인 로직이 모두 개발되어 있다.
+    * 개발자는 오류 페이지 화면만 `BasicErrorController`가 제공하는 룰과 우선순위에 따라서 등록하면 된다.
+    * 정적 HTML이면 정적 리소스, 뷰 템플릿을 사용해서 동적으로 오류 화면을 만들고 싶으면 뷰 템플릿 경로에 오류 페이지 파일을 만들어서 넣어두기만 하면 된다.
+  * ##### 뷰 선택 우선순위
+    * `BasicErrorController`의 처리 순서
+      1. 뷰 템플릿
+         * `resources/templates/error/500.html`
+         * `resources/templates/error/5xx.html`  
+      2. 정적 리소스(static, public)
+         * `resources/static/error/400.html`
+         * `resources/static/error/404.html`
+         * `resources/static/error/4xx.html`     
+      3. 적용 대상이 없을 때 뷰 이름(`error`) 
+         * `resources/templates/error.html`
+    * 해당 경로 위치에 HTTP 상태 코드 이름의 뷰 파일을 넣어두면 된다.
+    * 뷰 템플릿에 정적 리소스보다 우선순위가 높고, 404, 500처럼 구체적인 것이 5xx처럼 덜 구체적인 것 보다 우선순위가 높다
+  * ##### 오류 뷰 템플릿 추가
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>4xx 오류 화면 스프링 부트 제공</h2>
+        </div>
+        <div>
+            <p>오류 화면 입니다.</p>
+        </div>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>404 오류 화면 스프링 부트 제공</h2>
+        </div>
+        <div>
+            <p>오류 화면 입니다.</p>
+        </div>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+    ```HTML
+    <!DOCTYPE HTML>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="utf-8">
+    </head>
+    <body>
+    <div class="container" style="max-width: 600px">
+        <div class="py-5 text-center">
+            <h2>500 오류 화면 스프링 부트 제공</h2>
+        </div>
+        <div>
+            <p>오류 화면 입니다.</p>
+        </div>
+        <ul>
+            <li>오류 정보</li>
+            <ul>
+                <li th:text="|timestamp: ${timestamp}|"></li>
+                <li th:text="|path: ${path}|"></li>
+                <li th:text="|status: ${status}|"></li>
+                <li th:text="|message: ${message}|"></li>
+                <li th:text="|error: ${error}|"></li>
+                <li th:text="|exception: ${exception}|"></li>
+                <li th:text="|errors: ${errors}|"></li>
+                <li th:text="|trace: ${trace}|"></li>
+            </ul>
+            </li>
+        </ul>
+        <hr class="my-4">
+    </div> <!-- /container -->
+    </body>
+    </html>
+    ```
+* #### 스프링 부트 - 오류 페이지2
+* #### 정리
+
+
+---
+* ### API 예외 처리
+* #### 시작
+  * HTML 페이지의 경우 지금까지 설명했던 것 처럼 4xx, 5xx와 같은 오류 페이지만 있으면 대부분의 문제를 해결할 수 있다.
+  * 그런데 API의 경우에는 생각할 내용이 더 많다. 오류 페이지는 단순히 고객에게 오류 화면을 보여주고 끝이지만, API는 각 오류 상황에 맞는 오류 응답 스펙을 정하고, JSON으로 데이터를 내려주어야 한다.
+  * 지금부터 API의 경우 어떻게 예외 처리를 하면 좋은지 알아보자. API도 오류 페이지에서 설명했던 것 처럼 처음으로 돌아가서 서블릿 오류 페이지로 방식을 사용해보자.
+  * ##### WebServerCustomizer 다시 동작
+    ```Java
+    package hello.exception;
+
+    import org.springframework.boot.web.server.ConfigurableWebServerFactory;
+    import org.springframework.boot.web.server.ErrorPage;
+    import org.springframework.boot.web.server.WebServerFactoryCustomizer;
+    import org.springframework.http.HttpStatus;
+    import org.springframework.stereotype.Component;
+
+    @Component
+    public class WebServerCustomizer implements WebServerFactoryCustomizer<ConfigurableWebServerFactory> {
+
+        @Override
+        public void customize(ConfigurableWebServerFactory factory) {
+            ErrorPage errorPage404 = new ErrorPage(HttpStatus.NOT_FOUND, "/error-page/404");
+            ErrorPage errorPage500 = new ErrorPage(HttpStatus.INTERNAL_SERVER_ERROR, "/error-page/500");
+            ErrorPage errorPageEx = new ErrorPage(RuntimeException.class, "/error-page/500");
+
+            factory.addErrorPages(errorPage404, errorPage500, errorPageEx);
+        }
+    }
+    ``` 
+    * 이제 WAS에 예외가 전달되거나, `response.sendError()`가 호출되면 위에 등록한 예외 페이지 경로가 호출된다.
+  * ##### ApiExceptionController - API예외 컨트롤러
+    ```Java
+
+
+* #### 스프링 부트 기본 오류 처리
+* #### HandlerExceptionResolver 시작
+* #### HandlerExceptionResolver 활용
+* #### 스프링이 제공하는 ExceptionResolver1
+* #### 스프링이 제공하는 ExceptionResolver2
+* #### @ExceptionHandler
+* #### @ControllerAdvice
+* #### 정리
+---
+* ### 스프링 타입 컨버터
+* #### 프로젝트 생성
+  * 프로젝트 선택
+    * Project: Gradle 
+    * Project Language: Java 
+    * Spring Boot: 2.4.x
+  * Project Metadata 
+    * Group: hello
+    * Artifact: typeconverter
+    * Name: typeconverter
+    * Package name: hello.typeconverter 
+    * Packaging: Jar
+    * Java: 11
+  * Dependencies
+    * Spring Web
+    * Lombok
+    * Thymeleaf
+* #### 스프링 타입 컨버터 소개
+  * 문자를 숫자로 변환하거나, 반대로 숫자를 문자로 변환해야 하는 것 처럼 애플리케이션을 개발하다 보면 타입을 변환해야 하는 경우가 상당히 많다.
+  * ##### HelloController - 문자 타입을 숫자 타입으로 변경
+    ```Java
+    package hello.typeconverter.controller;
+
+    import org.springframework.web.bind.annotation.GetMapping;
+    import org.springframework.web.bind.annotation.RestController;
+
+    import javax.servlet.http.HttpServletRequest;
+
+    @RestController
+    public class HelloController {
+
+        @GetMapping("/hello-v1")
+        public String helloV1(HttpServletRequest request) {
+            String data = request.getParameter(("data"));  //문자 타입 조회
+            Integer intValue = Integer.valueOf(data);  //숫자 타입으로 변경
+            System.out.println("intValue = " + intValue);
+            return "ok";
+        }
+    }
+    ```
+    * 실행
+      * http://localhost:8080/hello-v1?data=10
+    * 분석
+      * `String data = request.getParameter("data")`
+        * HTTP 요청 파라미터는 모두 문자로 처리된다. 따라서 요청 파라미터를 자바에서 다른 타입으로 변환해서 사용하고 싶으면 다음과 같이 숫자 타입으로 변환하는 과정을 거쳐야 한다.
+          * `Integer intValue = Integer.valueOf(data)`
+    * ###### Integer.valueOf()
+      * String -> Integer
+      * parseInt() vs valueOf()
+        * parseInd(): 원시데이터인 int타입을 반환
+        * valueOf(): Integer 객체를 반환
+  * ##### 스프링 MVC가 제공하는 @RequestParam 사용
+    ```Java
+    package hello.typeconverter.controller;
+
+    @RestController
+    public class HelloController {
+
+        @GetMapping("/hello-v2")
+        public String helloV2(@RequestParam Integer data) {
+            System.out.println("data = " + data);
+            return "ok";
+        }
+    }
+    ``` 
+    * 실행
+      * http://localhost8080/hello-v2?data=10
+    * 앞서 보았들이 HTTP 쿼리 스트링으로 전달하는 `data=10`부분에서 10은 숫자 10이 아니라 문자 10이다.
+    * 스프링이 제공하는 `@RequestParam`을 사용하면 이 문자 10을 `Integer`타입의 숫자 10으로 편리하게 받을 수 있다.
+    * 이것은 스프링이 중간에서 타입을 변환해주었기 떄문이다.
+  * ##### @ModelAttribute 타입 변환 예시
+    ```Java
+    @ModelAttribute UserData data
+
+    class UserData{
+      Integer data;
+    } 
+    ```
+  * ##### @PathVariable 타입 변환 예시
+    ```Java
+    /users/{userId}
+    @PathVariable("data") Integer data
+    ```
+    * URL 경로는 문자다. /user/10 -> 여기서 10도 숫자 10이 아니라 그냥 문자 "10"이다.
+    * data를 `Integer`타입으로 받을 수 있는 것도 스프링이 타입 변환을 해주기 때문이다.
+  * ##### 스프링의 타입 변환 적용 예
+    * 스프링 MVC요청 파라미터
+      * `@RequestParam`, `@ModelAttribute`, `@PathVariable`
+    * `@Value`등으로 YML 정보 읽기
+    * XML에 넣은 스프링 빈 정보를 변환
+    * 뷰를 렌더링 할 때
+  * ##### 스프링과 타입 변환
+    * 이렇게 타입을 변환해야 하는 경우는 상당히 많다.
+    * 개발자가 직접 하나하나 타입 변환을 해야 한다면, 생각만 해도 괴로울 것이다.
+    * 스프링이 중간에 타입 변화기를 사용해서 타입을 `String` -> `Integer`로 변환해주었기 때문에 개발자는 편리하게 해당 타입을 바로 받을 수 있다. 앞에서는 문자를 숫자로 변경하는 예시를 들었지만, 반대로 숫자를 문자로 변경하는 것도 가능하고, `Boolean`타입을 숫자로 변경하는 것도 가능하다. 
+    * 만약 개발자가 새로운 타입을 만들어서 변환하고 싶으면 어떻게 하면 될까?
+  * ##### 컨버터 인터페이스
+    ```Java
+    package org.springframework.core.convert.converter;
+
+    public interface Converter<S, T>{
+
+      T convert(S source);
+    }
+    ``` 
+    * 스프링은 활장 가능한 컨버터 인터페이스를 제공한다.
+    * 개발자는 스프링에 추가적인 타입 변환이 필요하면 이 컨버터 인터페이스를 구현해서 등록하면 된다.
+    * 이 컨버터 인터페이스는 모든 타입에 적용할 수 있다. 필요하면 X -> Y 타입으로 변환하는 컨버터 인터페이스를 만들고, 또 Y -> X 타입으로 변환하는 컨버터 인터페이스를 만들어서 등록하면 된다.
+    * 예를 들어서 문자로 `"true"`가 오면 `"Boolean"`타임으로 받고 싶으면 `String` -> `Boolean`타입으로 변환되도록 컨버터 인터페이스를 만들어서 등록하고, 반대로 적용하고 싶으면 `Boolean` -> `String`타입으로 변환되도록 컨버터를 추가로 만들어서 등록하면 된다.
+    * 참고
+      * 과거에는 `PropertyEditor`라는 것으로 타입을 변환했다. `PropertyEditor`는 동시성 문제가 있어서 타입을 반활할 때 마다 객체를 계속 생성해야 하는 단점이 있다. 지금은 `Converter`의 등장으로 해당 문제들이 해결되었고, 기능 확장이 필요하면 `Converter`를 사용하면 된다.
+* #### 타입 컨버터 - Converter
+  * 타입 컨버터를 사용하려면 `org.springframework.core.convert.converter.Converter`인터페이스를 구현하면 된다.
+  * 주의 
+    * `Converter`라는 이름의 인터페이스가 많으니 조심해야 한다.
+      * `org.springframework.core.convert.converter.Converter`를 사용해야 한다.
+  * ##### StringToIntegerConverter - 문자를 숫자로 변환하는 타입 컨버터
+    ```Java
+    package hello.typeconverter.converter;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.core.convert.converter.Converter;
+
+    @Slf4j
+    public class StringToIntegerConverter implements Converter<String, Integer> {
+
+        @Override
+        public Integer convert(String source) {
+            log.info("converter source={}", source);
+            return Integer.valueOf(source);
+        }
+    }
+    ``` 
+    * `String` -> `Integer` 로 변환하기 때문에 소스가 `String`이 된다.
+    * 이 문자를 `Integer.valueOf(source)`를 사용해서 숫자로 변경한 다음에 변경된 숫자를 반환하면 된다.
+  * ##### IntegerToStringConverter - 숫자를 문자로 반환하는 타입 컨버터
+    ```Java
+    package hello.typeconverter.converter;
+
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.core.convert.converter.Converter;
+
+    @Slf4j
+    public class IntegerToStringConverter implements Converter<Integer, String> {
+
+        @Override
+        public String convert(Integer source) {
+            log.info("converter source={}", source);
+            return String.valueOf(source);
+        }
+    }
+    ```
+    * 이번에는 숫자를 문자로 변환하는 타입 컨버터이다. 앞의 컨버터와 반대의 일은 한다.
+    * 이번에는 숫자가 입력되기 때문에 소스가 `Integer`가 된다.
+    * `String.valueOf(source)`를 사용해서 문자로 변경한 다음 변경된 문자를 반환하면 된다.
+  * ##### ConverterTest - 타입 컨버터 테스트 코드
+    ```Java
+    package hello.typeconverter.converter;
+
+    import org.junit.jupiter.api.Test;
+
+    import static org.assertj.core.api.Assertions.assertThat;
+
+    class IntegerToStringConverterTest {
+
+        @Test
+        void StringToInteger() {
+            StringToIntegerConverter stringToIntegerConverter = new StringToIntegerConverter();
+            Integer result = stringToIntegerConverter.convert("1994");
+            assertThat(result).isEqualTo(1994);
+        }
+
+        @Test
+        void IntegerToString() {
+            IntegerToStringConverter integerToStringConverter = new IntegerToStringConverter();
+            String result = integerToStringConverter.convert(1994);
+            assertThat(result).isEqualTo("1994");
+        }
+    }
+    ``` 
+  * ##### 사용자 정의 타입 컨버터
+    `127.0.0.1:8080`과 같은 IP, PORT를 입력하면 IpPort 객체로 변환하는 컨버터를 만들어보자.
+    ```Java
+    package hello.typeconverter.type;
+
+    import lombok.EqualsAndHashCode;
+    import lombok.Getter;
+
+    @Getter
+    @EqualsAndHashCode
+    public class IpPort {
+
+        private String ip;
+        private int port;
+
+        public IpPort(String ip, int port) {
+            this.ip = ip;
+            this.port = port;
+        }
+    }
+    ```
+    * 롬복의 `@EqualsAndHashCode`를 넣으면 모든 필드를 사용해서 `equals()`, `hashCode()`를 생성한다.
+    * 따라서 모든 필드의 값이 같다면 `a.equals(b)`의 결과가 참이 된다.
+  * ##### StringToIpPortConverter - 컨버터
+    ```Java
+    package hello.typeconverter.controller;
+
+    import hello.typeconverter.type.IpPort;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.core.convert.converter.Converter;
+
+    @Slf4j
+    public class StringToIpPortConverter implements Converter<String, IpPort> {
+
+        @Override
+        public IpPort convert(String source) {
+            log.info("converter source={}", source);
+
+            String[] split = source.split(":");
+            String ip = split[0];
+            int port = Integer.parseInt(split[1]);
+
+            return new IpPort(ip, port);
+        }
+    }
+    ```
+    * `"127.0.0.1:8080"`같은 문자를 입력하면 `IpPort`객체를 만들어 반환한다.
+  * ##### IpPortToStringConverter
+    ```Java
+    package hello.typeconverter.converter;
+
+    import hello.typeconverter.type.IpPort;
+    import lombok.extern.slf4j.Slf4j;
+    import org.springframework.core.convert.converter.Converter;
+
+    @Slf4j
+    public class IpPortToStringConverter implements Converter<IpPort, String> {
+
+        @Override
+        public String convert(IpPort source) {
+            log.info("converter source={}", source);
+            
+            return source.getIp() + source.getPort();
+        }
+    }
+    ``` 
+    * `IpPort`객체를 입력하면 `"127.0.0.1:8080"`같은 문자를 반환한다.
+  * ##### ConverterTest - IpPort 컨버터 테스트 추가
+    ```Java
+    package hello.typeconverter.converter;
+
+    import hello.typeconverter.type.IpPort;
+    import org.junit.jupiter.api.Test;
+
+    import static org.assertj.core.api.Assertions.assertThat;
+
+    class IpPortToStringConverterTest {
+
+        @Test
+        void StringToIpPort() {
+            StringToIpPortConverter stringToIpPortConverter = new StringToIpPortConverter();
+            IpPort result = stringToIpPortConverter.convert("127.0.0.1:8080");
+            assertThat(result).isEqualTo(new IpPort("127.0.0.1", 8080));
+        }
+
+        @Test
+        void IpPortToString() {
+            IpPortToStringConverter ipPortToStringConverter = new IpPortToStringConverter();
+            String result = ipPortToStringConverter.convert(new IpPort("127.0.0.1", 8080));
+            assertThat(result).isEqualTo("127.0.0.1:8080");
+        }
+    }
+    ```
+    * 타입 컨버터 인터페이스가 단순해서 이해하기 어렵지 않았을 것이다.
+    * 그런데 이렇게 타입 컨버터를 하나하나 직접 사용하면, 개발자가 직접 컨버팅 하는 것과 큰 차이가 없다.
+    * 타입 컨버터를 등록하고 관리하면서 편리하게 변환 기능을 제공하는 역할을 하는 무언가가 필요하다.
+  * 참고
+    * 스프링은 용도에 따라 다양한 방식의 타입 컨버터를 제공한다
+      * `Converter`: 기본 타입 컨버터
+      * `ConverterFactory`: 전체 클래스 계층 구조가 필요할 떄
+      * `GenericConverter`: 정교한 구현, 대상 필드의 애노테이션 정보를 사용 가능
+      * `ConditionalGenericConverter`: 특정 조건이 참인 경우에만 실행
+    * 자세한 내용은 공식 문서를 참고하자.
+      * https://docs.spring.io/spring-framework/docs/current/reference/html/core.html#core- convert
+    * 스프링은 문자, 숫자, 불린, Enum등 일반적인 타입에 대한 부분의 컨버터를 기본으로 제공한다. IDE에서 `Converter`, `ConverterFactort`, `GenericConverter`의 구현체를 찾아보면 수 많은 컨버터를 확인할 수 있다.     
+* #### 컨버전 서비스 - ConversionService
+  * 이렇게 타입 컨버터를 하나하나 직접 찾아서 타입 변환에 사용하는 것은 매우 불편하다. 그래서 스프링은 개별 컨버터를 모아두고 그것을 묶어서 편리하게 사용할 수 있는 기능을 제공하는데, 이것이 바로 컨버전 서비스(`ConvertionService`)이다.
+  * ##### ConversionService 인터페이스
+    ```Java
+    package org.springframework.core.convert;
+
+    import org.springframework.lang.Nullable;
+
+    public interface ConversionService{
+      boolean canConvert(@Nullable Class<?> sourceType, Class<?> targetType);
+      boolean canConvert(@Nullable TypeDescriptor source sourceType, TypeDescriptor targetType);
+
+      <T> T convert(@Nullable Object source, Class<T> targetType);
+      Object convert(@Nullable Object source, @Nullable TypeDescriptor sourceType, TypeEdscriptor targetType);
+    }
+    ``` 
+    * 컨버전 서비스 인터페이스는 단순히 컨버팅이 가능한가? 확인하는 기능과, 컨버팅 기능을 제공한다
+  * ##### ConversionServiceTest - 컨버전 서비스 테스트 코드
+    ```Java
+    package hello.typeconverter.converter;
+
+    import hello.typeconverter.type.IpPort;
+    import org.junit.jupiter.api.Test;
+
+    import static org.assertj.core.api.Assertions.assertThat;
+
+    class IpPortToStringConverterTest {
+
+        @Test
+        void StringToIpPort() {
+            StringToIpPortConverter stringToIpPortConverter = new StringToIpPortConverter();
+            IpPort result = stringToIpPortConverter.convert("127.0.0.1:8080");
+            assertThat(result).isEqualTo(new IpPort("127.0.0.1", 8080));
+        }
+
+        @Test
+        void IpPortToString() {
+            IpPortToStringConverter ipPortToStringConverter = new IpPortToStringConverter();
+            String result = ipPortToStringConverter.convert(new IpPort("127.0.0.1", 8080));
+            assertThat(result).isEqualTo("127.0.0.1:8080");
+        }
+    }
+    ```
+    * `DefaultConversionService`는 `ConvertionService`인터페이스를 구헌했는데, 추가로 컨버터를 등록하는 기능도 제공한다.
+    * ###### 등록과 사용 분리
+      * 컨버터를 등록 할 떄는 `StrigToIntegerConverter`같은 타입 컨버터를 명확하게 알아야 한다.
+      * 반면에 컨버터를 사용하는 입장에서는 타입 컨버터를 전혀 몰라도 된다.
+      * 타입 컨버터들은 모두 컨버전 서비스 내부에 숨어서 제공된다.
+      * 따라서 타입 변환을 원하는 사용자는 컨버전 서비스 인터페이스에만 의존하면 된다.
+      * 물론 컨버전 서비스를 등록하는 부분과 사용하는 부분을 분리하고 의존관계 주입을 사용해야 한다.
+    * ###### 컨버전 서비스 사용
+      `Integer value = conversionService.converter("10", Integer.class)`
+      * 인터페이스 분리 원칙 - ISP(Interface Segregaion Principal)
+        * 인터페이스 분리 원칙은 클라이언트가 자신이 이용하지 않는 메서드에 의존하지 않아야 한다.
+        * `DefaultConversionService`는 다음 두 인터페이스를 구현한다
+          * `ConversionService`: 컨버터 사용에 초점
+          * `ConverterRegistry`: 컨버터 등록에 초점
+        * 이렇게 인터페이스를 분리하면 컨버터를 사용하는 클라이언트와 컨버터를 등록하고 관리하는 클라이언트의 관심사를 명확하게 분리할 수 있다.
+        * 특히 컨버터를 사용하는 클라이언트는 `ConversionService`만 의존하면 되므로, 컨버터를 어떻게 등록하고 관리하는지는 전혀 몰라도 된다.
+        * 결과적으로 컨버터를 사용하는 클라이언트는 꼭 필요한 메서드만 알게된다.
+        * 이렇게 인터페이스를 분리하는 것은 `ISP`라 한다
+        * ISP참고
+          * https://ko.wikipedia.org/wiki/ %EC%9D%B8%ED%84%B0%ED%8E%98%EC%9D%B4%EC%8A%A4_%EB%B6%84%EB% A6%AC_%EC%9B%90%EC%B9%99 
+    * 스프링 내부에서 `ConversionService`를 사용해서 타입을 변환한다. 예를 들어서 앞서 살펴본 `@RequestParam`같은 곳에서 이 기능을 사용해서 타입을 변환한다.
+* #### 스프링에 Converter 적용하기
+  * ##### WebConfig - 컨버터 등록
+    ```Java
+    package hello.typeconverter;
+
+    import hello.typeconverter.converter.IntegerToStringConverter;
+    import hello.typeconverter.converter.IpPortToStringConverter;
+    import hello.typeconverter.converter.StringToIntegerConverter;
+    import hello.typeconverter.converter.StringToIpPortConverter;
+    import org.springframework.context.annotation.Configuration;
+    import org.springframework.format.FormatterRegistry;
+    import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+    @Configuration
+    public class WebConfig implements WebMvcConfigurer {
+
+        @Override
+        public void addFormatters(FormatterRegistry registry) {
+            registry.addConverter(new StringToIntegerConverter());
+            registry.addConverter(new IntegerToStringConverter());
+            registry.addConverter(new StringToIpPortConverter());
+            registry.addConverter(new IpPortToStringConverter());
+        }
+    }
+    ```
+    * 스프링 내부에서 `ConversionService`를 제공한다
+    * 우리는 `WebMvcConfigurer`가 제공하는 `addFormatters()`를 사용해서 추가하고 싶은 컨버터를 등록하면 된다.
+    * 이렇게 하면 스프링은 내부에서 사용하는 `ConversionService`에 컨버터를 추가해준다.
+  * ##### HelloController - 기존 코드
+    ```Java
+    @GetMappinf("/hello-v2")
+    public String helloV2(@RequestParam Integer data){
+
+      System.out.println("data = " + data);
+      return "ok";
+    }
+    ```  
+    * 실행
+      * http://localhost:8080/hello-v2?data=10
+    * 실행 로그
+      ```
+      StringToIntegerConverter   : convert source=10
+      data = 10
+      ``` 
+      * `?data=10`의 쿼리 파라미터는 문자이고 이것은 `Integer data`로 변환하는 과정이 필요하다
+      * 실행해보면 직접 등록한 `StringToIntegerConverter`가 동작하는 로그를 확인할 수 있다.
+      * 그런데 생각해보면 `StringToIntegerConverter`를 등록하기 전에도 이 코드는 잘 수행되었다.
+      * 그것은 스프링이 내부에서 수많은 기본 컨버터들을 제공하기 떄문이다.
+      * 컨버터를 추가하면 추가한 컨버터가 기본 컨버터 보다 높은 우선순위를 가진다
+  * ##### HelloController - 추가
+    ```Java
+    package hello.typeconverter.controller;
+
+    @RestController
+    public class HelloController {
+
+        @GetMapping("/ip-port")
+        public String ipPort(@RequestParam IpPort ipPort) {
+            System.out.println("ipPort IP = " + ipPort.getIp());
+            System.out.println("ipPort PORT = " + ipPort.getPort());
+            return "ok";
+        }
+    }
+    ``` 
+    * 실행
+      * http://localhost:8080/ip-port?ipPort=127.0.0.1:8080
+    * 실행 로그
+      ```
+      StringToIpPortConverter    : convert source=127.0.0.1:8080
+      ipPort IP = 127.0.0.1
+      ipPort PORT = 8080
+      ``` 
+    * `?ipPort=127.0.0.1:8080`쿼리 스트링이 `@RequestParam IpPort ipPort`애서 객체 타입으로 잘 변환 된 것을 확인할 수 있다.
+    * 처리 과정
+      * `@RequestParam`은 `@RequestParam`을 처리하는 `ArgumentResolver`인 `RequestParamMethodArgumentResolver`에서 `ConversionService`를 사용해서 타입을 변환한다.
+      * 부모 클래스와 다양한 외부 클래스를 호출하는 등 복잡한 내무 과정을 거치기 떄문에 대량 이렇게 처리되는 것으로 이해해도 충분하다.
+      * 만약 더 깊에 확인하고 싶으면 `IpPortConverter`에 디버그 브레이크 포인트를 걸어서 확인해보자
+* #### 뷰 템플릿에 컨버터 적용하기
+  * 타임리프는 렌더링 시에 컨버터를 적용해서 랜더링 하는 방법을 편리하게 지원한다
+  * 이전까지 문제를 객체로 변환했다면, 이번에는 그 반대로 객체를 문자로 변환하는 작업을 확인할 수 있다
+  * ##### ConverterController
+    ```Java
+    package hello.typeconverter.controller;
+
+    import hello.typeconverter.type.IpPort;
+    import org.springframework.stereotype.Controller;
+    import org.springframework.ui.Model;
+    import org.springframework.web.bind.annotation.GetMapping;
+
+    @Controller
+    public class ConverterController {
+
+        @GetMapping("/converter-view")
+        public String converterView(Model model) {
+            model.addAttribute("number", 10000);
+            model.addAttribute("ipPort", new IpPort("127.0.0.1", 8080));
+
+            return "converter-view";
+        }
+    }
+    ```
+    * `Model`에 숫자 `10000`와 `ipPort`객체를 담아서 뷰 템플릿에 전달한다.
+  * ##### resources/templates/converter-view
+    ```HTML
+    <!DOCTYPE html>
+    <html xmlns:th="http://www.thymeleaf.org">
+    <head>
+        <meta charset="UTF-8">
+        <title>Title</title>
+    </head>
+    <body>
+    <ul>
+        <li>${number}: <span th:text="${number}"></span></li>
+        <li>${{number}}: <span th:text="${{number}}"></span></li>
+        <li>${ipPort}: <span th:text="${ipPort}"></span></li>
+        <li>${{ipPort}}: <span th:text="${{ipPort}}"></span></li>
+    </ul>
+    </body>
+    </html>
+    ```
+    * 타임리프는 `${{...}}`를 사용하면 자동으로 컨버전 서비스를 사용해서 변환된 결과를 출력해준다.
+    * 물론 스프링과 통합 되어서 스프링이 제공하는 컨버전 서비스를 사용하므로, 우리가 등록한 컨버터들을 사용할 수 있다.
+      * 변수 표현식: `${...}`
+      * 컨버전 서비스 적용: `${{...}}`
+    * 실행
+      * http://localhost:8080/converter-view
+    * 실행 결과
+      ```
+      ${number}: 10000
+      ${{number}}: 10000
+      ${ipPort}: hello.typeconverter.type.IpPort@59cb0946
+      ${{ipPort}}: 127.0.0.1:8080
+      ```   
+    * 실행 결과 로그
+      ```
+      IntegerToStringConverter   : convert source=10000
+      IpPortToStringConverter    : convert source=hello.typeconverter.type.IpPort@59cb0946
+      ``` 
+      * `S{{number}}`: 뷰 템플릿은 데이터를 문자로 출력한다. 따라서 컨버터를 적용하게 되면 `Integer`타입인 `10000`을 `String` 타입 `"10000"`으로 변환하는 컨버터인 `IntegerToStringConverter`를 실행하게 된다
+      * 이 부분은 컨버터를 실행하지 않아도 타임리프가 숫자를 문자로 자동으로 변환하기 때문에 컨버터를 적용할 때와 하지 않을 떄가 같다
+      * `${{ipPort}}`: 뷰 템플릿은 데이터를 문자로 출력한다. 따라서 컨버터를 적용하게 되면 `IpPort`타입을 `String` 타입으로 변한해야 하므로 `IpPortToStringConverter`가 적용된다. 그리고 그 결과 `"127.0.0.1:8080"`가 출력된다.
+  * ##### 폼에 적용하기
+    * ConverterController - 코드 추가 
+      ```Java
+      package hello.typeconverter.controller;
+
+      import hello.typeconverter.type.IpPort;
+      import lombok.Data;
+      import org.springframework.stereotype.Controller;
+      import org.springframework.ui.Model;
+      import org.springframework.web.bind.annotation.GetMapping;
+      import org.springframework.web.bind.annotation.ModelAttribute;
+      import org.springframework.web.bind.annotation.PostMapping;
+
+      @Controller
+      public class ConverterController {
+
+          @GetMapping("/converter-view")
+          public String converterView(Model model) {
+              model.addAttribute("number", 10000);
+              model.addAttribute("ipPort", new IpPort("127.0.0.1", 8080));
+
+              return "converter-view";
+          }
+
+          @GetMapping("/converter/edit")
+          public String converterForm(Model model) {
+              IpPort ipPort = new IpPort("127.0.0.1", 8080);
+              Form form = new Form(ipPort);
+
+              model.addAttribute("form", form);
+              return "/converter-form";
+          }
+
+          @PostMapping("/converter/edit")
+          public String converterEdit(@ModelAttribute Form form, Model model) {
+              IpPort ipPort = form.getIpPort();
+              model.addAttribute("ipPort", ipPort);
+              return "converter-view";
+          }
+
+          @Data
+          static class Form {
+
+              private IpPort ipPort;
+
+              public Form(IpPort ipPort) {
+                  this.ipPort = ipPort;
+              }
+          }
+      }
+      ``` 
+      * `Form`객체를 데이터를 전달하는 폼 객체로 사용한다.
+        * `GET /converter/edit`: `IpPort`를 뷰 템플릿 폼에 출력한다
+        * `POST /converter/edit`: 뷰 템플릿 폼의 `IpPort`정보를 받아서 출력한다
+    * ##### resources/templates/converter-form.html
+      ```HTML
+      <!DOCTYPE html>
+      <html xmlns:th="http://www.thymeleaf.org">
+      <head>
+          <meta charset="UTF-8">
+          <title>Title</title>
+      </head>
+      <body>
+      <form th:object="${form}" th:method="post">
+          th:field <input type="text" th:field="*{ipPort}"><br/>
+          th:value <input type="text" th:value="*{ipPort}">(보여주기 용도)<br/> <input type="submit"/>
+      </form>
+      </body>
+      </html>
+      ```
+      * 타임리프의 `th:filed`는 앞서 설명했듯이 `id`, `name`를 출력하는 등 다양한 기능이 있는데, 여기에 컨버전 서비스도 함꼐 적용된다.
+      * 실행
+        * http://localhost:8080/converter/edit
+      * `GET /converter/edit`
+        * `th:filed`가 자동으로 컨버전 서비스를 적용해주어서 `${{ipPort}}`처럼 적용이 되었다.
+        * 따라서 `IpPort` -> `String`으로 변환된다.
+      * `POST /converter/edit`
+        * `@ModelAttribuet`를 사용해서 `String` -> `IpPort`로 변환된다 
+* #### 포맷터 - Formatter
+* #### 포맷터를 지원하는 컨버전 서비스
+* #### 포맷터 적용하기
+* #### 스프링이 제공하는 기본 포맷터
+* #### 정리
