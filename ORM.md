@@ -686,384 +686,493 @@
       * 영속성 컨텍스트를 종료
 
 
-
-* ### 엔티티 매핑
+---
+---
+* ## 엔티티 매핑
+* ### 엔티티 매핑 소개
+  * 객체와 테이블 매핑: @Entity, @Table
+  * 필드와 컬럼 매핑: @Column
+  * 기본 키 매핑: @Id
+  * 연관관계 매핑: @ManyToOne, @JoinColumn
 * ### 객체와 테이블 매핑
-* @Entity
-* @Table
-```Java
-@Entity
-@Table(name = "MBR")
-public class Member {
-```
-* 실행
-```
-Hibernate: 
-    select
-        member0_.id as id1_0_0_,
-        member0_.name as name2_0_0_ 
-    from
-        MBR member0_ 
-    where
-        member0_.id=?
-``` 
-* form MBR...
-* ### 데이터 베이스 스키마 자동 생성
-* 애플리케이션 로딩시점에 CREATA 문으로 DB를 생성하고 시작하게 할 수 있다
-  * 보통은 테이블을 다 만들어 두고 객체로 돌아와서 개발을 하지만
-  * 이렇게 됐을 경우 장점은 JPA는 객체에 맵핑을 다 해두게 되면 애플리케이션이 로딩될 때 필요한 테이블들을 다 만들어준다
+  * #### @Entity
+    * `@Entity`가 붙은 클래스는 JPA가 관리하며, 이를 `엔티티`라 부른다
+    * JPA를 사용해서 테이블과 매핑할 클래스는 `@Entity`필수
+    * 주의
+      * `기본 생성자 필수`(파라미터가 없는 public 또는 protected 생성자)
+      * final 클래스, enum, interface, inner 클래스 사용X
+      * 저장할 필드에 final 사용X
+  * #### @Entity 속성 정리
+    * 속성: name
+      * JPA에서 사용할 엔티티 이름을 지정한다.
+      * 기본값: 클래스 이름을 그대로 사용(예: Member)
+      * 같은 클래스 이름이 없으면 가급적 기본값을 사용한다.
+  * #### @Table
+    * `@Table`은 엔티티와 매핑할 테이블을 지정한다
+      * `name`: 매핑할 테이블 이름(기본값 - 엔티티 이름을 사용)
+      * `catalog`: 데이터베이스 catalog 매핑
+      * `schema`: 데이터베이스 schema 매핑
+      * `uniqueConstraints(DLL)`: DLL 생성 시에 유니크 제약 조건 생성
+  * ### 예제 코드
+    ```Java
+    @Entity
+    @Tabel(name = "MBR")
+    public class Member{ }
+    ```
+  * ### 실행 결과
+    ```
+    Hibernate: 
+      select
+          member0_.id as id1_0_0_,
+          member0_.name as name2_0_0_ 
+      from
+          MBR member0_ 
+      where
+          member0_.id=?
+    ```   
+    * `@Table(name = "MBR")` 애노테이션 설정을 통해서 `form MBR member0_` MBR 테이블와 Member 엔티티가 매핑된 것을 확인할 수 있다.
+* ### 데이터베이스 스키마 자동 생성
+  * DDL을 애플리케이션 실행 시점에 자동 생성
+    * DDL(Data Definition Language) - 데이터 정의어
+      * 데이터베이스를 정의하는 언어를 말하며 데이터를 생성하거나 수정, 삭제 등 데이터의 전체 골격을 결정하는 역할의 언어
+      * CREATE: 데이터 베이스, 테이블 등을 생성하는 역할 
+      * ALTER: 테이블을 수정하는 역할 
+      * DROP: 데이터베이스, 테이블을 삭제하는 역할 
+      * TRUNCATE: 테이블을 초기화 시키는 역할
+  * 테이블 중심 -> 객체 중심
+  * 데이터베이스 방언을 활용해서 데이터베이스에 맞는 적절한 DDL 생성
+    * 애플리케이션 로딩시점에 CREATE 문으로 DB를 생성하고 시작하게 할 수 있다.
+    * 보통은 테이블을 다 만들어두고 객체로 돌아와서 개발을 하지만, 이 경우의 장접은 JPA가 객체에 매핑설정을 해두게 되면 애플리케이션이 로딩될 때 필요한 테이블을 만들어준다.
+  * 이렇게 `생성된 DDL은 개발 장비에서만 사용`
+  * 생성된 DDL은 운영서버에서는 사용하지 않거나, 적절히 다듬은 후 사용
+  * #### 속성
+    * `/META-INF/persistence.xml/<property name="hibernate.hbm2ddl.auto" value=" " />`
+    `create`: 기존테이블 삭제 후 다시 생성(DROP + CREATE)
+    `create-drop`: create와 같으나 종료시점에 테이블 DROP
+    `update`: 변경부분만 반영(운영 DB에서는 사용하면 안됨)
+    `validate`: 엔티티와 테이블이 정상 매핑되었는지만 확인
+    `none`: 사용하지 않음
+  * #### 주의
+    * `운영 장비에는 절대 create, create-drop, update 를 사용하면 안된다.`
+    * 개발 초기 단계는 create 또는 update
+    * 테스트 서버는 update 또는 validate
+    * 스테이징과 운영 서버는 validate 또는 none
+  * #### DDL 생성 기능
+    * 제약조건 추가: 회원 이름은 필수, 10자 초과X
+      ```Java
+      @Column(nullable = false, length = 10)
+      ```
+    * 유니크 제약조건 추가
+      ```Java
+      @Table(uniqueConstraints = {@UniqueConstraint(name = "NAME_AGE_UNIQUE", columnNames = ("NAME", "AGE"))})
+      ```  
+    * DDL 생성 기능은 DDL을 자동 생성할 떄만 사용된다, JPA의 실행 로직에는 영향을 주지 않는다.
 * ### 필드와 컬럼 매핑
-```Java
-package hellojpa;
+  * #### 요구사항 추가
+    1. 회원은 일반 회원과 관리자로 구분해야 한다
+    2. 회원 가입일과 수정일이 있어야 한다
+    3. 회원을 설명할 수 있는 필드가 있어야 한다. 이 필드는 길이 제한이 없다. 
+  * #### 예제 코드
+    ```Java
+    @Entity
+    public class Member{
 
-import javax.persistence.*;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.Date;
+        //PK Mapping
+        @Id 
+        private Long id;
 
-@Entity
-public class Member {
+        @Colum(name = "name")  //DB Column Name
+        private String name;   //Entity Filed Name
+        private Integer age;   //다른 타입을 사용할 수 있다(가장 적절한 Type으로 DB에 생성)
 
-    @Id //PK Mapping
-    private Long id;
+        //Entity Filed Type equal Enum
+        //DB에는 Enum Type이 존재하지 않는다
+        //DB에 Enum Type을 넣고싶은 경우 @Enumerated 사용
+        @Enumerated(EnumType.STRING) //반드시 EnumTpye.STRING!!!
+        private RoleType roleType;
+        
+        @Temporal(TemporalType.TIMESTAMP)
+        private Date createDate;
 
-    @Column(name = "name", nullable = false, columnDefinition = "varchar(100) default 'EMPTY'") //DB Column Name
-    private String username; //Object Name
-    private Integer age; //다른 타입을 사용할 수도 있다(가장 적절한 Type 이 DB에 생성된다)
+        @Temporal(TemporalType.TIMESTAMP)
+        private Date lastModifiedDate;
 
-    //Object 가 Enum 일 경우
-    //DB에는 Enum Type 이 존재하지 않는다
-    //DB에 Enum Type 을 넣고싶은 경우 @Enumerated 를 사용
-    @Enumerated(EnumType.STRING)
-    private RoleType roleType;
+        //VARCHAR를 넘어서는 큰 Type을 DB에 넣고싶은 경우 @Lob
+        @Lob
+        private String decription;
 
-    //날짜 타입
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date createdDate; //생성 일자
+        //DB랑 관계없이 Memory 영역안에서 해결
+        @Transient
+        private int temp;
 
-    @Temporal(TemporalType.TIMESTAMP)
-    private Date lastModifiedDate; //수정 일자
-
-    private LocalDate test1;
-    private LocalDateTime test2;
-
-    //VARCHAR 를 넘어서는 큰 Type을 넣고싶은 경우
-    @Lob
-    private String description;
-
-    //DB랑 관계없이 Memory 영역안에서 해결하고 싶은 경우
-    @Transient
-    private int temp;
-
-    public Member(){}
-
-    public Long getId() {
-        return id;
+        //Getter, Setter...
     }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
-    }
-
-    public Integer getAge() {
-        return age;
-    }
-
-    public void setAge(Integer age) {
-        this.age = age;
-    }
-
-    public RoleType getRoleType() {
-        return roleType;
-    }
-
-    public void setRoleType(RoleType roleType) {
-        this.roleType = roleType;
-    }
-
-    public Date getCreatedDate() {
-        return createdDate;
-    }
-
-    public void setCreatedDate(Date createdDate) {
-        this.createdDate = createdDate;
-    }
-
-    public Date getLastModifiedDate() {
-        return lastModifiedDate;
-    }
-
-    public void setLastModifiedDate(Date lastModifiedDate) {
-        this.lastModifiedDate = lastModifiedDate;
-    }
-
-    public String getDescription() {
-        return description;
-    }
-
-    public void setDescription(String description) {
-        this.description = description;
-    }
-
-    public int getTemp() {
-        return temp;
-    }
-
-    public void setTemp(int temp) {
-        this.temp = temp;
-    }
-}
-``` 
-* ### @Column
-* insertable, updatable
-* nullable(DDL)
-  * nullable = true(default)
-  * false로 할 경우 NOT NULL 제약조건이 걸리게된다
-* unigue 
-  * 잘 사용하지는 않는다
-  * 이름을 반영하기 어렵다
-* columnDefinition
-  ```Java
-  @Column(name = "name", nullable = false, columnDefinition = "varchar(100) default 'EMPTY'")  
-  ```
-* ### @Enumerated
-* Enum 이 변경되었을 떄 ORDINAL 에 중복이 발생할 수 있다.. 
-* default가 ORDINAL 이므로 EnumTypes.STRING 을 반드시 쓰도록 습관을 갖자
+    ```  
+  * #### 매핑 애노테이션 정리
+    * hibername.hbm2ddl.auto
+    * `@Column`: 컬럼 매핑
+    * `@Temporal`: 날짜 타입 매핑
+    * `@Enumerated`: enum 타입 매핑
+    * `@Lob`: BLOB, CLOB 매핑
+    * `@Transient`" 특정 필드를 컬럼에 매핑하지 않음(매핑 무시)
+  * #### @Column
+    * `name`: 필드와 매핑할 테이블의 컬럼 이름 (기본값: 객체 필드 이름)
+    * `insertable`, `updatable`: 등록, 변경 가능 여부 (기본값: TRUE)
+    * `nullable(DDL)`: null값의 허용 여부를 설정한다. false로 설정하면 DDL 생성 시에 NOT NULL 제약조건이 붙는다 (기본값: nullable = true)
+    * `unique(DDL)`: @Table의 nuiqueConstraints와 같지만 한 컬럼에 간단히 유니크 제약 조건을 걸 떄 사용한다
+      * 이름을 반영하기 어렵기 떄문에 자주 사용하지 않는다
+    * `columnDefinition(DDL)`: 데이터베이스 컬럼 정보를 직접 줄 수 있다 (기본값: 필드의 자바 타입과 방언 정보를 사용)
+      ```Java
+      @Column(name = "name", nullable = false, columnDefinition = "varchar(100) default 'EMPTY'")
+      ```
+    * `length(DDL)`: 문자 길이 제약조건, String 타입에만 사용한다 (기본값: 255)
+    * `precision, scale(DDL)`: BigDecimal 타입에서 사용한다 (BigInteger도 사용할 수 있다.) precision은 소수점을 포함한 전체 자리수를, scale은 소수의 자릿수다. 참고로 double, float 타입에는 정용되지 않는다. 아주 큰 숫자나 정밀한 소수를 다루어야 할 때만 사용한다 (기본값: persision = 19, scale = 2)
+  * #### @Enumerated
+    * 자바 enum 타입을 매핑할 떄 사용
+    * `주의! OREINAL 사용X`
+      * Java의 Enum이 변경되었을 때 ORDINAL 에 KEY는 같지만 VALUE가 다른 중복이 발생할 수 있다.
+    * `value`
+      * `EnumType.ORDINAL`: enum 순서를 데이터베이스에 저장
+      * `EnumType.STRING`: enum 이름을 데이터베이스에 저장
+    * 기본값
+      * EnumType.OREINAL
+      * EnumType.STRING을 반드시 쓰도록 습관을 갖자
+  * #### Temporal
+    * 날짜 타임(java.util.Date, java.util.Calendar)을 매핑할 때 사용
+    * 참고: LocalDate, LocalDateTime을 사용할 떄는 생량 가능(최신 하이버네이트 지원)
+    * `valeu`
+      * `TemporalType.DATE`: 날짜, 데이터베이스 date 타입과 매핑
+        * 예) 2022-02-03
+      * `TemporalType.TIME`: 시간, 데이터베이스 time 타입과 매핑
+        * 예) 14:05:12
+      * `TemporalType.TIMESTAMP`: 날짜와 시간, 데이터베이스 timestamp 타입과 매핑
+        * 예) 2022-02-03 14:05:12
+  * #### @Lob
+    * 데이터베이스 BLOB, CLOB 타입과 매핑
+    * @Lob에는 지정할 수 있는 속성이 없다.
+    * 매핑하는 필드 타입이 문자면 CLOB매핑, 나머지는 BLOB매핑
+      * `CLOB`: String, char[], java.sql.CLOB
+      * `BLOB`: byte[], java.sql.BLOB
+  * #### @Transient
+    * 필드 매핑X
+    * 데이터베이스에 저장X, 조회X
+    * 주로 메모리상에서만 임시로 어떤 값을 보관하고 싶을 떄 사용
 * ### 기본 키 매핑
-* DB 가 값을 자동으로 생성해서 할당하는 방법을 사용할떄는 @GeneratedValue 를 사용한다
-* @GeneratedValue(strategy = Generation.AUTO) _ default
-    * 데이터베이스 방언에 맞춰서 자동으로 생성된다
-```
-   @Id //PK Mapping
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
-    private String id;
-```    
-```
+  * #### 기본 키 매핑 어노테이션
+    * `@Id`
+    * `@GeneratedValue`
+      ```Java
+      @Id //PK Mapping 
+      @GeneratedValue(strategy = GenerationType.AUTO) //default
+      private String id;
+      ``` 
+      ```Java
+      try{
+          Member member = new Mmeber();
+          member.setName("memberA");
+
+          entityManager.persist(member);
+
+          transaction.commit();
+      }
+      ```
+      ```SQL
+      Hibernate: 
+          
+          create table Member (
+            id varchar(255) generated by default as identity,
+              name varchar(255) not null,
+              primary key (id)
+          )      
+      ```
+      * /META-INT/persistence.xml/ 의 방언은 MySQL로 변경하면 방언에 따라 자동으로 auto increment로 변경된다
+  * #### 기본 키 매핑 방법
+    * 직접 할당: `@Id만 사용`
+    * 자동 생성: `@GeneratedValue`
+      * `IDENTITY`: 데이터베이스에 위임, MySQL
+      * `SEQUENCE`: 데이터베이스 시퀀스 오브젝트 사용, ORACLE
+        * `@SequenceGenerator`필요
+      * `TABLE`: 키 생성용 테이블 사용, 모든 DB에서 사용
+        * `@TableGenerator`필요
+      * `AUTO`: 방언에 따라 자동 지정, 기본값
+  * #### IDENTITY 전략 - 특징
+    * 기본 키 생성을 데이터베이스에 위임
+    * 주로 MySQL, PostgreSQL, SQL Server, DB2에서 사용
+      * 예) MySQL의 AUTO_INCREMENT
+    * JPA는 보통 트랜잭션 커밋 시점에 INSERT SQL 실행
+    * AUTO_INCREMENT는 데이터베이스에 INSERT SQL을 실행한 이후에 ID값을 알 수 있음
+    * IDENTITY 전략은 entityManager.persist() 시점에 즉시 INSERT SQL을 실행하고 DB에서 식별자를 조회
+  * #### IDENTITY 전략 - 매핑
+    ```Java
+    @Entity
+    public class Member{
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long id;
+    }
+    ``` 
+    ```Java
     try {
-            Member member = new Member();
-            member.setName("C");
+        Member member = new Member();
+        member.setName("C");
 
-            em.persist(member);
+        System.out.println("================");
+        entityManager.persist(member);
+        System.out.println("member.id = " + member.getId());
+        System.out.println("================");
 
-            tx.commit();
-```
-```
-Hibernate: 
-    
-    create table Member (
-       id varchar(255) generated by default as identity,
-        name varchar(255) not null,
-        primary key (id)
-    )
-```
-방언은 MySQL로 바꾸면 auto increment 가 된다
-* SEQUENCE
-Long 를 사용해야 하는 이유
-```
-@Id //PK Mapping
-    @GeneratedValue(strategy = GenerationType.SEQUENCE)
-    private Long id;
-```
-```
-Hibernate: 
-    call next value for hibernate_sequence
-Hibernate: 
-    /* insert hellojpa.Member
-        */ insert 
-        into
-            Member
-            (name, id) 
-        values
-            (?, ?)
-```
-* SEQUENCE 전량 매핑
-```
-@Entity
-@SequenceGenerator(name = "MEMBER_SEQ_GENERATOR",
-sequenceName = "MEMBER_SEQ")
-public class Member {
-
-    @Id //PK Mapping
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "MEMBER_SEQ_GENERATOR")
-    private Long id;
-```
-```
-Hibernate: create sequence MEMBER_SEQ start with 1 increment by 50
-```
-* TABLE 전략
-```
-
-@Entity
-@TableGenerator(
-        name = "MEMBER_SEQ_GENERATOR",
-        table = "MY_SEQUENCES",
-        pkColumnValue = "MEMBER_SEQ", allocationSize = 1)
-public class Member {
-
-    @Id //PK Mapping
-    @GeneratedValue(strategy = GenerationType.TABLE,
-            generator = "MEMBER_SEQ_GENERATOR")
-    private Long id;
-```
-```
-    create table MY_SEQUENCES (
-       sequence_name varchar(255) not null,
-        next_val bigint,
-        primary key (sequence_name)
-    )
-```
-* 권장하는 식별자 전략
-자연키: 비즈니스 적으로 의미있는 번호, 주민등록번호나 전화번호 등등...
-대채키: sequence, uuid ...
-* IDENTITY 전략
-id에 값을 넣지안고 DB에 insert를 해야한다
-insert query 에 null 로 DB넘어오면 그떄 값을 세팅해준다(DB가)
-id값을 알 수 있는 시점은 DB에 들어가봐야 알 수 있다
-그런데 JPA 에서 영속성 컨텍스트에서 관리되기 위해서는 무조건 PK값이 있어야 한다
-그런데 IDNTITY전략시 PK값은 DB에 들어가봐야 알 수 있기 떄문에 제약이 생긴다 
-그래서 보통은 transaction.commit() 시점에 영속성 컨텍스트에서 DB로 쿼리를 보내지만  IDENTITY 전략의 경우에만 특별하게 em.persist(entity)를 호출하는 시점에 바로 insert query를 DB에 보낸다
-```
-
-        try {
-            Member member = new Member();
-            member.setName("C");
-
-            System.out.println("================");
-            em.persist(member);
-            System.out.println("member.id = " + member.getId());
-            System.out.println("================");
-
-            tx.commit();
-```
-```
-================
-Hibernate: 
-    /* insert hellojpa.Member
-        */ insert 
-        into
-            Member
-            (id, name) 
-        values
-            (null, ?)
-member.id = 1
-================
-```
-values 에 id값이 null 로 되어 있으며 DB는 id 값이 1도 되어 있으며 JPA 내부정으로 id의 1 값을 select 해서 가져오며 영속성 컨택스트에 1이라 세팅이 들어간다
-* SEQUENCE 전략 특징
-```
-
-@Entity
-@SequenceGenerator(
+        transaction.commit();    
+    }
+    ```
+    * Member.id에 값을 초기화하지 않은 상태에서 DB에 INSERT 해야한다.
+    * INSERT SQL에 id값이 null로 DB에 넘어오면 그때 DB가 해당 값을 세팅한다.
+    * JPA에서 영속성 컨텍스트 1차 캐시에서 관리되기 위해서는 반드시 PK값이 필요하다.
+    * id 값(PK)을 알 수 있는 시점은 DB에 들어갔을 떄라는 제약이 발생한다
+    * 이런 제약을 해결하기 위해서 일반적으로는 transaction.commit() 시점에 영속성 컨텍스트에서 DB로 Query SQL을 보내지만, IDENTITY 전략의 경우에만 특별하게 emtityManager.persist(entity)를 호출하는 시점에 바로 INSERT SQL을 DB에 보낸다    
+      ```SQL
+      ================
+      Hibernate: 
+          /* insert hellojpa.Member
+              */ insert 
+              into
+                  Member
+                  (id, name) 
+              values
+                  (null, ?)
+      member.id = 1
+      ================
+      ```
+      * DB는 INSERT SQL에 있는 values의 id값이 null인 것을 확인하고 매핑된 테이블의 id값을 1로 세팅한다
+      * JPA는 내부적으로 테이블의 id 값 1을 select 해서 가져오며, 영속성 컨텍스트 1차 캐시에 PK(id)의 value를 1로 세팅한다
+  * #### SEQUENCE 전략 - 특징
+    * 데이터베이스 시퀀스는 유일한 값을 순서대로 생성하는 특별한 데이터베이스 오브젝트
+    * Oracle, PostgreSQL, DB2, H2 데이터베이스에서 사용
+  * #### SEQUENCE 전략 - 매핑
+    ```Java
+    @Entity
+    @SequenceGenerator(
         name = "MEMBER_SEQ_GENERATOR",
         sequenceName = "MEMBER_SEQ", //매핑할 데이터베이스 시퀀스 이름
         initialValue = 1, allocationSize = 1)
-public class Member {
+    public class Member{
 
-    @Id //PK Mapping
-    @GeneratedValue(strategy = GenerationType.SEQUENCE,
+        @Id
+        @GeneratedValue(strategy = GenerationType.SEQUENCE,
             generator = "MEMBER_SEQ_GENERATOR")
-    private Long id;
-```
-```
-Hibernate: create sequence MEMBER_SEQ start with 1 increment by 1
-```
-1부터 시작해서 1씩 증가시켜
-```
-================
-Hibernate: 
-    call next value for MEMBER_SEQ
-member.id = 1
-================
-```
-DB에서 PK 값을 가져온다음 Member 의 id에 값을 넣어준다 
-그 다음에 영속성 컨텍스트에 저장을 한다
-insert query 는 commit 시점에 날라간다
-그런데 이렇게 계속 네트워크를 여러번 타게 되면 성능저하를 고려하게 된다..
-그렇다면 어떻게 성능 최적화를 할 수 있을까??
-* allocationSize (default = 50)
-call next 한 번 할때 미리 50개의 size 를 db에 올려두고 ???   
-```
-@Entity
-@SequenceGenerator(
+        private Long id;
+    }
+    ```
+  * #### SEQUENCE - @SequenceGenerator
+    * `주의: allocationSize default Value = 50`
+    * `name`: 식별자 생성기 이름 (Default Value: 필수)
+    * `sequenceName`: 데이터베이스에 등록되어 있는 시퀀스 이름 (Default Value: hibernate_sequence) 
+    * `initialValue`: DDL 생성 시에만 사용됨, 시퀀스 DDL을 생성할 때 처음 1 시작하는 수를 지정한다 (Default Value: 1)
+    * `allocationSize`: 시퀀스 한 번 호출에 증가하는 수(성능 최적화에 사용됨)
+      * `데이터베이스 시퀀스 값이 하나씩 증가하도록 설정되어 있으면 이 값을 반드시 1로 설정해야 한다` `(Default Value: 50)`
+    * `catalog`, `schema`: 데이터베이스 catalog, schema 이름
+  * #### SEQUENCE 전략과 최적화
+    ```Java
+    @Entity
+    @SequenceGenerator(
         name = "MEMBER_SEQ_GENERATOR",
         sequenceName = "MEMBER_SEQ", //매핑할 데이터베이스 시퀀스 이름
-        initialValue = 1, allocationSize = 50)
-```
-```
-try {
-            Member member1 = new Member();
-            member1.setName("A");
+        initialValue = 1, allocationSize = 1)
+    public class Member{
 
+        @Id
+        @GeneratedValue(strategy = GenerationType.SEQUENCE,
+            generator = "MEMBER_SEQ_GENERATOR")
+        private Long id;
+    }
+    ```
+    ```Java
+    try {
+        Member member = new Member();
+        member.setName("C");
+
+        System.out.println("================");
+        entityManager.persist(member);
+        System.out.println("member.id = " + member.getId());
+        System.out.println("================");
+
+        transaction.commit();    
+    }
+    ```
+    ```SQL
+      /* 1부터 시작해서 1씩 증가 */
+      Hibernate: create sequence MEMBER_SEQ start with 1 increment by 1
+
+      ================
+      Hibernate: 
+          call next value for MEMBER_SEQ
+      member.id = 1
+      ================
+      ```
+      * DB에서 id(PK)값을 가져온다음 Member.id에 값을 넣어준다
+      * 그 다음 영속성 컨텍스트에 1차 캐시에 저장한다
+      * INSERT SQL은 transaction.commit() 시점에 나간다
+      * 하지만 이렇게 계속 네트워크를 여러번 타게 되면 성능저하를 고려하게 된다...
+    * ##### allocationSize (default: 50)
+      * 최초에 call next value를 할때 미리 allocationSize 만큼의 Sequence를 db에 올려둔다
+        ```Java
+        try {
+            Member member1 = new Member();
+            member1.setId("tjdrb3807");
+            member1.setName("전성규");
+            member1.setRolType(RolType.USER);
+            member1.setCreateDate(LocalDateTime.now());
+      
             Member member2 = new Member();
-            member2.setName("B");
+            member2.setId("tjdwo1386");
+            member2.setName("김성재");
+            member2.setRolType(RolType.ADMIN);
+            member2.setCreateDate(LocalDateTime.now());
 
             Member member3 = new Member();
-            member3.setName("C");
+            member3.setId("alsdud1234");
+            member3.setName("이민영");
+            member3.setRolType(RolType.MEMBER);
+            member3.setCreateDate(LocalDateTime.now());
 
-            System.out.println("===================");
+            System.out.println("======== persist startLine ========");
 
-            em.persist(member1);  //1, 51
-            em.persist(member2);  //Mem 에서 호출
-            em.persist(member3);  //Mem 에서 호출
+            entityManager.persist(member1);
+            entityManager.persist(member2);
+            entityManager.persist(member3);
 
-            System.out.println("member1 = " + member1.getId());
-            System.out.println("member2 = " + member2.getId());
-            System.out.println("member3 = " + member3.getId());
+            System.out.println("member1.pk = " + member1.getPk());
+            System.out.println("member2.pk = " + member2.getPk());
+            System.out.println("member3.pk = " + member3.getPk());
 
-            System.out.println("===================");
+            System.out.println("======== persist endLine ========");
 
-            tx.commit();
-```
-```
-===================
-Hibernate: 
-    call next value for MEMBER_SEQ
-Hibernate: 
-    call next value for MEMBER_SEQ
-member1 = 1
-member2 = 2
-member3 = 3
-===================
-Hibernate: 
-    /* insert hellojpa.Member
-        */ insert 
-        into
-            Member
-            (name, id) 
-        values
-            (?, ?)
-Hibernate: 
-    /* insert hellojpa.Member
-        */ insert 
-        into
-            Member
-            (name, id) 
-        values
-            (?, ?)
-Hibernate: 
-    /* insert hellojpa.Member
-        */ insert 
-        into
-            Member
-            (name, id) 
-        values
-            (?, ?)
-```
-MEMBER_SEQ가 두 번 호출되는 이유
-처음 호출되면 DB SEQ = 1   | AP = 1
-두번 호출됨녀 DB SEQ = 51  | AP = 2
-세번 호출됨녀 DB SEQ = 51  | AP = 3
-무슨 말인가,,?
-나는 50개씩 메모리를 써야하는데 처음 호출해봤더니 1이다..
-뭔가 문제가 있나보다 하고 한 번 더 호출
+            System.out.println("======== commit startLine ========");
+
+            transaction.commit();
+
+            System.out.println("======== commit endLine ========");
+        }
+        ```  
+        ```SQL
+        ======== persist startLine ========
+        Hibernate: 
+            call next value for MEMBER_SEQ
+        Hibernate: 
+            call next value for MEMBER_SEQ
+        member1.pk = 1
+        member2.pk = 2
+        member3.pk = 3
+        ======== persist endLine ========
+        ======== commit startLine ========
+        Hibernate: 
+            /* insert hellojpa.Member
+                */ insert 
+                into
+                    MEMBER
+                    (CREATE_DATE, ID, NAME, ROLTYPE, UPDATE_DATE, PK) 
+                values
+                    (?, ?, ?, ?, ?, ?)
+        Hibernate: 
+            /* insert hellojpa.Member
+                */ insert 
+                into
+                    MEMBER
+                    (CREATE_DATE, ID, NAME, ROLTYPE, UPDATE_DATE, PK) 
+                values
+                    (?, ?, ?, ?, ?, ?)
+        Hibernate: 
+            /* insert hellojpa.Member
+                */ insert 
+                into
+                    MEMBER
+                    (CREATE_DATE, ID, NAME, ROLTYPE, UPDATE_DATE, PK) 
+                values
+                    (?, ?, ?, ?, ?, ?)
+        ======== commit endLine ========
+        ```       
+        * MEMBER_SEQ가 두 번 호출되는 이유
+        * 첫 번째 호출: DB SEQ = 1  | AP = 1
+        * 두 번쨰 호출: DB SEQ = 51 | AP = 2
+        * 세 번쨰 호출: DB SEQ = 51 | AP = 3
+        * allocationSize = 50으로 설정해서 50개의 메모리를 써야하는데, 처음 호출해봤더니 1이다... 뭔가 문제가 있다 생각하고 한번 더 호출...
+        * 인강 한번더 듣기 
+  * #### TABLE 전략
+    * 키 생성 테이블을 하나 만들어서 데이터베이스 시퀀스를 흉내내는 전략
+    * 장점: 모든 데이터베이스에 적용 가능
+    * 단전: 성능
+  * #### TABLE 전략 - 매핑 
+    ```Java
+    @Entity
+    @TableGenerator(name = "MEMBER_SEQ_GENERATOR",
+        table = "MY_SEQUENCES",
+        pkColumnValue = "MEMBER_SEQ", allocationSize = 1)
+    public class Member{
+
+        @Id
+        @GeneratedValue(strategy = GenerationType.TABLE,
+            generator = "MEMBER_SEQ_GENERATOR")
+        private Long id;
+    }
+    ```
+    ```SQL
+    create table MY_SEQUENCE(
+        sequence_name varchar(255) not null,
+        next_val bigint,
+        primary key(sequence_name)
+    )
+    ```     
+  * #### @TableGenerator - 속성
+    * `name`: 식별자 생성기 이름 (Default Value: 필수)
+    * `table`: 키생성 테이블명 (Default Value: hibernate_sequences)
+    * `pkColumnName`: 시퀀스 컬럼명 (Default Value: sequence_name)
+    * `valueColumnNa`: 시퀀스 값 컬럼명 (Default Value: next_val)
+    * `pkColumnValue`: 키로 사용할 값 이름 (Default Value: Entity Name)
+    * `initialVlaue`: 초기 값, 마지막으로 생성된 값이 기준 (Default Value: 0)
+    * `allocationSize`: 시퀀스 한 번 호출에 증가하는 수(성능 최적화에 사용) (`Default Value: 50`)
+    * `catalog`, `schema`: 데이터베이스 catalog, schema 이름
+    * `uniqueConstrains(DDL)`: 유니크 제약 조건을 지정할 수 있다.
+  * #### 권장하는 식별자 전략
+    * `기본 키 제약 조건`: null 아님, 유일, `변하면 안된다`.
+    * 미래까지 이 조건을 만족하는 자연키는 찾기 어렵다. 대리키(대체키)를 사용하자
+      * 자연키: 비즈니스 적으로 의미있는 KEY, 주민등록번호나 전화번호 등등...
+      * 대체키: SEQUENCE, UUID...
+    * 예를 들어 주민등록번호도 기본 키로 적절하지 않다.
+    * `권장: Long형 + 대체키 + 키 생성전략 사용`
+* ### 실전 예제 - 1.요구사항 분선과 기본 매핑
+  * #### 요구사항 분석
+    * 회원은 상품을 주문할 수 있다.
+    * 주문 시 여러 종류의 상품을 선택할 수 있다.
+  * #### 기능 목록
+    * 회원 기능
+      * 회원 등록
+      * 회원 조회
+    * 상품 기능
+      * 상품 등록
+      * 상품 수정
+      * 상품 조회
+    * 주문 기능
+      * 상품 주문
+      * 주문내역 조회
+      * 주문 취소
+  * #### 도메인 도멜 분석
+    ![](img/img274.png) 
+    * `회원과 주문의 관계`: `회원`은 여러 번 `주문`할 수 있다(일대다)
+    * `주문과 상품의 관계`: `주문`할 때 여러 `상품`을 선택할 수 있다. 반대로 같은 `삼품`도 여러 번 주문될 수 있다. 주문상품 이라는 모델을 만들어서 다대다 관계를 일대다, 다대일 관계로 품어냄
+  * #### 테이블 설계
+    ![](img/img275.png)
+  * #### 엔티티 설계와 매핑
+    ![](img/img276.png) 
+  * #### 데이터 중심 설계의 문제점
+    * 현재 방식은 객체 설계를 테이블 설계에 맞춘 방식
+    * 테이블의 외래키를 객체에 그대로 가져옴
+    * 객체 그래프 탐색이 불가능
+    * 참조가 없으므로 UML도 잘못됨
+---
+---      
+
+
+
 * 객체를 테이블에 맞추어 모델링
 * 단방향 연관관계
 * 객체 지향 모델링
@@ -1391,6 +1500,80 @@ public void changeTeam(Team team) {
         team.getMembers().add(this);
     }
 ```
+* 양방향 매핑 정리
+단방향 매핑으로 설계를 완료해라 
+* 연관관계 매핑 시작
+---
+---
+* ## 다양한 연관관계 매핑
+* ### 연관관계 매핑시 고려사항 3가지
+다대다는 실무에서 쓰면 안된다
+* 단방향 양방향
+양쪽이 서로 참조하면 양방향
+사실 양방향이라는 개념은 없다
+예를들어 멤버에서 팀에대한 참조가 있고, 팀에서 멤버에 대한 참조가 있다
+참조 입장에서 보면 단방향이 두 개 있는 것이다
+이것이 마치 양쪽에서 참조를 거니까 양방향인것처럼 보이는것뿐이지, 사실을 단방향이 두 개 있는 것이다
+* ### 다대일[N:1]
+* 다대일 단방향
+DB 입장에서 생각해보면 MEMBER(N) : TEAM(1) 이며, 다(N)쪽에 외래키(FK)가 가야한다
+외래키가 있는테이블을 기준으로 해당 엔티티에 연관된 참조를 넣어두고 매핑하면 된다
+* ### 일대다[1:N]
+일 이 연관관계 주인, 일 방향에서 외래키를 관리한다
+* 일다다 단방향
+영항이는 이 모델을 권장하지 않는다
+Team 이 List members 를 갖는다
+Member 객체는 team 을 알고싶지 않다..
+디비 입장에서는 무조건 다 쪾에 FK가 들어가야 한다
+Team 의 List members의 값을 바꿨을때 다른 태이블(MEMBER)에 있는 FK(TEAM_ID)를 update 처리 해야한다
+* 일대다 단방향 정리
+```Java
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String username;
+```
+```Java
+@Entity
+public class Team {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "TEAM_ID")
+    private Long id;
+    private String name;
+
+    @OneToMany
+    @JoinColumn(name ="TEAM_ID")
+    private List<Member> members = new ArrayList<>(); 
+```
+```Java
+        try {
+            Member member = new Member();
+            member.setUsername("member1");
+
+            em.persist(member);
+
+            Team team = new Team();
+            team.setName("TeamA");
+            team.getMembers().add(member);
+
+            em.persist(team);
+
+            tx.commit();
+```
+team.getMembers().add(member); 가 조금 애매하다 , TEAM 테이블이 insert될 내용이 아니다
+
+* ### 일대일[1:1]
+* ### 다대다[N:M]
+* ### 실전 예제 - 3.다양한 연관관계 매핑
 
 
 
