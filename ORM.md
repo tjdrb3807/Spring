@@ -1669,345 +1669,328 @@
 ---
 ---
 * ## 다양한 연관관계 매핑
-* ### 연관관계 매핑시 고려사항 3가지
-다대다는 실무에서 쓰면 안된다
-* 단방향 양방향
-양쪽이 서로 참조하면 양방향
-사실 양방향이라는 개념은 없다
-예를들어 멤버에서 팀에대한 참조가 있고, 팀에서 멤버에 대한 참조가 있다
-참조 입장에서 보면 단방향이 두 개 있는 것이다
-이것이 마치 양쪽에서 참조를 거니까 양방향인것처럼 보이는것뿐이지, 사실을 단방향이 두 개 있는 것이다
-* ### 다대일[N:1]
-* 다대일 단방향
-DB 입장에서 생각해보면 MEMBER(N) : TEAM(1) 이며, 다(N)쪽에 외래키(FK)가 가야한다
-외래키가 있는테이블을 기준으로 해당 엔티티에 연관된 참조를 넣어두고 매핑하면 된다
-```Java
-package hellojpa;
+  * ### 연관관계 매핑시 고려사항 3가지
+    * 다중성
+      * 다대일: @ManyToOne
+      * 일대다: @OneToMany
+      * 일대일: @OneToOne
+      * 다대다: @ManyToMany
+    * 단방향, 양방향
+      * 테이블
+        * 외래 키 하나로 양쪽 조인 가능
+        * 사실 방향이라는 개념이 없다
+      * 객체
+        * 참조용 필드가 있는 쪽으로만 참조 가능
+        * 함쪽만 참조하면 단방향
+        * 양쪽이 서로 참조하면 양방향
+          * Member Entity에 Tema에 대한 참조가 있고, Team Entity에 Member에 대한 참조가 있다면, 참조 입장에서는 단방향이 두 개 있는 것이다.
+          * 마치 양쪽에서 참조를 거니까 양방향인것처럼 보일뿐, 사실을 단방향이 두 개 있는 것이다.
+    * 연관관계의 주인
+      * 테이블을 외래 키 하나로 두 테이블이 연관관계를 맺는다.
+      * 객체 양방향 관계는 A -> B, B -> A 처럼 참조가 2군데
+      * 객체 양방향 관계는 참조가 2군데 있음, 둘중 테이블의 외래 키 를 관리할 곳을 지정해야한다.
+      * 연관관계의 주인: 외래 키를 관리하는 참조
+      * 주인의 반대편: 외래 키에 영향을 주지 않음, 단순 조회만 가능하다.
+  * ### 다대일[N:1]
+    ![](img/img289.png)
+    * DB입장에서 연관관계는 MEMBER(N) : TEAM(1)이며, `'N'쪽에 외래키(FK)가 존재해야 한다.`
+    * `외래키(FK)가 존재하는 테이블의 Entity에 역방향 Entity의 참조를 넣어두고 매핑한다.`
+      ```Java
+      @Entity
+      @Table(name = "MEMBER")
+      public class Member{
 
-import javax.persistence.*;
+          @Id
+          @Column(name = "MEMBER_ID")
+          @GeneratedValue(strategy = GenerationType.AUTO)
+          private Long id;
 
-@Entity
-public class Member {
+          @ManyToOne
+          @JoinColum(name = "TEAM_ID")
+          private Team team;
 
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
+          @Column(name = "MEMBER_NAME")
+          private String name;
 
-    @Column(name = "USERNAME")
-    private String name;
+          //default Constructor
 
-    @ManyToOne
-    @JoinColumn(name = "TEAM_ID")
-    private Team team;
+          //Getter, Setter
+      }
+      ``` 
+      ```Java
+      @Entity
+      @Table(name = "TEAM")
+      public class Team{
 
-    public Member() {
+          @Id
+          @Column(name = "TEAM_ID")
+          @GeneratedValue(strategy = GenerationType.AUTO)
+          private Long id;
+
+          //default Constructor
+
+          //Getter, Setter
+      }
+      ```
+    * 다다일 단방향 정리
+      * 가장 많이 사용되는 연관관계
+      * 다대일의 반대는 일대다
+  * ### 다대일 양방향
+    ![](img/img290.png)
+    ```Java
+    @Entity
+    @Table(name = "TEAM")
+    public class Team{
+
+        @Id
+        @Column(name = "TEAM_ID")
+        @GeneratedValue(strategy = GenerationType.AUTO)
+        private Long ing;
+
+        @OneToMany(mappedBy = "team")
+        private Lisg<Member> members = new ArrayList<>();
+
+        //default Constructor
+
+        //Getter, Setter
     }
+    ``` 
+    * 역방항 Entity 필드에 연관관계 주인 Entity 참조를 추가한다
+    * 역방향쪽에 연관관계를 추가한다해서 테이블에 영향을 미치지 않는다.
+    * 다대일 양방향 정리
+      * 외래 키가 있는 쪽이 연관관계의 주인이다.
+      * 양쪽을 서로 참조하도록 개발
+  * ### 일대다[1:N]
+    * 일대다 단방향
+      ![](img/img291.png)
+      * 테이블 연관관계를 TEAM(1) : MEMBER(N)이며, 다대일 단방향 연관관계처럼 FK가 존재하는 테이블과 매핑된 Entity 연관관계의 주인이 아닌 Team Entity가 연관관계의 주인으로 설정된 모델이다.
+      * 즉 Team Entity(1)가 연관관계의 주인으로서 주 방향에서 외래키를 관리한다
+      * 영한이는 이 모델 사용을 권장하지 않는다.
+        * Team Entity가 List Members 컬렉션을 갖고있으며, Member Entity는 Team을 알고싶지 않다는 전제조건이 깔려있다.
+        * DB 입장에서는 무조건 테이블 연관관계 'N'방향에 FK가 세팅되어야 한다
+        * 이러한 경우 Team Entity의 List members의 값을 수정하였을때 다른 테이블(MEMBER)에 있는 FK(TEAM_ID)를 update 처리해야 한다
+      ```Java
+      @Entity
+      @Table(name = "MEMBER")
+      public class Memeber{
 
-    public Long getId() {
-        return id;
-    }
+          @Id
+          @Column(name = "MEMBER_ID")
+          @GeneratedValue(strategy = GenerationType.AUTO)
+          private Long id;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+          @Column(name = "MEMBER_NAME")
+          private String name;
 
-    public String getName() {
-        return name;
-    }
+          //default Constructor
 
-    public void setName(String name) {
-        this.name = name;
-    }
+          //Getter, Setter
+      }
+      ``` 
+      ```Java
+      @Entity
+      @Table(name = "TEAM")
+      public class Team{
 
-    public Team getTeam() {
-        return team;
-    }
+          @Id
+          @Column(name = "TEAM_ID")
+          @GeneratedValue(strategy = GenerationType.AUTO)
+          private Long id;
 
-    public void setTeam(Team team) {
-        this.team = team;
-    }
+          @OneToMany
+          @JoinColumn(name = "TEAM_ID")
+          private List<Member> members = new ArrayList<>();
 
-    @Override
-    public String toString() {
-        return "Member{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", team=" + team +
-                '}';
-    }
-}
-```
-```Java
-package hellojpa;
+          @Column(name = "TEAM_NAME")
+          private String name;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
+          //default Constructor
 
-@Entity
-public class Team {
+          //Getter, Setter
+      }
+      ```
+      ```Java
+      try{
+          Member member = new Member();
+          member.setName("memberA");
+          entityManager.persist(member);
 
-    @Id
-    @GeneratedValue
-    @Column(name = "TEAM_ID")
-    private Long id;
-    private String name;
+          Team team = new Team();
+          team.setName("TeamA");
+          team.getMembers().add(member);
+          entityManager.persist(team);
 
-    public Long getId() {
-        return id;
-    }
+          transaction.commit();
+      }
+      ```
+      * `team.getMembers().add(member);`
+        * TEAM 테이블에 INSERT 될 내용이 아니다..
+      ```SQL
+      update
+              Member 
+          set
+              TEAM_ID=? 
+          where
+              MEMBER_ID=?
+      ```
+      * UPDATE Query가 추가로 나가는 이유
+        * `Team team = new Team()`, `team.setName("TeamA")`는 연관관계가 바뀌더라도 이 부분을 수정할떄는 그냥 TEAM 테이블에 INSERT 됟다.
+        * `team.getMembers().add(member)`는 Team Entity를 저장하는데 TEAM TABLE의 TEAM_ID를 SQL로 할 방법이 없다...
+        * 그러므로 옆테이블(MEMBER)에 UPDATE Qurey를 보내는 방법 밖에 없다.
+        * 따라서 UPDATE Query가 한번 더 호출되는 것이다(성능상의 큰 차이는 없다)
+      * 영한이가 이 방법을 잘 사용하지 않는 이유
+        * 실무에서는 최소 수십개의 테이블이 엮여서 돌가는 상황이다. 
+        * 이러한 상황에서 다른 테이블의 UPDATE Query가 날라감으로 인하여 운영상의 문제와 복잡도를 초례한다
+        * 그래서 영한이는 `일대다 단방향을 하게되면 다대일 양방향을 사용하는 전략`을 세운다
+    * 일대다 단방향 정리
+      * 일대다 단방향은 인대다(1:N)에서 일(1)이 연관관계의 주인이다
+      * 테이블 일대다 관계는 항상 다(N) 쪽에 외래 키가 있다
+      * 객체와 테이블의 차이 때문에 반대편 테이블의 외래 키를 관리하는 특이한 구조
+      * `@JoinColumn`을 반드시 사용해야한다. 그렇지 않으면 조인 테이블 방식을 사용함(중간에 테이블 하나 추가함)
+      * 일대대 단방향 매핑의 단점
+        * Entity가 관리하는 FK가 다른 테이블에 존재한다
+        * 연관관계 관리를 위해 추가로 UPDATE SQL 실행
+      * 일대다 단방향 매핑보다는 `다대일 양방향 매핑을 사용`하자
 
-    public void setId(Long id) {
-        this.id = id;
-    }
 
-    public String getName() {
-        return name;
-    }
+  team.getMembers().add(member); 가 조금 애매하다 , TEAM 테이블이 insert될 내용이 아니다
+  ```SQL
+  update
+          Member 
+      set
+          TEAM_ID=? 
+      where
+          MEMBER_ID=?
+  ```
+  업데이트 쿼리가 추가로 나가는 이유  Team team = new Team();, team.setName ("TeamA"); 입장에서는 연관관계가 바뀌었더라도 이부분을 변경할떄는 그냥 TEAM 테이블에 넣으면 된다
+  team.getMembers().add(member); 이 부분은 TEAM 엔티티를 저장하는데 TEMA 테이블의 TEAM_ID를 어떻게 할 방법이 없다.. 그래서 옆테이블에 있는것을 업데이트 치는 수 밖에 없다 그래서 업데이트 쿼리가 한번더 나간것이다 
+  성능상의 단점은 있지만 큰 차이는 없다
+  영한이가 이 방법을 잘 안쓰는 이유
+  실무에서 수십개의 테이블이 엮여서 돌아가는 상황에서 다른 테이블의 업테이트 쿼리가 날라가므로 인하여 운영상의 문제와 복잡도를 초례한다
+  그래서 영한이는 다대일 양방향을 하게되면 양방향을 추가하는 전략으로 간다
+  * 일대다 양방향
+  ```Java
+  @Entity
+  public class Team {
 
-    public void setName(String name) {
-        this.name = name;
-    }
-}
-```
-* 다대일 양방향
-역방향 쪾에 연관관계를 추가한다해서 테이블에 연향을 주지 않는다
-팀 엔티티에 필드 추가
-```Java
-package hellojpa;
+      @Id
+      @GeneratedValue
+      @Column(name = "TEAM_ID")
+      private Long id;
+      private String name;
 
-import javax.persistence.*;
-import java.util.ArrayList;
-import java.util.List;
+      @OneToMany
+      @JoinColumn(name = "TEAM_ID")
+      private List<Member> members = new ArrayList<>();
 
-@Entity
-public class Team {
+      @ManyToOne
+      @JoinColumn(name ="TEAM_ID"
+      , insertable = false, updatable = false)
+      private Team team
+  ```
+  결론적으로는 다대일 양방향을 사용하자
+  * ### 일대일[1:1]
+  * 일대일 관계
+  * 일대일: 주 테이블에 외래 키 단방향
+  ```Java
+  @Id
+      @GeneratedValue
+      @Column(name = "MEMBER_ID")
+      private Long id;
 
-    @Id
-    @GeneratedValue
-    @Column(name = "TEAM_ID")
-    private Long id;
-    private String name;
+      @Column(name = "USERNAME")
+      private String name;
 
-    @OneToMany(mappedBy = "team")
-    private List<Member> members = new ArrayList<>();
+      @ManyToOne
+      @JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
+      private Team team;
 
-    public Long getId() {
-        return id;
-    }
+      @OneToOne
+      @JoinColumn(name = "LOCKER_ID")
+      private Locker locker;
+  ```
+  ```Java
+  package hellojpa;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+  import javax.persistence.Column;
+  import javax.persistence.Entity;
+  import javax.persistence.GeneratedValue;
+  import javax.persistence.Id;
 
-    public String getName() {
-        return name;
-    }
+  @Entity
+  public class Locker {
 
-    public void setName(String name) {
-        this.name = name;
-    }
+      @Id
+      @Column(name = "LOCKER_ID")
+      @GeneratedValue
+      private Long id;
 
-    public List<Member> getMembers() {
-        return members;
-    }
+      private String name;
 
-    public void setMembers(List<Member> members) {
-        this.members = members;
-    }
-}
-```
-* ### 일대다[1:N]
-일 이 연관관계 주인, 일 방향에서 외래키를 관리한다
-* 일다다 단방향
-영항이는 이 모델을 권장하지 않는다
-Team 이 List members 를 갖는다
-Member 객체는 team 을 알고싶지 않다..
-디비 입장에서는 무조건 다 쪾에 FK가 들어가야 한다
-Team 의 List members의 값을 바꿨을때 다른 태이블(MEMBER)에 있는 FK(TEAM_ID)를 update 처리 해야한다
-* 일대다 단방향 정리
-```Java
+      public Locker() {
+      }
 
-@Entity
-public class Member {
+      public Long getId() {
+          return id;
+      }
 
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
+      public void setId(Long id) {
+          this.id = id;
+      }
 
-    @Column(name = "USERNAME")
-    private String username;
-```
-```Java
-@Entity
-public class Team {
+      public String getName() {
+          return name;
+      }
 
-    @Id
-    @GeneratedValue
-    @Column(name = "TEAM_ID")
-    private Long id;
-    private String name;
+      public void setName(String name) {
+          this.name = name;
+      }
+  }
+  ```
+  ```SQL
+  Hibernate: 
+      
+      create table Locker (
+         LOCKER_ID bigint not null,
+          name varchar(255),
+          primary key (LOCKER_ID)
+      )
+  ```
+  ```SQL
+  Hibernate: 
+      
+      create table Member (
+         MEMBER_ID bigint not null,
+          USERNAME varchar(255),
+          LOCKER_ID bigint,
+          TEAM_ID bigint,
+          primary key (MEMBER_ID)
+      )
+  ```
+  Member 에 LOCKER_ID 들어간것 확인
+  일대일 양방향일 경우
+  ```JAva
+  @Entity
+  public class Locker {
 
-    @OneToMany
-    @JoinColumn(name ="TEAM_ID")
-    private List<Member> members = new ArrayList<>(); 
-```
-```Java
-        try {
-            Member member = new Member();
-            member.setUsername("member1");
+      @Id
+      @Column(name = "LOCKER_ID")
+      @GeneratedValue
+      private Long id;
 
-            em.persist(member);
+      private String name;
 
-            Team team = new Team();
-            team.setName("TeamA");
-            team.getMembers().add(member);
-
-            em.persist(team);
-
-            tx.commit();
-```
-team.getMembers().add(member); 가 조금 애매하다 , TEAM 테이블이 insert될 내용이 아니다
-```SQL
-update
-        Member 
-    set
-        TEAM_ID=? 
-    where
-        MEMBER_ID=?
-```
-업데이트 쿼리가 추가로 나가는 이유  Team team = new Team();, team.setName ("TeamA"); 입장에서는 연관관계가 바뀌었더라도 이부분을 변경할떄는 그냥 TEAM 테이블에 넣으면 된다
-team.getMembers().add(member); 이 부분은 TEAM 엔티티를 저장하는데 TEMA 테이블의 TEAM_ID를 어떻게 할 방법이 없다.. 그래서 옆테이블에 있는것을 업데이트 치는 수 밖에 없다 그래서 업데이트 쿼리가 한번더 나간것이다 
-성능상의 단점은 있지만 큰 차이는 없다
-영한이가 이 방법을 잘 안쓰는 이유
-실무에서 수십개의 테이블이 엮여서 돌아가는 상황에서 다른 테이블의 업테이트 쿼리가 날라가므로 인하여 운영상의 문제와 복잡도를 초례한다
-그래서 영한이는 다대일 양방향을 하게되면 양방향을 추가하는 전략으로 간다
-* 일대다 양방향
-```Java
-@Entity
-public class Team {
-
-    @Id
-    @GeneratedValue
-    @Column(name = "TEAM_ID")
-    private Long id;
-    private String name;
-
-    @OneToMany
-    @JoinColumn(name = "TEAM_ID")
-    private List<Member> members = new ArrayList<>();
-
-    @ManyToOne
-    @JoinColumn(name ="TEAM_ID"
-    , insertable = false, updatable = false)
-    private Team team
-```
-결론적으로는 다대일 양방향을 사용하자
-* ### 일대일[1:1]
-* 일대일 관계
-* 일대일: 주 테이블에 외래 키 단방향
-```Java
-@Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
-
-    @Column(name = "USERNAME")
-    private String name;
-
-    @ManyToOne
-    @JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
-    private Team team;
-
-    @OneToOne
-    @JoinColumn(name = "LOCKER_ID")
-    private Locker locker;
-```
-```Java
-package hellojpa;
-
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-
-@Entity
-public class Locker {
-
-    @Id
-    @Column(name = "LOCKER_ID")
-    @GeneratedValue
-    private Long id;
-
-    private String name;
-
-    public Locker() {
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public void setName(String name) {
-        this.name = name;
-    }
-}
-```
-```SQL
-Hibernate: 
-    
-    create table Locker (
-       LOCKER_ID bigint not null,
-        name varchar(255),
-        primary key (LOCKER_ID)
-    )
-```
-```SQL
-Hibernate: 
-    
-    create table Member (
-       MEMBER_ID bigint not null,
-        USERNAME varchar(255),
-        LOCKER_ID bigint,
-        TEAM_ID bigint,
-        primary key (MEMBER_ID)
-    )
-```
-Member 에 LOCKER_ID 들어간것 확인
-일대일 양방향일 경우
-```JAva
-@Entity
-public class Locker {
-
-    @Id
-    @Column(name = "LOCKER_ID")
-    @GeneratedValue
-    private Long id;
-
-    private String name;
-
-    @OneToOne(mappedBy = "locker")
-    private Member member;
-```
-* 일대일: 대상 테이블에 외래 키 단방향
-지원도 안되고 방법도 없다
-* 일대일: 대상 테이블에 외래 키 양방향
-Member member를 연관관계 주인으로 잡아서 연결...
-말에 모순이 있다
-일대일 관계는 자신의 엔티티의 외럐 키는 직접 관리해야 한다
-* ### 다대다[N:M]
-* ### 실전 예제 - 3.다양한 연관관계 매핑
+      @OneToOne(mappedBy = "locker")
+      private Member member;
+  ```
+  * 일대일: 대상 테이블에 외래 키 단방향
+  지원도 안되고 방법도 없다
+  * 일대일: 대상 테이블에 외래 키 양방향
+  Member member를 연관관계 주인으로 잡아서 연결...
+  말에 모순이 있다
+  일대일 관계는 자신의 엔티티의 외럐 키는 직접 관리해야 한다
+  * ### 다대다[N:M]
+  * ### 실전 예제 - 3.다양한 연관관계 매핑
 
 
 
