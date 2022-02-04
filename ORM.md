@@ -1367,7 +1367,7 @@
   * ### 양방향 매핑
     ![](img/img281.png)
     * 테이블 연관관계
-      * 단방향 매칭과 양방향 매핑의 테이블 연관관계에는 차이가 없다.
+      * 단방향 매핑과 양방향 매핑의 테이블 연관관계에는 차이가 없다.
       * 멤버 테이블에서 멤버의 팀을 알고싶으면 
         * MEMBER.TEAM_ID(FK)를 TEMA.TEAM_ID(PK)와 JOIN
       * 팀 테이블에서 팀에 소속된 멤버를 알고싶으면
@@ -1435,7 +1435,7 @@
     ```
   * ### 객체와 테이블이 관계를 맺는 차이
     ![](img/img282.png) 
-    * `객쳋 연관관계 = 2개`
+    * `객체 연관관계 = 2개`
       * 회원 -> 팀 연관관계 1개(단방향)
       * 팀 -> 회원 연관관계 1개(단방향)
     * `테이블 연관관계 = 1개`
@@ -1503,38 +1503,154 @@
         * DB 입장에서는 FK가 있는 곳이 "다"이며, FK 가 없는 곳이 "1"이다.
         * 그 말은 DB의 "다"쪽이 연관관계의 주인이 되어야 성능 이슈가 없고 설계도 깔끔해진다하네..
     ```Java
-    Team team = new Team();
-    team.setName("TeamA");
-    entityManager.persist(team);
+    try {
+        Member member = new Member();
+        member.setName("Jeon");
+        member.setAge(29);
+        entityManager.persist(member);
 
-    Member member = new Member();
-    member.setName("member1");
+        Team team = new Team();
+        team.setName("TeamA");
+        team.getMembers().add(member); //역방향(연관관계 주인이 아닌)만 연관관계 설정
+        entityManager.persist(team);
 
-    //역방향(주인이 아닌 방향)만 연관관계 설정
-    team.getMembers().add(member);
-
-    entityManager.persist(member);
+          ransaction.commit();
+    }
     ``` 
-    * h2 확인
+    ![](img/img287.png)
+    * MEMBER TABLE에 있는 TEAM_ID의 값이 null
+    * 연관관계의 주인은 Member.team `team.getMembers().add(member);`는 mappedBy로 지정된 읽기 전용이다.
+    * 즉 JAP에서 UPDATE, INSERT QUERY를 날릴때 mappedBy의 변경은 신경쓰지 않는다.
   * ### 양방향 매핑시 연관관계의 주인에 값을 입력해야 한다(순수한 객체 관계를 고려하면 항상 양쪽다 값을 입력해야 한다.)
     ```Java
-    Team team = new Team();
-    team.setName("TeamA");
-    entityManager.persist(team);
+    try {
+        Team team = new Team();
+        team.setName("TeamA");
+        entityManager.persist(team);
 
-    Member member = new Member();
-    member.setName("member1");
+        Member member = new Member();
+        member.setName("Jeon");
+        member.setAge(29);
+        member.setTeam(team);  //연관관계의 주인에 값을 설정
+        entityManager.persist(member);
 
-    team.getMembers().add(member);
-    //연관관계의 주인에 값 설정
-    member.setTeam(team);
-
-    entityManager.persist(member);
+        transaction.commit();
+    }
     ``` 
-    * h2 확인
+    ![](img/img288.png)
+    * 연관관계의 주인 필드에 값을 주입(`member.setTeam(team);`)하므로 DB의 MEMBER.TEAM_ID의 값이 정상적으로 입력되었다.
   * ### 양방향 연관관계 주의 - 실습
     * `순수 객체 상태를 고려해서 항상 양쪾에 값을 설정하자`
+      ```Java
+      try {
+          Team team = new Team();
+          team.setName("TeamA");
+          entityManager.persist(team);
+
+          Member member = new Member();
+          member.setName("Jeon");
+          member.setAge(29);
+          member.setTeam(team);
+          entityManager.persist(member);
+
+          entityManager.flush();
+          entityManager.clear();
+
+          Team findTeam = entityManager.find(Team.class, team.getId());
+          System.out.println("========== SELECT QUERY START LINE ==========");
+          List<Member> members = findTeam.getMembers();
+          for (Member m : members) {
+              System.out.println("m = " + m.getName());
+          }
+          System.out.println("========== SELECT QUERY END LINE ==========");
+
+          transaction.commit();
+        }
+      ``` 
+      ```SQL
+      ========== SELECT QUERY START LINE ==========
+      Hibernate: 
+          select
+              members0_.TEAM_ID as TEAM_ID4_0_0_,
+              members0_.MEMBER_ID as MEMBER_I1_0_0_,
+              members0_.MEMBER_ID as MEMBER_I1_0_1_,
+              members0_.MEMBAER_AGE as MEMBAER_2_0_1_,
+              members0_.MEMBER_NAME as MEMBER_N3_0_1_,
+              members0_.TEAM_ID as TEAM_ID4_0_1_ 
+          from
+              MEMBER members0_ 
+          where
+              members0_.TEAM_ID=?
+      m = Jeon
+      ========== SELECT QUERY END LINE ==========
+      ```  
+      * JPA가 members의 데이터를 가져오는 시점에 SELECT QUERY를 한 번 날린다
+      * 하지만 객체 관계를 고려하면 이 부분은 문제가 발생한다
+      ```Java
+      try {
+          Team team = new Team();
+          team.setName("TeamA");
+          entityManager.persist(team);
+
+          Member member = new Member();
+          member.setName("Jeon");
+          member.setAge(29);
+          member.setTeam(team);
+          entityManager.persist(member);
+
+          //entityManager.flush();
+          //entityManager.clear();
+
+          Team findTeam = entityManager.find(Team.class, team.getId()); //1차 캐시
+          System.out.println("========== SELECT QUERY START LINE ==========");
+          List<Member> members = findTeam.getMembers();
+          for (Member m : members) {
+              System.out.println("m = " + m.getName());
+          }
+          System.out.println("========== SELECT QUERY END LINE ==========");
+
+          transaction.commit();
+      }
+      ```
+      ```SQL
+      ========== SELECT QUERY START LINE ==========
+      ========== SELECT QUERY END LINE ==========
+      ```
+      * entityManager.flush(), entityManager.clear()를 주석처리하게 되면 team 은 영속성 컨텍스트의 1차 캐시에 저장되어인는 상태가 되며, team.members 컬렉션에는 아무 데이터도 존재하지 않는다.
+      * 이러한 결과를 초래하므로, 양방향 연관관계 설정에서 객체지향을 고려한다면 양방향 다 값을 설정하는것이 올바르다
     * 연관관계 편의 메소드를 생성하자
+      ```Java
+      @Entity
+      @Table(name ="MEMBER")
+      public class Member{
+
+          @ManyToOne
+          @JoinColumn(name ="TEAM_ID")
+          private Team team;
+
+          public void changeTeam(Team team) {
+              this.team = team;
+              team.getMembers().add(this);
+          }
+      }
+      ``` 
+      * this는 나 자신의 인스턴스 즉, Member
+      ```Java
+      try {
+          Team team = new Team();
+          team.setName("TeamA");
+          entityManager.persist(team);
+
+          Member member = new Member();
+          member.setName("Jeon");
+          member.setAge(29);
+          member.changeTeam(team);
+          entityManager.persist(member);
+      }
+      ```      
+      * 영한이의 개인적인 취향
+        * 연관관계 편의 메소드나 JPA 상태를 변경하는 메소드는 setXXX를 잘 사용하지 않는다.
+        * setXXX가 Java의 getter, setter 관례때문에 로직이 없는 단순한 상황에서만 사용한다.
     * 양방향 매핑시에 무한 루프를 조심하자
       * 예: toString(), lombok, JSON 생성 라이브러리
   * ### 양방향 매핑 정리
@@ -1550,233 +1666,6 @@
     ![](img/img285.png) 
   * ### 객체 구조
     ![](img/img286.png) 
-
-
-
-
-* 양방향 매핑시 가장 많이 하는 실수
-연관관계 주인에 값을 입력하지 않음
-```Java
-   try {
-            //저장
-            Member member = new Member();
-            member.setUsername("member1");
-            em.persist(member);
-
-            Team team = new Team();
-            team.setName("TeamA");
-            team.getMembers().add(member);
-            em.persist(team);
-
-            //DB에서 가져오고 싶은 경우
-            em.flush();
-            em.clear();
-            
-            tx.commit();
-```
-insert query 2번
-```
-Hibernate: 
-    /* insert hellojpa.Member
-        */ insert 
-        into
-            Member
-            (TEAM_ID, USERNAME, MEMBER_ID) 
-        values
-            (?, ?, ?)
-Hibernate: 
-    /* insert hellojpa.Team
-        */ insert 
-        into
-            Team
-            (name, TEAM_ID) 
-        values
-            (?, ?)
-```
-MEMBER Table 에 TEAM_ID의 값이 null 이네,,,?
-연관관계의 주인은 Member.team 인데 jpaMain에서 `team.getMembers().add(member);` 는 mappedBy 로 읽기 전용이다.
-즉 JPA 에서 UPDATE, INSERT 할 떄 mappedBy의 변경은 신경쓰지 않는다(읽기 전용)
-```Java
-        try {
-            //저장
-            Team team = new Team();
-            team.setName("TeamA");
-//            team.getMembers().add(member);
-            em.persist(team);
-
-            Member member = new Member();
-            member.setUsername("member1");
-            member.setTeam(team);
-            em.persist(member);
-
-            //DB에서 가져오고 싶은 경우
-            em.flush();
-            em.clear();
-
-            tx.commit();
-```
-연관관계 주인에 값을 주입 하므로 (member.setTeam(team)) DB에 정상적으로 값이 입력되었다
-* 앙방향 매핑시 연관관계의 주인에 값을 입력해야 한다
-순수한 객체 관계를 고려하면 항상 양쪽다 값을 입력해야 한다.
-```Java
-
-        try {
-            //저장
-            Team team = new Team();
-            team.setName("TeamA");
-//            team.getMembers().add(member);
-            em.persist(team);
-
-            Member member = new Member();
-            member.setUsername("member1");
-            member.setTeam(team);
-            em.persist(member);
-
-            //DB에서 가져오고 싶은 경우
-            em.flush();
-            em.clear();
-
-            Team findTeam = em.find(Team.class, team.getId());
-            List<Member> members = findTeam.getMembers();
-            for (Member m : members) {
-                System.out.println("m = " + m.getUsername());
-            }
-
-            tx.commit();
-```
-```
-m = member1
-```
-List<Member> members = findTeam.getMembers();
-            for (Member m : members) {
-                System.out.println("m = " + m.getUsername());
-            }
-이 부분에서 
-```
- select
-        members0_.TEAM_ID as TEAM_ID3_0_0_,
-        members0_.MEMBER_ID as MEMBER_I1_0_0_,
-        members0_.MEMBER_ID as MEMBER_I1_0_1_,
-        members0_.TEAM_ID as TEAM_ID3_0_1_,
-        members0_.USERNAME as USERNAME2_0_1_ 
-    from
-        Member members0_ 
-    where
-        members0_.TEAM_ID=?
-```
-select query 가 나가게 된다
-즉 JAP 가 members 의 데이터를 끌고오는 시점에 쿼리를 한번 날리다
-근데 객체 관계를 고려하면 이 부분은 문제가 된다
-```Java
-try {
-            //저장
-            Team team = new Team();
-            team.setName("TeamA");
-            em.persist(team);
-
-            Member member = new Member();
-            member.setUsername("member1");
-            member.setTeam(team);
-            em.persist(member);
-
-            team.getMembers().add(member);
-
-            //DB에서 가져오고 싶은 경우
-//            em.flush();
-//            em.clear();
-
-            Team findTeam = em.find(Team.class, team.getId());  //1차 캐시
-            List<Member> members = findTeam.getMembers();
-            for (Member m : members) {
-                System.out.println("m = " + m.getUsername());
-            }
-
-            tx.commit();
-```
-flush, clear 를 주석처리하면 team은 1차 캐시에 저장되어있는 상태이므로
-```
-     try {
-            //저장
-            Team team = new Team();
-            team.setName("TeamA");
-            em.persist(team);
-
-            Member member = new Member();
-            member.setUsername("member1");
-            member.setTeam(team);
-            em.persist(member);
-
-//            team.getMembers().add(member);
-
-            //DB에서 가져오고 싶은 경우
-//            em.flush();
-//            em.clear();
-
-            Team findTeam = em.find(Team.class, team.getId());  //1차 캐시
-            List<Member> members = findTeam.getMembers();
-            System.out.println("====================");
-            for (Member m : members) {
-                System.out.println("m = " + m.getUsername());
-            }
-            System.out.println("====================");
-
-            tx.commit();
-
-```
-```
-====================
-====================
-```
-다시 말하자면 team 이 영속성 컨텍스트의 1차 캐시에 들어가 있는 상태이며 team에 컬렉션이 아무것도 없다 
-따라서 객체지향적으로 생각하면 양쪽 다 값을 세팅해주는것이 올바르다
-//            team.getMembers().add(member); 의 주석을 풀어서 확인하자
-* 양방향 연관관계 주의 - 실습
-연관관계 편ㅇ늬 메소드를 생성하자
-```Java
-public void setTeam(Team team) {
-        this.team = team;
-        team.getMembers().add(this);
-    }
-```
-this 는 나 자신의 인스턴스 즉 Member
-```Java
-        try {
-            //저장
-            Team team = new Team();
-            team.setName("TeamA");
-            em.persist(team);
-
-            Member member = new Member();
-            member.setUsername("member1");
-            member.setTeam(team);  //**
-            em.persist(member);
-
-            //DB에서 가져오고 싶은 경우
-            em.flush();
-            em.clear();
-
-            Team findTeam = em.find(Team.class, team.getId());  //1차 캐시
-            List<Member> members = findTeam.getMembers();
-            System.out.println("====================");
-            for (Member m : members) {
-                System.out.println("m = " + m.getUsername());
-            }
-            System.out.println("====================");
-
-            tx.commit();
-```
-* 영한이의 개인적인 취향
-연관관계 편의 매서드나 JPA 상태를 변경하는 메소드는 set을 잘 안쓴다
-set이 Java의 getter setter 관례떄문에 로직이 없는 단순한 상황에서만 사용
-```Java
-public void changeTeam(Team team) {
-        this.team = team;
-        team.getMembers().add(this);
-    }
-```
-* 양방향 매핑 정리
-단방향 매핑으로 설계를 완료해라 
-* 연관관계 매핑 시작
 ---
 ---
 * ## 다양한 연관관계 매핑
