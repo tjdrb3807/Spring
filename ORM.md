@@ -1990,8 +1990,659 @@
   말에 모순이 있다
   일대일 관계는 자신의 엔티티의 외럐 키는 직접 관리해야 한다
   * ### 다대다[N:M]
-  * ### 실전 예제 - 3.다양한 연관관계 매핑
+실무에서는 사용하면 안된다
+왜 쓰면 안되는지에 초첨을 맞춰서 공부
+다대다 단방향
+```Java
+package hellojpa;
 
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
+public class Product {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+
+    public Product() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+```Java
+package hellojpa;
+
+import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
+    private Team team;
+
+    @OneToOne
+    @JoinColumn(name = "LOCKER_ID")
+    private Locker locker;
+
+    @ManyToMany
+    @JoinTable(name = "MEMBER_PRODUCT")
+    private List<Product> products = new ArrayList<>();
+
+    public Member() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+```SQL
+Hibernate: 
+    
+    create table MEMBER_PRODUCT (
+       Member_MEMBER_ID bigint not null,
+        products_id bigint not null
+    )
+```
+외래키 제약 조건으로 생기는것
+```SQL
+Hibernate: 
+    
+    alter table MEMBER_PRODUCT 
+       add constraint FKc6hsxwm11n18ahnh5yvbj62cf 
+       foreign key (products_id) 
+       references Product
+Hibernate: 
+    
+    alter table MEMBER_PRODUCT 
+       add constraint FK4ibylolqmostllrjdc147aowv 
+       foreign key (Member_MEMBER_ID) 
+       references Member
+```
+다대다 양방향
+```JAva
+
+@Entity
+public class Product {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @ManyToMany(mappedBy = "products")
+    private List<Member> members = new ArrayList<>();
+```
+* 다대다 매핑의 한계
+매핑 정보만 들어가고 추가적인 데이터를 담을 수 없다
+쿼리도 개발자가 생각하지 못한 쿼리가 나온다
+다대다 한계 극복
+```JAva
+package hellojpa;
+
+import javax.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+public class MemberProduct {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "MEMBER_ID")
+    private Member member;
+
+    @ManyToOne
+    @JoinColumn(name = "PRODUCT_ID")
+    private Product product;
+
+    private int count;
+    private int price;
+    private LocalDateTime orderDateTime;
+}
+
+```
+```JAva
+@OneToMany(mappedBy = "member")
+    private List<MemberProduct> memberProducts = new ArrayList<>();
+```
+```JAva
+@OneToMany(mappedBy = "product")
+    private List<MemberProduct> memberProducts = new ArrayList<>();
+```
+  * ### 실전 예제 - 3.다양한 연관관계 매핑
+---
+---
+* ## 고급 매핑
+* ### 상속관계 매핑
+* 조인 전략
+가장 정규화된 전략
+ITEM, ALBUM, MOVIE, BOOK 테이블을 만들어서 데이터는 나누고, 조인으로 구성한다 
+INSERT는 두 번 하며 PK가 같으므로 PK, FK로 조인데서 데이터를 가져온다
+구분하기 위해 ITEM 에 구분하는 컬럼 DTYPE을 둔다
+```Java
+package hellojpa;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
+public class Item {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+    private int price;
+}
+```
+```Java
+package hellojpa;
+
+@Entity
+public class Album extends Item{
+
+    private String artist;
+}
+```
+```Java
+@Entity
+package hellojpa;
+
+public class Movie extends Item{
+
+    private String director;
+    private String actor;
+}
+```
+```Java
+@Entity
+package hellojpa;
+
+public class Book extends Item{
+
+    private String author;
+    private String isbn;
+}
+```
+```SQL
+Hibernate: 
+    
+    create table Item (
+       DTYPE varchar(31) not null,
+        id bigint not null,
+        name varchar(255),
+        price integer not null,
+        artist varchar(255),
+        author varchar(255),
+        isbn varchar(255),
+        actor varchar(255),
+        director varchar(255),
+        primary key (id)
+    )
+```
+JPA 기본 전략이 단일 테이블 전략이기 떄무에 CREATE 문이 이렇게 나간다
+```JAva
+
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+public class Item {
+```
+```SQL
+Hibernate: 
+    
+    create table Album (
+       artist varchar(255),
+        id bigint not null,
+        primary key (id)
+    )
+Hibernate: 
+    
+    create table Book (
+       author varchar(255),
+        isbn varchar(255),
+        id bigint not null,
+        primary key (id)
+    )
+Hibernate: 
+    
+    create table Item (
+       id bigint not null,
+        name varchar(255),
+        price integer not null,
+        primary key (id)
+    )
+Hibernate: 
+    
+    create table Movie (
+       actor varchar(255),
+        director varchar(255),
+        id bigint not null,
+        primary key (id)
+    )
+```
+```JAva
+ try {
+            Movie movie = new Movie();
+            movie.setDirector("a");
+            movie.setActor("bbb");
+            movie.setName("바람과 함꼐 사라지다");
+            movie.setPrice(10000);
+
+            em.persist(movie);
+            
+            tx.commit();
+        }
+```
+```SQL
+Hibernate: 
+    /* insert hellojpa.Movie
+        */ insert 
+        into
+            Item
+            (name, price, id) 
+        values
+            (?, ?, ?)
+Hibernate: 
+    /* insert hellojpa.Movie
+        */ insert 
+        into
+            Movie
+            (actor, director, id) 
+        values
+            (?, ?, ?)
+```
+조회
+```Java
+        try {
+            Movie movie = new Movie();
+            movie.setDirector("a");
+            movie.setActor("bbb");
+            movie.setName("바람과 함꼐 사라지다");
+            movie.setPrice(10000);
+
+            em.persist(movie);
+
+            em.flush();
+            em.close();
+
+            Movie findMovie = em.find(Movie.class, movie.getId());
+            System.out.println("findMovie = " + findMovie);
+
+
+            tx.commit();
+        }
+```
+```SQL
+select movie 하면서 innerjoin Item
+```
+JPA 상속관계에 있어서 이러한 기능을 지원한다
+조회할 떄 join이 필요하면 join까지 다 해주고 두번 insert까지
+
+DTYPE 
+자식타입의 어떤애돌 들어가는지 확인용
+```JAva
+
+@Entity
+@Inheritance(strategy = InheritanceType.JOINED)
+@DiscriminatorColumn
+public class Item {
+
+```
+```SQL
+Hibernate: 
+    
+    create table Item (
+       DTYPE varchar(31) not null,
+        id bigint not null,
+        name varchar(255),
+        price integer not null,
+        primary key (id)
+    )
+```
+@DiscriminatorColumn 의 default 는 Entity Name 이다
+이름을 변경하고 싶으면
+```Java
+
+@Entity
+@DiscriminatorValue("M")
+public class Movie extends Item{
+```
+h2에서 확인
+
+장점
+데이터가 정규화 되어있다 
+제약조건은 ITEM에 걸어서 맞출 수 있다
+외래키 참조 무결성 제약조건
+기본적으로 조인 적략이 정석
+* 단일 테이블 전략
+논리 모델을 한 테이블로 다 합치고 ALBUM , MOVIE, BOOK 을 구분할 컬럼(DTYPE)을 둔다
+```Java
+@Entity
+@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorColumn
+public class Item {
+```
+```SQL
+Hibernate: 
+    
+    create table Item (
+       DTYPE varchar(31) not null,
+        id bigint not null,
+        name varchar(255),
+        price integer not null,
+        artist varchar(255),
+        author varchar(255),
+        isbn varchar(255),
+        actor varchar(255),
+        director varchar(255),
+        primary key (id)
+    )
+```
+자식 타입의 테이블은 생성되지 않는다
+```SQL
+Hibernate: 
+    call next value for hibernate_sequence
+Hibernate: 
+    /* insert hellojpa.Movie
+        */ insert 
+        into
+            Item
+            (name, price, actor, director, DTYPE, id) 
+        values
+            (?, ?, ?, ?, 'M', ?)
+```
+쿼리를 한번만 친다
+@DiscriminatorColumn이 없어도 DTYPE 이 생성된다 구분하려면 필수이기 떄문
+DTYPE 은 운영상 항상 있는게 좋다
+생각해보면 JpaMain은 변경하지 않고 @DiscriminatorColumn의 타입만 바꿧는데 조인전략에서 단인 전략으로 작 적용된것을 확인할 수 있었다 이는 엄청난 장점이라 할 수 있다
+* 구현 클래스마다 테이블 전략
+각 테이블마다 모든 컬럼은 둔다
+중복을 허용
+```JAva
+
+@Entity
+@Inheritance(strategy = InheritanceType.TABLE_PER_CLASS)
+@DiscriminatorColumn
+public abstract class Item {
+```
+사실 추상클래스로 만드는 것이 정확하다 
+public class Item 이라 하면 Item 을 상속과 상관없이 독단적으로 쓰는 경우가 있을 수 있다 추상클래스로 만들면 Item 테이블이 생성되지 않는것을 확인할 수 있을것이다
+```SQL
+Hibernate: 
+    
+    create table Album (
+       id bigint not null,
+        name varchar(255),
+        price integer not null,
+        artist varchar(255),
+        primary key (id)
+    )
+Hibernate: 
+    
+    create table Book (
+       id bigint not null,
+        name varchar(255),
+        price integer not null,
+        author varchar(255),
+        isbn varchar(255),
+        primary key (id)
+    )
+Hibernate: 
+    
+    create table Movie (
+       id bigint not null,
+        name varchar(255),
+        price integer not null,
+        actor varchar(255),
+        director varchar(255),
+        primary key (id)
+    )
+```
+@DiscriminatorColumn가 의미가 없다
+표면적으로는 이 전략이 괸장히 편리하 전략이라 생각할 수 있지만 이 전략에는 치명적인 단점이 있다
+```Java
+        try {
+            Movie movie = new Movie();
+            movie.setDirector("a");
+            movie.setActor("bbb");
+            movie.setName("바람과 함꼐 사라지다");
+            movie.setPrice(10000);
+
+            em.persist(movie);
+
+            em.flush();
+            em.close();
+
+            Item item = em.find(Item.class, movie.getId());
+            System.out.println("item = " + item);
+
+
+            tx.commit();
+        }
+```
+```SQL
+select union all ....
+```
+데이터를 넣을떄와 명확하게 지정해서 조회할떄는 괜찮은데 지금처럼 부모클래스로 조회를 하게되면 union all 로 테이블은 전부다 데이터가 있는지 없는지 뒤져본다
+너무 비효율적인 동작
+* ### @MappedSuperclass
+상속관계 매핑이랑 별로 관련이 없다,,,?
+* @MappedSuperclass
+디비는 완전 분리되어 있는데 객체 입장에서 공통 속성 필드를 공통 속성 상속으로 사옹하고 싶다
+즉 속성만 상속받아서 쓰고싶다
+```Java
+package hellojpa;
+
+import java.time.LocalDateTime;
+
+@MappedSuperclass
+public abstract class BaseEntity {
+
+    private String createBy;
+    private LocalDateTime createDate;
+    private String lastModifiedBy;
+    private LocalDateTime lastModifiedDate;
+
+    public String getCreateBy() {
+        return createBy;
+    }
+
+    public void setCreateBy(String createBy) {
+        this.createBy = createBy;
+    }
+
+    public LocalDateTime getCreateDate() {
+        return createDate;
+    }
+
+    public void setCreateDate(LocalDateTime createDate) {
+        this.createDate = createDate;
+    }
+
+    public String getLastModifiedBy() {
+        return lastModifiedBy;
+    }
+
+    public void setLastModifiedBy(String lastModifiedBy) {
+        this.lastModifiedBy = lastModifiedBy;
+    }
+
+    public LocalDateTime getLastModifiedDate() {
+        return lastModifiedDate;
+    }
+
+    public void setLastModifiedDate(LocalDateTime lastModifiedDate) {
+        this.lastModifiedDate = lastModifiedDate;
+    }
+}
+
+```
+```Java
+@Entity
+public class Team extends BaseEntity {
+```
+```Java
+
+@Entity
+public class Member extends BaseEntity {
+
+```
+```Java
+        try {
+            Member member = new Member();
+            member.setName("MemberA");
+            member.setCreateBy("Kim");
+            member.setCreateDate(LocalDateTime.now());
+
+            em.persist(member);
+
+            em.flush();
+            em.close();
+
+            tx.commit();
+        }
+```
+```SQL
+Hibernate: 
+    
+    create table Member (
+       MEMBER_ID bigint not null,
+        createBy varchar(255),
+        createDate timestamp,
+        lastModifiedBy varchar(255),
+        lastModifiedDate timestamp,
+        USERNAME varchar(255),
+        LOCKER_ID bigint,
+        TEAM_ID bigint,
+        primary key (MEMBER_ID)
+    )
+Hibernate: 
+    
+    create table Team (
+       TEAM_ID bigint not null,
+        createBy varchar(255),
+        createDate timestamp,
+        lastModifiedBy varchar(255),
+        lastModifiedDate timestamp,
+        name varchar(255),
+        primary key (TEAM_ID)
+    )
+```
+@Column(name = "")으로 테이블 컬럼명 지정 가능
+엔티티가 아니다, 테이블과 매핑되지 않느다
+create table BaseEntiy 가 없다 
+조회, 검색 불가
+
+* ### 실전 예쩨 - 4.상속관계 매핑
+---
+---
+* ## 프록시와 연관관계 관리
+  * ### 프록시
+* member를 조회할 떄 team 도 할계 조회해야 할까?
+```Java
+package hellojpa;
+
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.EntityTransaction;
+import javax.persistence.Persistence;
+
+public class JpaMain {
+
+    public static void main(String[] args) {
+        EntityManagerFactory emf = Persistence.createEntityManagerFactory("hello");
+
+        EntityManager em = emf.createEntityManager();
+
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            Member member = em.find(Member.class, 1L);
+//            printMemberAndTeam(member);
+            printMamer(member);
+
+
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+        } finally {
+            em.close();
+        }
+        emf.close();
+    }
+
+    //어느 경우에는 Member 만 가져와서 사용(Team 정보를 안가져오고 싶음)
+    private static void printMamer(Member member) {
+        System.out.println("member = " + member.getName());
+    }
+
+    //어느 경우에는 Member와 Team을 같이 가져와서 사용
+    private static void printMemberAndTeam(Member member) {
+        String name = member.getName();
+        System.out.println("name = " + name);
+
+        Team team = member.getTeam();
+        System.out.println("team = " + team.getMembers());
+    }
+}
+
+```
+* 프록시 기초
+em.getReference(): DB에 쿼리가 안가갔는데 조회 가능
+  * ### 즉시 로딩과 지연 로딩
+  * ### 지연 로딩 활용
+  * ### 영속성 전이: CASCAED
+  * ### 고아 객체
+  * ### 영속성 전이 + 고아 객체, 생명주기
+  * ### 실전 예제 - 5.연관관계 관리 
 
 
 
