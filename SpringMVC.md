@@ -23,7 +23,7 @@
     * 예) 톰캣(Tomcat), Jetty, Undertow
 * #### 웹 서버, 웹 애플리케이션 서버 차이
   * 웹 서버는 정적 리소스(파일), WAS는 애플리케이션 로직
-  * 사실 둥의 용어도 경계도 모호하다
+  * 사실 둘의 용어도 경계도 모호하다
     * 웹 서버도 프로그램을 실행하는 기능을 포함하기도 한다
     * 웹 애플리케이션 서버도 웹 버서의 기능을 제공한다
   * 자바는 서블릿 컨테이너 기능을 제공하면 WAS
@@ -84,7 +84,7 @@
    * 서블릿을 지원하는 WAS 사용
         ```
         * 비즈니스 로직 실행
-        * 데이터베이스에 저장 요창
+        * 데이터베이스에 저장 요청
         ``` 
         * `의미있는 로직만 구현`
    * 서버에서 HTTP 응답 메시지 생성
@@ -99,7 +99,7 @@
         ```   
 * #### 특징
   ```Java
-  @WebServley(name = "helloServlet", urlPatterns = "/hello")
+  @WebServlet(name = "helloServlet", urlPatterns = "/hello")
   puvlic class HelloServlet extends HttpServlet{
 
       @Override

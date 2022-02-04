@@ -1681,6 +1681,144 @@
 * 다대일 단방향
 DB 입장에서 생각해보면 MEMBER(N) : TEAM(1) 이며, 다(N)쪽에 외래키(FK)가 가야한다
 외래키가 있는테이블을 기준으로 해당 엔티티에 연관된 참조를 넣어두고 매핑하면 된다
+```Java
+package hellojpa;
+
+import javax.persistence.*;
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "TEAM_ID")
+    private Team team;
+
+    public Member() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Team getTeam() {
+        return team;
+    }
+
+    public void setTeam(Team team) {
+        this.team = team;
+    }
+
+    @Override
+    public String toString() {
+        return "Member{" +
+                "id=" + id +
+                ", name='" + name + '\'' +
+                ", team=" + team +
+                '}';
+    }
+}
+```
+```Java
+package hellojpa;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
+public class Team {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "TEAM_ID")
+    private Long id;
+    private String name;
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+* 다대일 양방향
+역방향 쪾에 연관관계를 추가한다해서 테이블에 연향을 주지 않는다
+팀 엔티티에 필드 추가
+```Java
+package hellojpa;
+
+import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
+
+@Entity
+public class Team {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "TEAM_ID")
+    private Long id;
+    private String name;
+
+    @OneToMany(mappedBy = "team")
+    private List<Member> members = new ArrayList<>();
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public List<Member> getMembers() {
+        return members;
+    }
+
+    public void setMembers(List<Member> members) {
+        this.members = members;
+    }
+}
+```
 * ### 일대다[1:N]
 일 이 연관관계 주인, 일 방향에서 외래키를 관리한다
 * 일다다 단방향
@@ -1733,8 +1871,141 @@ public class Team {
             tx.commit();
 ```
 team.getMembers().add(member); 가 조금 애매하다 , TEAM 테이블이 insert될 내용이 아니다
+```SQL
+update
+        Member 
+    set
+        TEAM_ID=? 
+    where
+        MEMBER_ID=?
+```
+업데이트 쿼리가 추가로 나가는 이유  Team team = new Team();, team.setName ("TeamA"); 입장에서는 연관관계가 바뀌었더라도 이부분을 변경할떄는 그냥 TEAM 테이블에 넣으면 된다
+team.getMembers().add(member); 이 부분은 TEAM 엔티티를 저장하는데 TEMA 테이블의 TEAM_ID를 어떻게 할 방법이 없다.. 그래서 옆테이블에 있는것을 업데이트 치는 수 밖에 없다 그래서 업데이트 쿼리가 한번더 나간것이다 
+성능상의 단점은 있지만 큰 차이는 없다
+영한이가 이 방법을 잘 안쓰는 이유
+실무에서 수십개의 테이블이 엮여서 돌아가는 상황에서 다른 테이블의 업테이트 쿼리가 날라가므로 인하여 운영상의 문제와 복잡도를 초례한다
+그래서 영한이는 다대일 양방향을 하게되면 양방향을 추가하는 전략으로 간다
+* 일대다 양방향
+```Java
+@Entity
+public class Team {
 
+    @Id
+    @GeneratedValue
+    @Column(name = "TEAM_ID")
+    private Long id;
+    private String name;
+
+    @OneToMany
+    @JoinColumn(name = "TEAM_ID")
+    private List<Member> members = new ArrayList<>();
+
+    @ManyToOne
+    @JoinColumn(name ="TEAM_ID"
+    , insertable = false, updatable = false)
+    private Team team
+```
+결론적으로는 다대일 양방향을 사용하자
 * ### 일대일[1:1]
+* 일대일 관계
+* 일대일: 주 테이블에 외래 키 단방향
+```Java
+@Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @ManyToOne
+    @JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
+    private Team team;
+
+    @OneToOne
+    @JoinColumn(name = "LOCKER_ID")
+    private Locker locker;
+```
+```Java
+package hellojpa;
+
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
+public class Locker {
+
+    @Id
+    @Column(name = "LOCKER_ID")
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+
+    public Locker() {
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+```
+```SQL
+Hibernate: 
+    
+    create table Locker (
+       LOCKER_ID bigint not null,
+        name varchar(255),
+        primary key (LOCKER_ID)
+    )
+```
+```SQL
+Hibernate: 
+    
+    create table Member (
+       MEMBER_ID bigint not null,
+        USERNAME varchar(255),
+        LOCKER_ID bigint,
+        TEAM_ID bigint,
+        primary key (MEMBER_ID)
+    )
+```
+Member 에 LOCKER_ID 들어간것 확인
+일대일 양방향일 경우
+```JAva
+@Entity
+public class Locker {
+
+    @Id
+    @Column(name = "LOCKER_ID")
+    @GeneratedValue
+    private Long id;
+
+    private String name;
+
+    @OneToOne(mappedBy = "locker")
+    private Member member;
+```
+* 일대일: 대상 테이블에 외래 키 단방향
+지원도 안되고 방법도 없다
+* 일대일: 대상 테이블에 외래 키 양방향
+Member member를 연관관계 주인으로 잡아서 연결...
+말에 모순이 있다
+일대일 관계는 자신의 엔티티의 외럐 키는 직접 관리해야 한다
 * ### 다대다[N:M]
 * ### 실전 예제 - 3.다양한 연관관계 매핑
 
