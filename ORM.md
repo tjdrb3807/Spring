@@ -1197,14 +1197,12 @@
     public class Member {
 
         @Id
-        @Column(name = "PK")
+        @Column(name = "member_id")
         @GeneratedValue(strategy = GenerationType.AUTO)
         private Long id;
 
-        @Column(name = "USERNAME")
         private String name;
 
-        @Column(name = "TEAM_ID(FK)")
         private Long teamId;
 
         //default Constructor
@@ -1222,11 +1220,10 @@
     public class Team {
         
         @Id
-        @Column(name = "PK")
+        @Column(name = "team_id")
         @GeneratedValue(strategy = GenerationType.AUTO)
         private Long id;
         
-        @Column(name = "TEAMNAME")
         private String name;
         
         //default Constructor
@@ -1281,18 +1278,17 @@
     public class Member {
 
         @Id
-        @Column(name = "PK")
+        @Column(name = "member_id")
         @GeneratedValue(strategy = GenerationType.AUTO)
         private Long id;
 
-        @Column(name = "USERNAME")
         private String name;
 
-    //    @Column(name = "TEAM_ID")
+    //    @Column(name = "team_id")
     //    private Long teamId;
 
         @ManyToOne
-        @JoinColumn(name = "TEAM_ID")
+        @JoinColumn(name = "team_id")
         private Team team;
 
         //default Structor
@@ -1385,15 +1381,14 @@
     public class Member {
 
         @Id
-        @Column(name = "PK")
+        @Column(name = "member_id")
         @GeneratedValue(strategy = GenerationType.AUTO)
         private Long id;
 
-        @Column(name = "USERNAME")
         private String name;
 
         @ManyToOne
-        @JoinColumn(name = "TEAM_ID")
+        @JoinColumn(name = "team_id")
         private Team team;
 
         //default Structor
@@ -1404,15 +1399,13 @@
   * ### Team 엔티티는 컬렉션 추가
     ```Java
     @Entity
-    @Table(name = "TEAM")
     public class Team {
 
         @Id
         @Column(name = "PK")
-        @GeneratedValue(strategy = GenerationType.AUTO)
+        @GeneratedValue
         private Long id;
 
-        @Column(name = "TEAMNAME")
         private String name;
 
         @OneToMany(mappedBy = "team")
@@ -1697,19 +1690,17 @@
     * `외래키(FK)가 존재하는 테이블의 Entity에 역방향 Entity의 참조를 넣어두고 매핑한다.`
       ```Java
       @Entity
-      @Table(name = "MEMBER")
       public class Member{
 
           @Id
-          @Column(name = "MEMBER_ID")
-          @GeneratedValue(strategy = GenerationType.AUTO)
+          @Column(name = "member_id")
+          @GeneratedValue
           private Long id;
 
           @ManyToOne
-          @JoinColum(name = "TEAM_ID")
+          @JoinColum(name = "team_id")
           private Team team;
 
-          @Column(name = "MEMBER_NAME")
           private String name;
 
           //default Constructor
@@ -1717,14 +1708,14 @@
           //Getter, Setter
       }
       ``` 
+
       ```Java
       @Entity
-      @Table(name = "TEAM")
       public class Team{
 
           @Id
-          @Column(name = "TEAM_ID")
-          @GeneratedValue(strategy = GenerationType.AUTO)
+          @Column(name = "team_id")
+          @GeneratedValue
           private Long id;
 
           //default Constructor
@@ -1739,12 +1730,11 @@
     ![](img/img290.png)
     ```Java
     @Entity
-    @Table(name = "TEAM")
     public class Team{
 
         @Id
-        @Column(name = "TEAM_ID")
-        @GeneratedValue(strategy = GenerationType.AUTO)
+        @Column(name = "team_id")
+        @GeneratedValue
         private Long ing;
 
         @OneToMany(mappedBy = "team")
@@ -1771,15 +1761,13 @@
         * 이러한 경우 Team Entity의 List members의 값을 수정하였을때 다른 테이블(MEMBER)에 있는 FK(TEAM_ID)를 update 처리해야 한다
       ```Java
       @Entity
-      @Table(name = "MEMBER")
       public class Memeber{
 
           @Id
-          @Column(name = "MEMBER_ID")
-          @GeneratedValue(strategy = GenerationType.AUTO)
+          @Column(name = "member_id")
+          @GeneratedValue
           private Long id;
 
-          @Column(name = "MEMBER_NAME")
           private String name;
 
           //default Constructor
@@ -1787,21 +1775,20 @@
           //Getter, Setter
       }
       ``` 
+      
       ```Java
       @Entity
-      @Table(name = "TEAM")
       public class Team{
 
           @Id
-          @Column(name = "TEAM_ID")
-          @GeneratedValue(strategy = GenerationType.AUTO)
+          @Column(name = "team_id")
+          @GeneratedValue
           private Long id;
 
           @OneToMany
-          @JoinColumn(name = "TEAM_ID")
+          @JoinColumn(name = "team_id")
           private List<Member> members = new ArrayList<>();
 
-          @Column(name = "TEAM_NAME")
           private String name;
 
           //default Constructor
@@ -1851,453 +1838,561 @@
         * Entity가 관리하는 FK가 다른 테이블에 존재한다
         * 연관관계 관리를 위해 추가로 UPDATE SQL 실행
       * 일대다 단방향 매핑보다는 `다대일 양방향 매핑을 사용`하자
+    * 일대다 양방향
+      ![](img/img292.png)
+      ```Java
+      @Entity
+      public class Team{
 
+          @Id
+          @Column(name = "tema_id")
+          @GeneratedValue
+          private Long id;
+          private Sring name;
 
-  team.getMembers().add(member); 가 조금 애매하다 , TEAM 테이블이 insert될 내용이 아니다
-  ```SQL
-  update
-          Member 
-      set
-          TEAM_ID=? 
-      where
-          MEMBER_ID=?
-  ```
-  업데이트 쿼리가 추가로 나가는 이유  Team team = new Team();, team.setName ("TeamA"); 입장에서는 연관관계가 바뀌었더라도 이부분을 변경할떄는 그냥 TEAM 테이블에 넣으면 된다
-  team.getMembers().add(member); 이 부분은 TEAM 엔티티를 저장하는데 TEMA 테이블의 TEAM_ID를 어떻게 할 방법이 없다.. 그래서 옆테이블에 있는것을 업데이트 치는 수 밖에 없다 그래서 업데이트 쿼리가 한번더 나간것이다 
-  성능상의 단점은 있지만 큰 차이는 없다
-  영한이가 이 방법을 잘 안쓰는 이유
-  실무에서 수십개의 테이블이 엮여서 돌아가는 상황에서 다른 테이블의 업테이트 쿼리가 날라가므로 인하여 운영상의 문제와 복잡도를 초례한다
-  그래서 영한이는 다대일 양방향을 하게되면 양방향을 추가하는 전략으로 간다
-  * 일대다 양방향
-  ```Java
-  @Entity
-  public class Team {
+          @OneToMany
+          @JoinColumn(name = "team_id")
+          private List<Member> members = new ArrayList<>();
 
-      @Id
-      @GeneratedValue
-      @Column(name = "TEAM_ID")
-      private Long id;
-      private String name;
+          //default Constructor
 
-      @OneToMany
-      @JoinColumn(name = "TEAM_ID")
-      private List<Member> members = new ArrayList<>();
+          //Getter, Setter
+      }
+      ``` 
+      ```Java
+      @Entity
+      public class Member{
 
-      @ManyToOne
-      @JoinColumn(name ="TEAM_ID"
-      , insertable = false, updatable = false)
-      private Team team
-  ```
-  결론적으로는 다대일 양방향을 사용하자
+          @Id
+          @Column(name = "member_id")
+          @GeneratedValue
+          private Long id;
+
+          private String username;
+
+          @ManyToOne
+          @JoinColumn(name = "team_id", insertable = false, updatable = false)
+          private Team team;
+
+          //default Constructor
+
+          //Getter, Setter
+      }
+      ```
+    * 일대다 양방향 정리
+      * 이러한 매핑은 공식적으로 존재하지 않는다
+      * 읽기 전용 필드를 사용해서 양방향 처럼 사용하는 방법
+        * `@JoinColumn(insertable = false, updatable = false)`
+      * `다대일 양방향을 사용하자`
   * ### 일대일[1:1]
-  * 일대일 관계
-  * 일대일: 주 테이블에 외래 키 단방향
-  ```Java
-  @Id
-      @GeneratedValue
-      @Column(name = "MEMBER_ID")
-      private Long id;
+    * 일대일 관계
+      * 일대일 관계는 그 반대도 일대일
+      * 주 테이블이나 대상 테이블 중에 외래 키 선택 가능
+        * 주 테이블에 외래 키
+        * 대상 테이블에 외래 키
+      * 외래 키에 데이터베이스 유니크(UNI) 제약조건 추자
+    * 일대일: 주 테이블에 외래 키 단방향
+      ![](img/img293.png)
+      ```Java
+      @Entity
+      public class Member{
 
-      @Column(name = "USERNAME")
-      private String name;
+          @Id
+          @Column(name = "member_id")
+          @GeneratedValue
+          private Long id;
 
-      @ManyToOne
-      @JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
-      private Team team;
+          @OneToOne
+          @JoinColumn(name = "locker_id")
+          private Locker locker;
 
-      @OneToOne
-      @JoinColumn(name = "LOCKER_ID")
-      private Locker locker;
-  ```
-  ```Java
-  package hellojpa;
+          private String username;
 
-  import javax.persistence.Column;
-  import javax.persistence.Entity;
-  import javax.persistence.GeneratedValue;
-  import javax.persistence.Id;
+          //default constructor
 
-  @Entity
-  public class Locker {
-
-      @Id
-      @Column(name = "LOCKER_ID")
-      @GeneratedValue
-      private Long id;
-
-      private String name;
-
-      public Locker() {
+          //Getter, Setter
       }
+      ```
+      ```Java
+      @Entity
+      public class Locker{
 
-      public Long getId() {
-          return id;
+          @Id
+          @Column(name = "locker_id")
+          @GeneratedValue
+          private Long id;
+
+          private String name;
+
+          //default Constructor
+
+          //Getter, Setter
       }
+      ```
+      ```SQL
+      Hibernate: 
+          
+          create table Locker (
+            LOCKER_ID bigint not null,
+              name varchar(255),
+              primary key (LOCKER_ID)
+          )
+      Hibernate: 
+          
+          create table Member (
+            MEMBER_ID bigint not null,
+              USERNAME varchar(255),
+              LOCKER_ID bigint,
+              TEAM_ID bigint,
+              primary key (MEMBER_ID)
+          )
+      ```   
+      * MEMBER Table에 LOCKER_ID 가 들어간 것을 확인할 수 있다.
+      * 다대일(@ManyToOne) 단방향 매핑과 유사
+    * 일대일: 주 테이블에 외래 키 양방향  
+      ![](img/img294.png)  
+      ```Java
+      @Entity
 
-      public void setId(Long id) {
-          this.id = id;
+      public classs Locker{
+
+          @Id
+          @Column(name = "locker_id")
+          @GeneratedValue
+          private Long id;
+
+          private String name;
+
+          @OneToOne(mappedBy = "locker")
+          private Member member;
+
+          //default Constructor
+
+          //Getter, Setter
       }
-
-      public String getName() {
-          return name;
-      }
-
-      public void setName(String name) {
-          this.name = name;
-      }
-  }
-  ```
-  ```SQL
-  Hibernate: 
-      
-      create table Locker (
-         LOCKER_ID bigint not null,
-          name varchar(255),
-          primary key (LOCKER_ID)
-      )
-  ```
-  ```SQL
-  Hibernate: 
-      
-      create table Member (
-         MEMBER_ID bigint not null,
-          USERNAME varchar(255),
-          LOCKER_ID bigint,
-          TEAM_ID bigint,
-          primary key (MEMBER_ID)
-      )
-  ```
-  Member 에 LOCKER_ID 들어간것 확인
-  일대일 양방향일 경우
-  ```JAva
-  @Entity
-  public class Locker {
-
-      @Id
-      @Column(name = "LOCKER_ID")
-      @GeneratedValue
-      private Long id;
-
-      private String name;
-
-      @OneToOne(mappedBy = "locker")
-      private Member member;
-  ```
-  * 일대일: 대상 테이블에 외래 키 단방향
-  지원도 안되고 방법도 없다
-  * 일대일: 대상 테이블에 외래 키 양방향
-  Member member를 연관관계 주인으로 잡아서 연결...
-  말에 모순이 있다
-  일대일 관계는 자신의 엔티티의 외럐 키는 직접 관리해야 한다
+      ``` 
+      * 다대일 양향뱡 매핑 처럼 `외래 키가 있는 곳이 연관관계의 주인`
+      * 반대편은 mappedBy 적용
+    * 일대일: 대상 테이블에 외래 키 당방향
+      ![](img/img259.png) 
+      * `단방향 관계는 JPA 지원X`
+    * 일대일: 대상 테이블에 외래 키 양방향
+      ![](img/img296.png) 
+      * Locker Entity의 Member member 참조를 연관관계의 주인으로 잡아서 연결
+      * 일대일 관계는 자신 엔티티의 외래 키는 직접 관리해야 한다.
+    * 일대일 정리
+      * 주 테이블에 외래 키
+        * 주 객체가 대상 객체의 참조를 가지는 것 처럼, 주 테이블에 외래 키를 두고 대상 테이블을 찾음
+        * 객체지향 개발자 선호
+        * JPA 매핑 편리
+        * 장점: 주 테이블에만 조회해도 대상 테이블에 데이터가 있는지 확인 가능
+        * 단점: 값이 없으면 외래 키에 null 허용
+      * 대상 테이블에 외래 키
+        * 대상 테이블에 외래 키가 존재
+        * 전통적인 데이터베이스 개발자 선호
+        * 장점: 주 데이블과 대상 테이블을 일대일에서 일대다 관꼐로 변경할 때 테이블 구조 유지
+        * 단정: 프록시 기능의 한계로 지연 로딩으로 설정해도 항상 즉시 로딩됨
   * ### 다대다[N:M]
-실무에서는 사용하면 안된다
-왜 쓰면 안되는지에 초첨을 맞춰서 공부
-다대다 단방향
-```Java
-package hellojpa;
+    * 다대다
+      ![](img/img297.png)
+      * 실무에서는 사용해서는 안되며, 왜 사용하면 안되는지에 초점을 맞추도록!
+      * 관계형 데이터베이스는 정규화된 테이블 2개로 다대다 관계를 표현할 수 없다
+      * 연결 테이블을 추가해서 일대가, 다대일 관계로 풀어내야한다. 
+      ![](img/img298.png)
+      * 객체는 컬렉션을 사영해서 객체 2개로 다대다 관계를 성립시킬 수 있다.
+      * `@ManyToMany`사용
+      * `@JoinTable`로 연결 테이블 지정
+      * 다대다 매핑: 단방향, 양방향 가능
+    * 다대다 단방향
+      ```Java
+      @Entity
+      public class Product{
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
+          @Id
+          @Column(name = "product_id")
+          @GeneratedValue
+          private Long id;
 
-@Entity
-public class Product {
+          private Stirng name;
 
-    @Id
-    @GeneratedValue
-    private Long id;
+          //default Construcotr
 
-    private String name;
+          //Getter, Setter
+      }
+      ``` 
 
-    public Product() {
-    }
+      ```Java
+      @Entity
+      public class Member{
+      
+          @Id
+          @Column(name = "member_id")
+          @GeneratedValue
+          private Long id;
 
-    public Long getId() {
-        return id;
-    }
+          @ManyToMany
+          @JoinTable(name = "Member_Product")
+          private List<Product> products = new ArrayList<>();
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+          private String name;
 
-    public String getName() {
-        return name;
-    }
+          //default Constructor
 
-    public void setName(String name) {
-        this.name = name;
-    }
-}
-```
-```Java
-package hellojpa;
+          //Getter, Setter
+      }
+      ```      
 
-import javax.persistence.*;
-import java.util.ArrayList;
-import java.util.List;
+      ```SQL
+      Hibernate: 
+          
+          create table MEMBER_PRODUCT (
+            Member_MEMBER_ID bigint not null,
+              products_id bigint not null
+          )      
+      ```
+      ```SQL
+      Hibernate: 
+          
+          alter table MEMBER_PRODUCT 
+            add constraint FKc6hsxwm11n18ahnh5yvbj62cf 
+            foreign key (products_id) 
+            references Product
+      Hibernate: 
+          
+          alter table MEMBER_PRODUCT 
+            add constraint FK4ibylolqmostllrjdc147aowv 
+            foreign key (Member_MEMBER_ID) 
+            references Member
+      ```
+      * 외래 키 제약조건으로 생기는 SQL
+    * 다대다 양방향
+      ```Java
+      @Entity
+      public class Product{
 
-@Entity
-public class Member {
+          @Id
+          @Column(name = "product_id")
+          @GeneratedValue
+          private Long id;
 
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
+          @ManyToMany(mappedBy = "products")
+          private List<Member> members = new ArrayList<>();
 
-    @Column(name = "USERNAME")
-    private String name;
+          
+          private Stirng name;
 
-    @ManyToOne
-    @JoinColumn(name = "TEAM_ID", insertable = false, updatable = false)
-    private Team team;
+          //default Construcotr
 
-    @OneToOne
-    @JoinColumn(name = "LOCKER_ID")
-    private Locker locker;
+          //Getter, Setter
 
-    @ManyToMany
-    @JoinTable(name = "MEMBER_PRODUCT")
-    private List<Product> products = new ArrayList<>();
+      }
+      ``` 
+    * 다대다 매핑의 한계
+      * 편리해 보이지만 실무에서 사용할 수 없다.
+      * 연결 테이블이 단순히 연결만 하고 끝나지 않는다.
+      * 매핑 정보만 연결 테이블에 들어가고 추가적인 테이터를 담을 수 없다.
+      * 개발자가 생각하지 못한 Query가 나간다
+    * 다대다 한계 극복
+      ![](img/img299.png) 
+      * 연결 테이블용 엔티티 추가(연결 테이블을 엔티티로 승격)
+      * `@ManyToMany` -> `@OneToMany`, `@ManyToOne`
+        ```Java
+        @Entity
+        public class MemberProduct{
 
-    public Member() {
-    }
+            @Id
+            @Column(name = "orders")
+            @GeneratedValue
+            private Long id;
 
-    public Long getId() {
-        return id;
-    }
+            @ManyToOne
+            @JoinColumn(name = "member_id")
+            private Member member;
 
-    public void setId(Long id) {
-        this.id = id;
-    }
+            @ManyToOne
+            @JoinColumn(name = "product_id")
+            private Product product;
 
-    public String getName() {
-        return name;
-    }
+            private String orderAmount;
 
-    public void setName(String name) {
-        this.name = name;
-    }
-}
-```
-```SQL
-Hibernate: 
-    
-    create table MEMBER_PRODUCT (
-       Member_MEMBER_ID bigint not null,
-        products_id bigint not null
-    )
-```
-외래키 제약 조건으로 생기는것
-```SQL
-Hibernate: 
-    
-    alter table MEMBER_PRODUCT 
-       add constraint FKc6hsxwm11n18ahnh5yvbj62cf 
-       foreign key (products_id) 
-       references Product
-Hibernate: 
-    
-    alter table MEMBER_PRODUCT 
-       add constraint FK4ibylolqmostllrjdc147aowv 
-       foreign key (Member_MEMBER_ID) 
-       references Member
-```
-다대다 양방향
-```JAva
+            private LocalDateTime orderDate;
 
-@Entity
-public class Product {
+            //default Constructor
 
-    @Id
-    @GeneratedValue
-    private Long id;
+            //Getter, Setter
 
-    @ManyToMany(mappedBy = "products")
-    private List<Member> members = new ArrayList<>();
-```
-* 다대다 매핑의 한계
-매핑 정보만 들어가고 추가적인 데이터를 담을 수 없다
-쿼리도 개발자가 생각하지 못한 쿼리가 나온다
-다대다 한계 극복
-```JAva
-package hellojpa;
+        }
+        ``` 
+        ```Java
+        @Entity
+        public class Member{
 
-import javax.persistence.*;
-import java.time.LocalDateTime;
+            ...
 
-@Entity
-public class MemberProduct {
+            @OneToMany(mappedBy = "member")
+            private List<MemberProduct> memberProducts = new ArrayList<>();
+        }
+        ```
+        ```Java
+        @Entity
+        public class Product{
 
-    @Id
-    @GeneratedValue
-    private Long id;
+            ...
 
-    @ManyToOne
-    @JoinColumn(name = "MEMBER_ID")
-    private Member member;
-
-    @ManyToOne
-    @JoinColumn(name = "PRODUCT_ID")
-    private Product product;
-
-    private int count;
-    private int price;
-    private LocalDateTime orderDateTime;
-}
-
-```
-```JAva
-@OneToMany(mappedBy = "member")
-    private List<MemberProduct> memberProducts = new ArrayList<>();
-```
-```JAva
-@OneToMany(mappedBy = "product")
-    private List<MemberProduct> memberProducts = new ArrayList<>();
-```
+            @OneToMany(mappedBy = "product")
+            private List<MemberProduct> memberProducts = new ArrayList<>();
+        }
+        ```
   * ### 실전 예제 - 3.다양한 연관관계 매핑
+    * 배송, 카테고리 추가 - 엔티티
+      ![](img/img300.png)  
+      * 주문과 배송은 1:1(@OneToOne)
+      * 상품과 카테고리는 N:M(@ManyToMany)
+    * 배송, 카테고리 추가 - ERD
+      ![](img/img301.png)   
+    * 배송, 카테고리 추가 - 엔티티 상세
+      ![](img/img302.png)   
+    * N:M 관계는 1:N, N:1로
+      * 테이블의 N:M 관계는 중간 테이블을 이용해서 1:N, N:1
+      * 실전에서는 중간 테이블이 단순하지 않다
+      * @ManyToMany는 제약: 필드 추가X, 엔티티 테이블 불일치
+      * 실전에서는 `@ManyToMany 사용X`
+    * @JoinColumn
+      * 외래 키를 매핑할 때 사용
+        ![](img/img303.png) 
+    * @ManyToOne - 주요 속성
+      * 다대일 관계 매핑
+        ![](img/img304.png)
+    * @OneToMany - 주요 속성
+      * 다대일 관계 매핑
+        ![](img/img305.png)        
 ---
 ---
+
+<br>
+<br>
+
 * ## 고급 매핑
+
+<br>
+
 * ### 상속관계 매핑
+  <br> 
+
+  * 상속관계 매핑
+    * 관계형 데이터베이스는 상속 관계가 존재하지 않는다.
+    * 슈퍼타입, 서브타입 관계라는 모델링 기법이 객체 상속과 유사     
+      <br>
+
+      ![](img/img306.png)  
+      <br>
+
+    * 상속관계 매핑: 객체의 상속과 구조와 DB의 슈퍼타입 서브타입 관계를 매핑
+    * 슈퍼타입 서브타입 놀리 모델을 실제 물리 모델로 구현하는 방법
+      * 각각 테이블로 변환 -> `조인 전략`
+      * 통합 테이블로 변환 -> `단일 테이블 전략`
+      * 서브타입 테이블로 변환 -> `구현 클래스마다 테이블 전략`
+
+  <br>
+
+  * 주요 어노테이션
+    * @Inheritance(strategy = InheritanceType.XXX)
+      * `JOINED`: 조인 전략
+      * `SINGLE_TABLE`: 단일 테이블 전략 
+      * `TABLE_PER_CLASS`: 구현 클래스마다 테이블 전략
+    * @DiscriminatorColumn(name = "DTYPE")
+    * @DiscriminatorValue("XXX")
+  <br> 
+
+  * 조인 전략
+  <br>
+
+  ![](img/img307.png)    
+  <br>
+
+    ```Java
+    @Entity
+    public abstract class Item{
+
+        @Id
+        @Column(name = "item_id")
+        @GeneratedValue
+        private Long id;
+
+        private String namel
+
+        private int price;
+
+        //default Constructor
+
+        //Getter, Setter
+    }
+    ``` 
+    <br>
+
+    ```Java
+    @Entity
+    public class Album extends Item {
+
+        private String artist;
+
+        //default Constructor
+
+        //Getter, Setter
+    }
+    ```
+    <br>
+
+    ```Java
+    @Entity
+    public class Movie extends Item{
+
+        private String director;
+
+        private String actor;
+
+        //default Constructor
+
+        //Getter, Setter
+    }
+    ```
+    <br>
+
+    ```Java
+    @Entity
+    public class Book extends Item{
+
+        private String author;
+
+        private String isbn;
+
+        //default Constructor
+
+        //Getter, Setter
+    }
+    ```
+    <br>
+
+    ```SQL
+    Hibernate: 
+        
+        create table Item (
+          DTYPE varchar(31) not null,
+            item_id bigint not null,
+            name varchar(255),
+            price integer not null,
+            author varchar(255),
+            isbn varchar(255),
+            artiest varchar(255),
+            actor varchar(255),
+            director varchar(255),
+            primary key (item_id)
+        )
+    ```
+    * JPA의 기본 전략이 Single Table 이므로 CREATE문이 이러헥 생성된다. 
+    * 조인 전략으로 변경
+      <br>
+
+      ```Java
+      @Entity
+      @Inheritnace(strategy = InheritnaceType.JOINED)
+      public class Item {
+
+          ...
+      }
+      ```
+      <br>
+
+      ```SQL
+      Hibernate: 
+          
+          create table Album (
+            artiest varchar(255),
+              item_id bigint not null,
+              primary key (item_id)
+          )
+      Hibernate: 
+          
+          create table Book (
+            author varchar(255),
+              isbn varchar(255),
+              item_id bigint not null,
+              primary key (item_id)
+          )
+
+      Hibernate: 
+          
+          create table Item (
+            item_id bigint not null,
+              name varchar(255),
+              price integer not null,
+              primary key (item_id)
+          )
+
+      Hibernate: 
+          
+          create table Movie (
+            actor varchar(255),
+              director varchar(255),
+              item_id bigint not null,
+              primary key (item_id)
+          )
+      ```
+      <br>
+
+    * 실행
+    <br>
+
+      ```Java
+      try {
+          Movie movie = new Movie();
+          movie.setDirector("봉준호");
+          movie.setActor("송강호");
+          movie.setName("기생충");
+
+          entityManager.persist(movie);
+
+          transaction.commint();
+      } 
+      ```
+      <br>
+      
+      ```SQL
+      Hibernate: 
+          /* insert hellojpa.mapping.Movie
+              */ insert 
+              into
+                  Item
+                  (name, price, item_id) 
+              values
+                  (?, ?, ?)
+      Hibernate: 
+          /* insert hellojpa.mapping.Movie
+              */ insert 
+              into
+                  Movie
+                  (actor, director, item_id) 
+              values
+                  (?, ?, ?)
+      ```
+
+
+
+
+
+
+  
+
+  
+
+
 * 조인 전략
 가장 정규화된 전략
 ITEM, ALBUM, MOVIE, BOOK 테이블을 만들어서 데이터는 나누고, 조인으로 구성한다 
 INSERT는 두 번 하며 PK가 같으므로 PK, FK로 조인데서 데이터를 가져온다
 구분하기 위해 ITEM 에 구분하는 컬럼 DTYPE을 둔다
-```Java
-package hellojpa;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
 
-@Entity
-public class Item {
-
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    private String name;
-    private int price;
-}
-```
-```Java
-package hellojpa;
-
-@Entity
-public class Album extends Item{
-
-    private String artist;
-}
-```
-```Java
-@Entity
-package hellojpa;
-
-public class Movie extends Item{
-
-    private String director;
-    private String actor;
-}
-```
-```Java
-@Entity
-package hellojpa;
-
-public class Book extends Item{
-
-    private String author;
-    private String isbn;
-}
-```
-```SQL
-Hibernate: 
-    
-    create table Item (
-       DTYPE varchar(31) not null,
-        id bigint not null,
-        name varchar(255),
-        price integer not null,
-        artist varchar(255),
-        author varchar(255),
-        isbn varchar(255),
-        actor varchar(255),
-        director varchar(255),
-        primary key (id)
-    )
-```
-JPA 기본 전략이 단일 테이블 전략이기 떄무에 CREATE 문이 이렇게 나간다
-```JAva
-
-@Entity
-@Inheritance(strategy = InheritanceType.JOINED)
-public class Item {
-```
-```SQL
-Hibernate: 
-    
-    create table Album (
-       artist varchar(255),
-        id bigint not null,
-        primary key (id)
-    )
-Hibernate: 
-    
-    create table Book (
-       author varchar(255),
-        isbn varchar(255),
-        id bigint not null,
-        primary key (id)
-    )
-Hibernate: 
-    
-    create table Item (
-       id bigint not null,
-        name varchar(255),
-        price integer not null,
-        primary key (id)
-    )
-Hibernate: 
-    
-    create table Movie (
-       actor varchar(255),
-        director varchar(255),
-        id bigint not null,
-        primary key (id)
-    )
-```
-```JAva
- try {
-            Movie movie = new Movie();
-            movie.setDirector("a");
-            movie.setActor("bbb");
-            movie.setName("바람과 함꼐 사라지다");
-            movie.setPrice(10000);
-
-            em.persist(movie);
-            
-            tx.commit();
-        }
-```
-```SQL
-Hibernate: 
-    /* insert hellojpa.Movie
-        */ insert 
-        into
-            Item
-            (name, price, id) 
-        values
-            (?, ?, ?)
-Hibernate: 
-    /* insert hellojpa.Movie
-        */ insert 
-        into
-            Movie
-            (actor, director, id) 
-        values
-            (?, ?, ?)
-```
 조회
 ```Java
         try {
