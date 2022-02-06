@@ -2208,6 +2208,9 @@
   <br>
 
   ![](img/img307.png)    
+  * ITEM, ALBUM, MOVIE, BOOK 테이블을 만들어서 데이터를 나누고, 조인으로 구성한다
+  * INSERT는 두 번 나가며 PK가 같으므로 PK, FK로 조인해서 데이터를 가져온다
+  * 구분을 하기위해 ITEM 에 구분하는 컬럼 DTYPE을 둔다
   <br>
 
     ```Java
@@ -2375,87 +2378,149 @@
               values
                   (?, ?, ?)
       ```
+      <br>
 
+    * 조회
+      ```Java
+      try {
+          Movie movie = new Movie();
+          movie.setDirector("봉준호");
+          movie.setActor("송강호");
+          movie.setName("기생충");
+          movie.setPrice(10000);
 
+          entityManager.persist(movie);
 
+          entityManager.flush();
+          entityManager.clear();
 
+          Movie findMovie = entityManager.find(Movie.class, movie.getId());
+          System.out.println("findMovie = " + findMovie);
+      }
+      ``` 
+      <br>
 
+      ```SQL
+      Hibernate: 
+          select
+              movie0_.item_id as item_id1_2_0_,
+              movie0_1_.name as name2_2_0_,
+              movie0_1_.price as price3_2_0_,
+              movie0_.actor as actor1_3_0_,
+              movie0_.director as director2_3_0_ 
+          from
+              Movie movie0_ 
+          inner join
+              Item movie0_1_ 
+                  on movie0_.item_id=movie0_1_.item_id 
+          where
+              movie0_.item_id=?
+      findMovie.name = 기생충
+      ```
+      <br>
+      
+      * 조회할때 join이 필요하다면 join을 지원하며 INSERT SQL을 두번 날리는 것 까지 지원한다
+      <br>
 
-  
+    * DTYPE
+      ```Java
+      @Entity
+      @Inheritance(strategy = InheritanceType.JOINED)
+      @DiscriminatorColumn
+      public abstract Item {
 
-  
+          ...
+      }
+      ```
+      <br>
 
+      ```SQL
+      Hibernate: 
+          
+          create table Item (
+            DTYPE varchar(31) not null,
+              item_id bigint not null,
+              name varchar(255),
+              price integer not null,
+              primary key (item_id)
+          )
+      ```
+      ![](img/img308.png)
+      * `@DiscriminatorColumn`의 default는 Entity 이름이다
+      * 이름은 변경하고 싶다면
+      <br>
 
-* 조인 전략
-가장 정규화된 전략
-ITEM, ALBUM, MOVIE, BOOK 테이블을 만들어서 데이터는 나누고, 조인으로 구성한다 
-INSERT는 두 번 하며 PK가 같으므로 PK, FK로 조인데서 데이터를 가져온다
-구분하기 위해 ITEM 에 구분하는 컬럼 DTYPE을 둔다
+        ```Java
+        @Entity
+        @Inheritance(strategy = InheritnaceType.JOINED)
+        @DiscriminatorValue("M")
+        public class Movie extends Item {
 
-
-조회
-```Java
-        try {
-            Movie movie = new Movie();
-            movie.setDirector("a");
-            movie.setActor("bbb");
-            movie.setName("바람과 함꼐 사라지다");
-            movie.setPrice(10000);
-
-            em.persist(movie);
-
-            em.flush();
-            em.close();
-
-            Movie findMovie = em.find(Movie.class, movie.getId());
-            System.out.println("findMovie = " + findMovie);
-
-
-            tx.commit();
+          ...
         }
-```
-```SQL
-select movie 하면서 innerjoin Item
-```
-JPA 상속관계에 있어서 이러한 기능을 지원한다
-조회할 떄 join이 필요하면 join까지 다 해주고 두번 insert까지
+        ``` 
+    * 장점
+      * 테이블 정규화(테이터가 정규화)
+      * 외래 키 참조 무결성 제약 조건 활용가능
+        * 제약 조건을 Item에 걸어서 맞출 수 있다
+      * 저장공간 효율화
+    * 단점
+      * 조회시 조인을 많이 사용, 성능 저하
+      * 저회 쿼리가 복잡함
+      * 데이터 저장시 INSERT SQL 2번 호출
+  * 단일 테이블 전략
+    ![](img/img309.png)
+    * 논리 모델을 한 테이블로 전부 합치고 ALBUM, MOVIE, BOOK을 구분할 컬럼(DTYPE)을 둔다
+      ```Java
+      @Entity
+      @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+      public abstract class Item {
 
-DTYPE 
-자식타입의 어떤애돌 들어가는지 확인용
-```JAva
+          ...
+      }
+      ```  
+      <br>
 
-@Entity
-@Inheritance(strategy = InheritanceType.JOINED)
-@DiscriminatorColumn
-public class Item {
+      ```SQL
+      Hibernate: 
+          
+          create table Item (
+            DTYPE varchar(31) not null,
+              item_id bigint not null,
+              name varchar(255),
+              price integer not null,
+              author varchar(255),
+              isbn varchar(255),
+              artiest varchar(255),
+              actor varchar(255),
+              director varchar(255),
+              primary key (item_id)
+          )
+      ```      
+      * 자식 타입의 테이블은 생성되지 않는다
+      ```SQL
+      Hibernate: 
+          /* insert hellojpa.mapping.Movie
+              */ insert 
+              into
+                  Item
+                  (name, price, actor, director, DTYPE, item_id) 
+              values
+                  (?, ?, ?, ?, 'Movie', ?)
+      ``` 
+      * INSERT SQL을 한 번만 내보낸다
+      * `@DiscriminatorColumn`이 없더도 DTYPE 이 생성된다(구분하려면 필수)
+      * 생각해보면 JpaMain을 변경하지 않고 `@DiscriminatorColumn`만 변경했을 뿐인데 조인 전략에서 단일 전략으로 적용되는 것을 확인할 수 있다. 이는 상속매핑의 엄청난 장점이라 할 수 있다
 
-```
-```SQL
-Hibernate: 
-    
-    create table Item (
-       DTYPE varchar(31) not null,
-        id bigint not null,
-        name varchar(255),
-        price integer not null,
-        primary key (id)
-    )
-```
-@DiscriminatorColumn 의 default 는 Entity Name 이다
-이름을 변경하고 싶으면
-```Java
 
-@Entity
-@DiscriminatorValue("M")
-public class Movie extends Item{
-```
-h2에서 확인
 
-장점
-데이터가 정규화 되어있다 
-제약조건은 ITEM에 걸어서 맞출 수 있다
-외래키 참조 무결성 제약조건
-기본적으로 조인 적략이 정석
+
+
+
+  
+
+  
+
 * 단일 테이블 전략
 논리 모델을 한 테이블로 다 합치고 ALBUM , MOVIE, BOOK 을 구분할 컬럼(DTYPE)을 둔다
 ```Java
@@ -2732,10 +2797,968 @@ public class JpaMain {
 ```
 * 프록시 기초
 em.getReference(): DB에 쿼리가 안가갔는데 조회 가능
+```Java
+ try {
+            Member member = new Member();
+            member.setName("hello");
+
+            em.persist(member);
+
+            em.flush();
+            em.close();
+
+            //
+            Member findMember = em.find(Member.class, member.getId());
+            System.out.println("findMember.name = " + findMember.getName());
+            System.out.println("findMember.id = " + findMember.getId());
+
+
+            tx.commit();
+        }
+```
+```SQL
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.TEAM_ID as TEAM_ID7_3_0_,
+        team1_.TEAM_ID as TEAM_ID1_7_1_,
+        team1_.createBy as createBy2_7_1_,
+        team1_.createDate as createDa3_7_1_,
+        team1_.lastModifiedBy as lastModi4_7_1_,
+        team1_.lastModifiedDate as lastModi5_7_1_,
+        team1_.name as name6_7_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.TEAM_ID=team1_.TEAM_ID 
+    where
+        member0_.MEMBER_ID=?
+findMember.name = hello
+findMember.id = 1
+```
+```Java
+try {
+            Member member = new Member();
+            member.setName("hello");
+
+            em.persist(member);
+
+            em.flush();
+            em.clear();
+
+
+//            Member findMember = em.find(Member.class, member.getId());
+            System.out.println("======= getReference Start Line ========");
+            Member findMember = em.getReference(Member.class, member.getId());
+            System.out.println("======= getReference End Line ========");
+
+            System.out.println("findMember.name = " + findMember.getName());
+            System.out.println("findMember.id = " + findMember.getId());
+
+
+            tx.commit();
+        } 
+```
+```SQL
+======= getReference Start Line ========
+======= getReference End Line ========
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.TEAM_ID as TEAM_ID7_3_0_,
+        team1_.TEAM_ID as TEAM_ID1_7_1_,
+        team1_.createBy as createBy2_7_1_,
+        team1_.createDate as createDa3_7_1_,
+        team1_.lastModifiedBy as lastModi4_7_1_,
+        team1_.lastModifiedDate as lastModi5_7_1_,
+        team1_.name as name6_7_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.TEAM_ID=team1_.TEAM_ID 
+    where
+        member0_.MEMBER_ID=?
+findMember.name = hello
+findMember.id = 2
+```
+getReference 하는 시점에는 DB 에 Query를 하지 않는다 
+id를 가지고 올 떄는 쿼리가 나가지 않았다 왜냐하면 getReference로 찾을떄 이미 파라미터로 getId()를 넣었기 때문에 값이 이미 있으므로 쿼리를 날리지 않은 것이다(디비에서 안가져와도 값을 알수 있기 때문이다)
+반면에 Name은 DB에 있는 것 이므로 JPA가 getName()를 찍는 시점에 DB에 쿼리를 날린다
+그 이후 findMmeber에 값을 채우고 값을 출력한다
+여기서 값을 체운다는 표현을 사용하였는데 사실은 조금 더 복잡한 매커니즘이 존재한다 그 매커니즘에 대해서 알아보도록 하자
+```Java
+System.out.println("findMember = " + findMember.getClass());
+```
+```SQL
+findMember = class hellojpa.Member$HibernateProxy$fm6cNgm8
+```
+이름이 Member 가 아니다.. Hibernamet가 만든 가짜 클레스 이름이다(프록시 클래스)
+프록시 엔티티는 껍대기는 똑같은데 안에게 비어있으며 내부에 target이 존재 하면 진짜 reference를 가리킨다(초기에는 null) 
+* 프록시 특징
+getName()을 호출하면 target 에 있는 getName()을 대신 호출한다
+그런데 청음에는 target이 존재하지 않는다(DB에서 조회한 적이 없기 떄문에)
+* 프록시 객체의 초기화
+targent이 비어있다 
+2. JPA가 영속성 컨텍스트에 초기화 요청
+3. 영속석 컨텍스트가 DB조회
+4. 실제 Entity 생성
+5. Target에 생성한 Entity 연결
+JpaMain 에서 두번 호출해서 Query문 출력 회수 확인해볼 것
+* 프록시의 특징
+프록시 객체를 초기화 할 떄, 프록시 객체가 실제 엔티티로 바뀌는 것은 안니다
+```Java
+ try {
+            Member member = new Member();
+            member.setName("hello");
+
+            em.persist(member);
+
+            em.flush();
+            em.clear();
+
+
+//            Member findMember = em.find(Member.class, member.getId());
+            System.out.println("======= getReference Start Line ========");
+            Member findMember = em.getReference(Member.class, member.getId());
+            System.out.println("======= getReference End Line ========");
+            System.out.println("before findMember = " + findMember.getClass());;
+
+            System.out.println("findMember = " + findMember.getClass());
+            System.out.println("findMember.name = " + findMember.getName());
+            System.out.println("findMember.id = " + findMember.getId());
+
+            System.out.println("after findMember = " + findMember.getClass());
+
+
+            tx.commit();
+ }
+ ```
+ ```SQL
+ before findMember = class hellojpa.Member$HibernateProxy$iciMAbVb
+ after findMember = class hellojpa.Member$HibernateProxy$iciMAbVb
+ ```
+ 프록시 객체는 원본 엔티티를 상속받음, 따라서 타입 체크시 주의해햐함
+ ```JAva
+         try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            Member member2 = new Member();
+            member2.setName("member2");
+
+            em.persist(member2);
+
+            em.flush();
+            em.clear();
+
+            Member m1 = em.find(Member.class, member1.getId());
+            Member m2 = em.find(Member.class, member2.getId());
+
+            System.out.println("m1 == m2: " + (m1.getClass() == m2.getClass()));
+            
+            tx.commit();
+        }
+ ```
+ ```SQL
+ m1 == m2: true
+ ```
+ ```Java
+             Member m1 = em.find(Member.class, member1.getId());
+            Member m2 = em.getReference(Member.class, member2.getId());
+ ```
+ ```SQL
+ m1 == m2: false
+ ```
+ ```JAva
+
+    private static void logic(Member m1, Member m2) {
+        System.out.println("m1 == m2: " + (m1 instanceof Member));
+        System.out.println("m1 == m2: " + (m2 instanceof Member));
+    }
+ ```
+ 영속성 컨텍스트에 찾는 엔티티가 있으면 em.getReference()를 해도 실제 엔티티 반환
+ ```Java
+ try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member findMember = em.find(Member.class, member1.getId()); //영속석 컨텍스트에 올라가게 된다
+            System.out.println("findMember = " + findMember.getClass());
+
+            Member reference = em.getReference(Member.class, member1.getId());
+            System.out.println("reference = " + reference.getClass());
+
+            tx.commit();
+        }
+```
+```SQL
+findMember = class hellojpa.Member
+reference = class hellojpa.Member
+```
+reference 도 프록시가 아닌 Member 이다.. (두 가지 이유가 존재한다)
+1. 이미 Member를 영속성 컨텍스트 1차 캐시에 올려두었는데 굳이 프록시로 가져와봐야 아무런 이점이 없다 그냥 원본을 반환하는것이 성능 최적화 입장에서 훨씬더 좋다
+2. JPA에서는 a == a 를 하면 항상 true 가 나온다
+```java
+System.out.println("a == a: " + (findMmeber == reference));
+```
+```SQL
+a == a: true
+```
+findMember가 실제 엔티티던 프록시던 상관 없이 JPA 에서는 == 비교가 한 영속성 컨텍스트 안에서 가져온것이고 PK도 똑같으면 JPA는 항상 true 를 반환해 주어야 한다 이것이 JPA가 기본적으로 제공하는 메커니즘 중 하나다(JPA는 항상 한 트렉젠션 안에서 같은 것을 보장해준다)
+```Java
+        try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member findMember = em.getReference(Member.class, member1.getId());
+            System.out.println("findMember = " + findMember.getClass());
+
+            Member reference = em.getReference(Member.class, member1.getId());
+            System.out.println("reference = " + reference.getClass());
+
+            System.out.println("a == a: " + (findMember == reference));
+
+            tx.commit();
+        } 
+```
+```SQL
+findMember = class hellojpa.Member$HibernateProxy$iNEUVy98
+reference = class hellojpa.Member$HibernateProxy$iNEUVy98
+```
+같은 프록시가 반환되었따 a==a : true 를 보장하기 위해
+```Java
+try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member refMember = em.getReference(Member.class, member1.getId());
+            System.out.println("refMember = " + refMember.getClass());
+
+            Member findMember = em.find(Member.class, member1.getId());
+            System.out.println("findMember = " + findMember.getClass());
+
+            System.out.println("refMember == findMember: " + (refMember == findMember));
+
+            tx.commit();
+```
+```SQL
+refMember = class hellojpa.Member$HibernateProxy$y3WuDHYI
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.TEAM_ID as TEAM_ID7_3_0_,
+        team1_.TEAM_ID as TEAM_ID1_7_1_,
+        team1_.createBy as createBy2_7_1_,
+        team1_.createDate as createDa3_7_1_,
+        team1_.lastModifiedBy as lastModi4_7_1_,
+        team1_.lastModifiedDate as lastModi5_7_1_,
+        team1_.name as name6_7_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.TEAM_ID=team1_.TEAM_ID 
+    where
+        member0_.MEMBER_ID=?
+findMember = class hellojpa.Member$HibernateProxy$y3WuDHYI
+refMember == findMember: true
+```
+findMember 도 프록시가 반환되었다!!!
+프록시가 한 번 조회가 되면 em.find 에서 프록시를 반환한다(true 를 보장하기 위해)
+중요한 것은 개발과정에서 프록시던 실제 엔티티던 개발에 문제가 없게 개발하는 것이 중요하다
+영속성 컨텍스트의 도움을 받을 수 없는 준역속 상태일 때, 프로시를 초기화 하면 문제 발생(실무에서 정말 많이 맞닥드리는 문제)
+```JAva
+        try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member refMember = em.getReference(Member.class, member1.getId());
+            System.out.println("refMember = " + refMember.getClass()); //Proxy
+
+            refMember.getName();  //DB에 쿼리가 나가면서 프록시 객체 초기화
+
+            tx.commit();
+```
+```SQL
+refMember = class hellojpa.Member$HibernateProxy$6IYlvUiq
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.TEAM_ID as TEAM_ID7_3_0_,
+        team1_.TEAM_ID as TEAM_ID1_7_1_,
+        team1_.createBy as createBy2_7_1_,
+        team1_.createDate as createDa3_7_1_,
+        team1_.lastModifiedBy as lastModi4_7_1_,
+        team1_.lastModifiedDate as lastModi5_7_1_,
+        team1_.name as name6_7_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.TEAM_ID=team1_.TEAM_ID 
+    where
+        member0_.MEMBER_ID=?
+```
+프록시의 초기화는 영속성 컨텍스트에 의하여 이루어진다고 하였는데 영속성 컨텍스트를 꺼버린다면?
+```Java
+          try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member refMember = em.getReference(Member.class, member1.getId());
+            System.out.println("refMember = " + refMember.getClass()); //Proxy
+
+            em.detach(refMember); //영속성 컨텍스트에서 끄집어 낸다, 영속성 컨텍스트에서 관리하지 않는다
+//            em.close();
+
+              System.out.println("refMember = " + refMember.getName());
+
+            tx.commit();
+        } catch (Exception e) {
+            tx.rollback();
+              System.out.println("e = " + e);
+        } finally {
+            em.close();
+        }
+        emf.close();
+```
+```SQL
+e = org.hibernate.LazyInitializationException: could not initialize proxy [hellojpa.Member#24] - no Session
+```
+일반적으로 트잰젝션이 시작하고 끝나는것와 영속성 컨택스트가 시작하고 끝나는 것을 맞춪다 
+트랜젝션이 끝나고나서 프록시를 조회할 떄 보면 no seesion error 를 확인할 수 있다,,,
+* 프록시 확인
+```Java
+          try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member refMember = em.getReference(Member.class, member1.getId());
+            System.out.println("refMember = " + refMember.getClass()); //Proxy
+
+              System.out.println("isLoaded = " + emf.getPersistenceUnitUtil().isLoaded(refMember));
+
+            tx.commit();
+        }
+```
+```SQL
+isLoaded = false
+```
+```JAva
+Member refMember = em.getReference(Member.class, member1.getId());
+            System.out.println("refMember = " + refMember.getClass()); //Proxy
+
+              refMember.getName(); //초기화
+              System.out.println("isLoaded = " + emf.getPersistenceUnitUtil().isLoaded(refMember));
+
+```
+```SQL
+isLoaded = true
+```
+```Java
+try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member refMember = em.getReference(Member.class, member1.getId());
+            System.out.println("refMember = " + refMember.getClass()); //Proxy
+              Hibernate.initialize(refMember); //강제 초기화
+
+            tx.commit();
+```
+```SQL
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.TEAM_ID as TEAM_ID7_3_0_,
+        team1_.TEAM_ID as TEAM_ID1_7_1_,
+        team1_.createBy as createBy2_7_1_,
+        team1_.createDate as createDa3_7_1_,
+        team1_.lastModifiedBy as lastModi4_7_1_,
+        team1_.lastModifiedDate as lastModi5_7_1_,
+        team1_.name as name6_7_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.TEAM_ID=team1_.TEAM_ID 
+    where
+        member0_.MEMBER_ID=?
+```
   * ### 즉시 로딩과 지연 로딩
+* 지연 로딩 LAZY을 사용해서 프록시로 조회
+```Java
+@Entity
+public class Member extends BaseEntity {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn
+    private Team team;
+```
+team 을 프록시 객체로 조회한다. 즉 Member class 만 DB에서 조회한다
+```Java
+          try {
+            Member member1 = new Member();
+            member1.setName("member1");
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member m = em.find(Member.class, member1.getId());
+
+
+            tx.commit();
+        } 
+```
+```SQL
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.team_TEAM_ID as team_TEA7_3_0_ 
+    from
+        Member member0_ 
+    where
+        member0_.MEMBER_ID=?
+```
+```Java
+          try {
+              Team team = new Team();
+              team.setName("teamA");
+
+              em.persist(team);
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setTeam(team);
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+            Member m = em.find(Member.class, member1.getId());
+
+              System.out.println("m = " + m.getTeam().getClass());
+
+              System.out.println("=======================");
+              m.getTeam().getName();
+              System.out.println("=======================");
+            tx.commit();
+        } 
+```
+```SQL
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.team_TEAM_ID as team_TEA7_3_0_ 
+    from
+        Member member0_ 
+    where
+        member0_.MEMBER_ID=?
+m = class hellojpa.Team$HibernateProxy$HKa35KmH
+=======================
+Hibernate: 
+    select
+        team0_.TEAM_ID as TEAM_ID1_7_0_,
+        team0_.createBy as createBy2_7_0_,
+        team0_.createDate as createDa3_7_0_,
+        team0_.lastModifiedBy as lastModi4_7_0_,
+        team0_.lastModifiedDate as lastModi5_7_0_,
+        team0_.name as name6_7_0_ 
+    from
+        Team team0_ 
+    where
+        team0_.TEAM_ID=?
+=======================
+```
+MEmber 를 조히할떄는 Member 엔티티를 가져오고 
+team 이 프록시로 나온것을 확인할 수 있다
+team 을 건들이는 시점에 프록시 객체가 초기화 되면에 DB에서 가져오는 것을 확인할 수 있다
+즉 지연로딩으로 설정하면 연관된 것을 프록시로 가져온다
+비즈니스 로직상 Member 에 있는 값만 출력하는 경우가 많다면 이렇게 가는것이 좋다
+* Member와 Team을 자주 함꼐 사용한다면?
+반대로 비즈니스 로직상 Member와 Team 에 있는 값을 출력해야 하는 경우가 많다면 멤버 따로 팀 따로 쿼리가 두번씩 꼐속 나가게 되면서 네트워크를 따로 타게 된다 이런 경우 성능상 손해를 보게 된다
+* 즉시 로딩 EAGER를 사용해서 함꼐 조회
+```Java
+@Entity
+public class Member extends BaseEntity {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn
+    private Team team;
+``` 
+```Java
+Member m = em.find(Member.class, member1.getId());
+```
+이 시점에서
+```SQL
+Hibernate: 
+    select
+        member0_.MEMBER_ID as MEMBER_I1_3_0_,
+        member0_.createBy as createBy2_3_0_,
+        member0_.createDate as createDa3_3_0_,
+        member0_.lastModifiedBy as lastModi4_3_0_,
+        member0_.lastModifiedDate as lastModi5_3_0_,
+        member0_.USERNAME as USERNAME6_3_0_,
+        member0_.team_TEAM_ID as team_TEA7_3_0_,
+        team1_.TEAM_ID as TEAM_ID1_7_1_,
+        team1_.createBy as createBy2_7_1_,
+        team1_.createDate as createDa3_7_1_,
+        team1_.lastModifiedBy as lastModi4_7_1_,
+        team1_.lastModifiedDate as lastModi5_7_1_,
+        team1_.name as name6_7_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.team_TEAM_ID=team1_.TEAM_ID 
+    where
+        member0_.MEMBER_ID=?
+```
+member 랑 team을 조인해서 한번의 쿼리로 전부 가져온다 
+이 경우는 즉시로딩이기 떄문에 프록시가 필요가 없다
+```SQL
+m = class hellojpa.Team
+```
+이미 초기화가 끝나있는 상태이다 즉, 초기화가 필요가 없다
+m.getTeam().getName();하면 실제 가져온 값을 출력하는 것이다 sout으로 변경해서 확인
+
+```SQL
+=======================
+=======================
+```
+* 프록시와 즉시로딩 주의
+실무에서는 즉시 로딩을 사용하면 안된다
+즉시로딩을 적용하면 예상하지 못한 SQL 발생
+지금 예제에서는 join 테이블이 2개여서 간단해 보이지만 실무에서는 수십개의 테이블이 돌아가면서 join 된 테이블이 여러개가 있는 경우다 다분하다 따라서 즉시로딩을 해버리면 조인된 테이블들에 대한 쿼리문이 엄천난 길이의 쿼리문에 발생하게 된다
+따라서 지연로딩으로 속칭 발라내야 한다
+즉시 로딩은 JPQL에서 N + 1 문제를 일으킨다
+```Java
+            try {
+              Team team = new Team();
+              team.setName("teamA");
+
+              em.persist(team);
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setTeam(team);
+
+            em.persist(member1);
+
+            em.flush();
+            em.clear();
+
+//            Member m = em.find(Member.class, member1.getId());
+
+                List<Member> members = em.createQuery("select m from Member m", Member.class).getResultList();
+
+                tx.commit();
+```
+```SQL
+Hibernate: 
+    select
+        team0_.TEAM_ID as TEAM_ID1_7_0_,
+        team0_.createBy as createBy2_7_0_,
+        team0_.createDate as createDa3_7_0_,
+        team0_.lastModifiedBy as lastModi4_7_0_,
+        team0_.lastModifiedDate as lastModi5_7_0_,
+        team0_.name as name6_7_0_ 
+    from
+        Team team0_ 
+    where
+        team0_.TEAM_ID=?
+Hibernate: 
+    select
+        team0_.TEAM_ID as TEAM_ID1_7_0_,
+        team0_.createBy as createBy2_7_0_,
+        team0_.createDate as createDa3_7_0_,
+        team0_.lastModifiedBy as lastModi4_7_0_,
+        team0_.lastModifiedDate as lastModi5_7_0_,
+        team0_.name as name6_7_0_ 
+    from
+        Team team0_ 
+    where
+        team0_.TEAM_ID=?
+```
+EAGER 로 설정했는데 쿼리가 두번 나가는 것을 확인할 수 있다
+em.find 는 PK를 찎어서 가져오는 것이기 떄문에 JPA가 내부적으로 다 찾아서 할 수 있다
+그런데 JPQL은 "select m from Member m" 이 우선 SQL로 번역(SELECT * FROM MEMBER)이 된다 그러면 Member만 select 한다
+그럼 Member를 가져와봤더니 team 이 EAGER 가 설정 되어있는것을 확인
+즉시로딩(EAGER)라는 것은 일단 가져올때 무조건 값이 다 들어가 있어야 한다
+그렇다면 "select m from Member m"에서 Member 쿼리가 나가고 만약 member의 개수가 10개면 그 10개 만큼 EAGER를 가져오기 위해서 별도로 나간다..
+다시 말하면
+1. SQL로 번역(select * from Member)
+2. Mmeber를 가져옴
+3. Member를 보니까 EAGER 이므로 Team 도 가져와야됨, 레이즈면 프록시를 집어 넣으면 됨
+4. 즉 EAGER 이므로 List<Member> members = 이 반환하는 시점에 Team이 다 들어가 잇어야 한다 
+5. 그렇다면 그것만큼 별도의 SQL(select * form Team where TEAM_ID = xxx)이 나가게 된다
+```Java
+ try {
+              Team teamA = new Team();
+              teamA.setName("teamA");
+
+              em.persist(teamA);
+
+              Team teamB = new Team();
+              teamB.setName("teamB");
+
+              em.persist(teamB);
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setTeam(teamA);
+
+            em.persist(member1);
+
+            Member member2 = new Member();
+            member2.setName("member2");
+            member2.setTeam(teamB);
+
+            em.persist(member2);
+
+            em.flush();
+            em.clear();
+
+//            Member m = em.find(Member.class, member1.getId());
+
+                List<Member> members = em.createQuery("select m from Member m", Member.class).getResultList();
+
+                tx.commit();
+        } 
+``` 
+```SQL
+Hibernate: 
+    /* select
+        m 
+    from
+        Member m */ select
+            member0_.MEMBER_ID as MEMBER_I1_3_,
+            member0_.createBy as createBy2_3_,
+            member0_.createDate as createDa3_3_,
+            member0_.lastModifiedBy as lastModi4_3_,
+            member0_.lastModifiedDate as lastModi5_3_,
+            member0_.USERNAME as USERNAME6_3_,
+            member0_.team_TEAM_ID as team_TEA7_3_ 
+        from
+            Member member0_
+```
+Mmeber는 한번에 가져온다 
+MEmber가 둘 이면서 서로 다른팀이고 영속성 컨텍스트에도 존재하지 않기때문에 따로따로 가져와야 한다
+```SQL
+Hibernate: 
+    select
+        team0_.TEAM_ID as TEAM_ID1_7_0_,
+        team0_.createBy as createBy2_7_0_,
+        team0_.createDate as createDa3_7_0_,
+        team0_.lastModifiedBy as lastModi4_7_0_,
+        team0_.lastModifiedDate as lastModi5_7_0_,
+        team0_.name as name6_7_0_ 
+    from
+        Team team0_ 
+    where
+        team0_.TEAM_ID=?
+Hibernate: 
+    select
+        team0_.TEAM_ID as TEAM_ID1_7_0_,
+        team0_.createBy as createBy2_7_0_,
+        team0_.createDate as createDa3_7_0_,
+        team0_.lastModifiedBy as lastModi4_7_0_,
+        team0_.lastModifiedDate as lastModi5_7_0_,
+        team0_.name as name6_7_0_ 
+    from
+        Team team0_ 
+    where
+        team0_.TEAM_ID=?
+```
+N + 1 문제
+결과가 10개면 N은 10 1은 최적회(select m from Member m")
+즉 처음 쿼리 하나를 날렸는데 추가쿼리 N개가 나간다 
+```JAva
+
+@Entity
+public class Member extends BaseEntity {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn
+    private Team team;
+
+```
+```SQL
+Hibernate: 
+    /* select
+        m 
+    from
+        Member m */ select
+            member0_.MEMBER_ID as MEMBER_I1_3_,
+            member0_.createBy as createBy2_3_,
+            member0_.createDate as createDa3_3_,
+            member0_.lastModifiedBy as lastModi4_3_,
+            member0_.lastModifiedDate as lastModi5_3_,
+            member0_.USERNAME as USERNAME6_3_,
+            member0_.team_TEAM_ID as team_TEA7_3_ 
+        from
+            Member member0_
+```
+team은 프록시로 잡혀있으므로 
+N+1 문제가 발생하지 않는다
+
+즉 N+1문제 대안법은 
+모든 연관관계를 지연로딩으로 전부 세팅한다 그 이후 세가지 방법이 존재한다
+가장 기본적인 방법은  jPQL fetch join: run time에 내가 원하는 애들을 동적으로 선택해서 한번에 가져온다  
   * ### 지연 로딩 활용
+지금부터 설명은 굉장히 이론적인 것이며 실무에서는 다 지연로딩으로 발라야 한다
   * ### 영속성 전이: CASCAED
+* 영속성 전이: 저장
+```Java
+package hellojpa;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
+public class Parent {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @OneToMany(mappedBy = "parent")
+    private List<Child> childList = new ArrayList<>();
+
+    //연관관계 펴의 메소드
+    public void addChild(Child child) {
+        childList.add(child);
+        child.setParent(this);
+    }
+
+
+    private String name;
+}
+```
+```JAva
+package hellojpa;
+
+import javax.persistence.Entity;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+
+@Entity
+public class Child {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @ManyToOne
+    @JoinColumn(name = "parent_id")
+    private Parent parent;
+
+    private String name;
+}
+
+```
+```Java
+        try {
+            Child child1 = new Child();
+            Child child2 = new Child();
+
+            Parent parent = new Parent();
+            parent.addChild(child1);
+            parent.addChild(child2);
+
+            System.out.println("====== Persist Start ========");
+            em.persist(parent);
+            em.persist(child1);
+            em.persist(child2);
+            System.out.println("====== Persist End ========");
+
+        }
+```
+```SQL
+persist 3번 호출
+```
+parent 중심으로 개발을 하고있지 않은것 같은 느낌이 든다
+코드를 짤때 페어런트 중심으로 코드를 짜고 싶다 페어런트와 차일드를 관래해주었으면 좋겠따
+페어런트를 persist 할떄 차일드는 자동으로 persist 됏으면 좋겟따
+```Java
+@Entity
+public class Parent {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+    private List<Child> childList = new ArrayList<>();
+
+```
+```JAva
+try {
+            Child child1 = new Child();
+            Child child2 = new Child();
+
+            Parent parent = new Parent();
+            parent.addChild(child1);
+            parent.addChild(child2);
+
+            System.out.println("====== Persist Start ========");
+            em.persist(parent);
+            System.out.println("====== Persist End ========");
+
+        }
+```
+```SQL
+child 로 persist 된 것을 확인할 수 잇다(insert)
+```
+언제 쓰는가?
+자식이 하나의 부보에 의해서만 관래 될떄는 유용하지만
+자식이 하나의 부모가 아닌 여러 부모에 의하여 관리되며진다면 이 경우는 사용하면 안됟다
+즉 소유가자 하나일떄(라고 표현)이것을 아용해도 좋다
+그런데 다른 애들이 child를 안게되는 순간 이것을 사용하명 안된다 운영이 너무 힘들어진다..
+이때는 전부 따로따로 관리해야 한다 
+단일 엔티티에 종속적일 떄는 보통 라이프 사이클이 똑같기 때문에 사용해도 괜찮다
+즉 전재가 두가지를 만족할 떄 사용해야 하느데 라이브 사이클이 똑같을 떄 단일 소유자 일떄 사용해도 된다 
   * ### 고아 객체
+고아가 되면 지워진다
+```Java
+
+@Entity
+public class Parent {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Child> childList = new ArrayList<>();
+
+```
+```Java
+try {
+            Child child1 = new Child();
+            Child child2 = new Child();
+
+            Parent parent = new Parent();
+            parent.addChild(child1);
+            parent.addChild(child2);
+
+            System.out.println("====== Persist Start ========");
+            em.persist(parent);
+            System.out.println("====== Persist End ========");
+
+            em.flush();
+            em.clear();
+
+            Parent findParent = em.find(Parent.class, parent.getId());
+            findParent.getChildList().remove(0);
+
+        }
+``` 
+```SQL
+delete form Child where id=?
+```
   * ### 영속성 전이 + 고아 객체, 생명주기
   * ### 실전 예제 - 5.연관관계 관리 
 
