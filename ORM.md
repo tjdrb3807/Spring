@@ -2712,112 +2712,15 @@
           System.out.println("member = " + member.getName());
       }
       ```
-      <br>
-
-  * ## _프록시 기초_
     <br>
 
-    * entityManager.find() vs entityManager.getReference()
-    * `entityManager.find()`: 데이터베이스를 통해서 실제 Entity 객체 제회 
-    * `entityManager.getReference()`: `데이터베이스 조회를 미루는 가짜(Proxy) Entity 객체 조회`
-      ![](img/img312.png)
+    * ### _프록시 기초_
       <br>
 
-      ```Java
-      try {
-          Member member = new Member();
-          member.setName("memberA");
-
-          entityManager.persist(member);
-
-          entityManager.flush();
-          entityManager.clear();
-
-          System.out.println("======= getReference Start Line =======");
-          Member findMember = entityManager.getReference(Member.class, member.getId());
-          System.out.println("======= getReference End Line =======");
-          System.out.println("findMember.name = " + findMember.getName());
-          System.out.println("findMember.id = " + findMember.getId());
-      }
-      ```
-      <br>
-
-      ```SQL
-      ======= getReference Start Line =======
-      ======= getReference End Line =======
-      select
-          member0_.MEMBER_ID as MEMBER_I1_3_0_,
-          member0_.createBy as createBy2_3_0_,
-          member0_.createDate as createDa3_3_0_,
-          member0_.lastModifiedBy as lastModi4_3_0_,
-          member0_.lastModifiedDate as lastModi5_3_0_,
-          member0_.USERNAME as USERNAME6_3_0_,
-          member0_.TEAM_ID as TEAM_ID7_3_0_,
-          team1_.TEAM_ID as TEAM_ID1_7_1_,
-          team1_.createBy as createBy2_7_1_,
-          team1_.createDate as createDa3_7_1_,
-          team1_.lastModifiedBy as lastModi4_7_1_,
-          team1_.lastModifiedDate as lastModi5_7_1_,
-          team1_.name as name6_7_1_ 
-      from
-          Member member0_ 
-      left outer join
-          Team team1_ 
-              on member0_.TEAM_ID=team1_.TEAM_ID 
-      where
-          member0_.MEMBER_ID=?
-      findMember.name = memberA
-      findMember.id = 1
-      ```
-      * `entityManager.getReference()`하는 시점에는 DB에 Query가 나가지 않는다.
-      * `findMember.getId()`하는 시점에 DB에 Query가 나자기 않는다.
-        * entityManager.getReference(Member.class, `member.getId()`)로 Member Entity를 찾을때 이미 Parameter로 member.getId()를 넣을것은 Member.id 값을 안다는 의미이다. 그러므로 DB에서 값을 가져오지 않아도 Query를 날리지 않은 것이다.
-      * `findMmeber.getName()`하는 시점에 DB에 Query가 나간다
-        * Member.name의 값은 DB에 저장되어 있으므로, JPA가 getNama()을 호출하는 시점에 DB에 Query를 날린다
-        * 이후 findMember에 값을 채우고 출력한다
-          * 여기서 값을 채운다는 표현을 사용하였는데 사실을 조금 더 복잡한 매커니즘이 존재한다. 그 매커니즘에 대해서 알아보도록 하자.
-  <br>
-  <br>
-
-  * ## _프록시 특징_
-    * 실제 클래스를 상속 받아서 만들어진다
-      ![](img/img313.png)
-    <br>
-
-    ```Java
-    System.out.println("findMember = " + findMember.getClass());
-    ``` 
-    ```SQL
-    findMember = class hellojpa.Member$HibernateProxy$fm6cNgm8
-    ```
-    * entityManager.getReference(Member.class, member.getId());로 DB에서 가져온 Member Entity의 Class 이름이 Member가 아니다?!?!?
-      * entityManager.getReference()로 DB에서 가져온 Entity는 실제 Entity가 아닌 가짜 클래스 즉 `Porxy Entity`이다.
-      * Proxy Entity는 실제 Entity와 필드와 메소드 구성은 같지만 값을 비어있다.
-      * Proxy Entity는 Entity target(Reference)을 보관하고 있으며, 이는 진짜 Entity를 가리킨다.(초기에는 Entity target = null)
-      * Proxy Entity를 호출하면 Proxy Entity는 실제 Entity의 메소르들 호출한다
-        <br>
-        
-        ![](img/img314.png) 
-        * `entityManager.getReference(Member.class, member.getId()).getName()`을 호출하면 Proxy Entity에 있는 `Entity target = Member Entity`의 `getName()` 메소드를 호출한다
-        * 하지만 Proxy Entity의 Entity target은 초기값이 null이다.(이전에 DB에서 조회한 기록이 없기 때문이다)
-    * 사용하는 입장에서는 진짜 Entity인지 Proxy Entity인지 구분자히 않고 사용하면 된다(이론상)
-  <br>
-  <br>
-
-  * ## _프록시 객체의 초기화_
-    ![](img/img315.png)
-    * entityManager.getReference(Member.class, member.getId()).getName() 호출시 Member Proxy Entity는 초기와가 된 상태가 아니라 `Entity target = null`이면 다음 순서를 진행한다.
-      1. JPA가 영속성 컨텍스트에 Proxy Entity 초기화 요청
-      2. 영속성 컨텍스트가 DB 조회
-      3. 실제 Entity(Member)생성 
-      4. Entity target = Member Entity 연결 
-      * JpaMain에서 두번 호출해서 Query문 출력 회수 확인해볼 것 
-  <br>
-
-  * ## _프록시의 특징_
-    * Proxy Entity는 처음 사용할 때 한 번만 초기화
-    * Proxy Entity를 초기화 할 떄, Proxy Entity가 실제 Entity로 바뀌는 것은 아니다.
-      * 초기화되면 Proxy Entity를 통해서 실제 Entity에 접근 가능
+      * entityManager.find() vs entityManager.getReference()
+      * `entityManager.find()`: 데이터베이스를 통해서 실제 Entity 객체 제회 
+      * `entityManager.getReference()`: `데이터베이스 조회를 미루는 가짜(Proxy) Entity 객체 조회`
+        ![](img/img312.png)
         <br>
 
         ```Java
@@ -2830,24 +2733,202 @@
             entityManager.flush();
             entityManager.clear();
 
+            System.out.println("======= getReference Start Line =======");
             Member findMember = entityManager.getReference(Member.class, member.getId());
-
-            Systme.out.println("before findMember = " + findMember.getClass());
-            System.out.println("after findMener = " + findMember.getClass());
-
-            transaction.commit();
+            System.out.println("======= getReference End Line =======");
+            System.out.println("findMember.name = " + findMember.getName());
+            System.out.println("findMember.id = " + findMember.getId());
         }
         ```
         <br>
 
         ```SQL
-        before findMember = class hellojpa.Member$HibernateProxy$iciMAbVb
-        after findMember = class hellojpa.Member$HibernateProxy$iciMAbVb
+        ======= getReference Start Line =======
+        ======= getReference End Line =======
+        select
+            member0_.MEMBER_ID as MEMBER_I1_3_0_,
+            member0_.createBy as createBy2_3_0_,
+            member0_.createDate as createDa3_3_0_,
+            member0_.lastModifiedBy as lastModi4_3_0_,
+            member0_.lastModifiedDate as lastModi5_3_0_,
+            member0_.USERNAME as USERNAME6_3_0_,
+            member0_.TEAM_ID as TEAM_ID7_3_0_,
+            team1_.TEAM_ID as TEAM_ID1_7_1_,
+            team1_.createBy as createBy2_7_1_,
+            team1_.createDate as createDa3_7_1_,
+            team1_.lastModifiedBy as lastModi4_7_1_,
+            team1_.lastModifiedDate as lastModi5_7_1_,
+            team1_.name as name6_7_1_ 
+        from
+            Member member0_ 
+        left outer join
+            Team team1_ 
+                on member0_.TEAM_ID=team1_.TEAM_ID 
+        where
+            member0_.MEMBER_ID=?
+        findMember.name = memberA
+        findMember.id = 1
         ```
+        * `entityManager.getReference()`하는 시점에는 DB에 Query가 나가지 않는다.
+        * `findMember.getId()`하는 시점에 DB에 Query가 나자기 않는다.
+          * entityManager.getReference(Member.class, `member.getId()`)로 Member Entity를 찾을때 이미 Parameter로 member.getId()를 넣을것은 Member.id 값을 안다는 의미이다. 그러므로 DB에서 값을 가져오지 않아도 Query를 날리지 않은 것이다.
+        * `findMmeber.getName()`하는 시점에 DB에 Query가 나간다
+          * Member.name의 값은 DB에 저장되어 있으므로, JPA가 getNama()을 호출하는 시점에 DB에 Query를 날린다
+          * 이후 findMember에 값을 채우고 출력한다
+            * 여기서 값을 채운다는 표현을 사용하였는데 사실을 조금 더 복잡한 매커니즘이 존재한다. 그 매커니즘에 대해서 알아보도록 하자.
+    <br>
     <br>
 
-    * Proxy Entity는 원본 Entity를 상속받는다.
-      * 따라서 타입 체크시 주의해야한다.(`==` 비교 실피, 대신 `instance of` 사용)
+    * ### _프록시 특징_
+      * 실제 클래스를 상속 받아서 만들어진다
+        ![](img/img313.png)
+      <br>
+
+      ```Java
+      System.out.println("findMember = " + findMember.getClass());
+      ``` 
+      ```SQL
+      findMember = class hellojpa.Member$HibernateProxy$fm6cNgm8
+      ```
+      * entityManager.getReference(Member.class, member.getId());로 DB에서 가져온 Member Entity의 Class 이름이 Member가 아니다?!?!?
+        * entityManager.getReference()로 DB에서 가져온 Entity는 실제 Entity가 아닌 가짜 클래스 즉 `Porxy Entity`이다.
+        * Proxy Entity는 실제 Entity와 필드와 메소드 구성은 같지만 값을 비어있다.
+        * Proxy Entity는 Entity target(Reference)을 보관하고 있으며, 이는 진짜 Entity를 가리킨다.(초기에는 Entity target = null)
+        * Proxy Entity를 호출하면 Proxy Entity는 실제 Entity의 메소르들 호출한다
+          <br>
+          
+          ![](img/img314.png) 
+          * `entityManager.getReference(Member.class, member.getId()).getName()`을 호출하면 Proxy Entity에 있는 `Entity target = Member Entity`의 `getName()` 메소드를 호출한다
+          * 하지만 Proxy Entity의 Entity target은 초기값이 null이다.(이전에 DB에서 조회한 기록이 없기 때문이다)
+      * 사용하는 입장에서는 진짜 Entity인지 Proxy Entity인지 구분자히 않고 사용하면 된다(이론상)
+    <br>
+    <br>
+
+    * ### _프록시 객체의 초기화_
+      ![](img/img315.png)
+      * entityManager.getReference(Member.class, member.getId()).getName() 호출시 Member Proxy Entity는 초기와가 된 상태가 아니라 `Entity target = null`이면 다음 순서를 진행한다.
+        1. JPA가 영속성 컨텍스트에 Proxy Entity 초기화 요청
+        2. 영속성 컨텍스트가 DB 조회
+        3. 실제 Entity(Member)생성 
+        4. Entity target = Member Entity 연결 
+        * JpaMain에서 두번 호출해서 Query문 출력 회수 확인해볼 것 
+    <br>
+
+    * ### _프록시의 특징_
+      * Proxy Entity는 처음 사용할 때 한 번만 초기화
+      * Proxy Entity를 초기화 할 떄, Proxy Entity가 실제 Entity로 바뀌는 것은 아니다.
+        * 초기화되면 Proxy Entity를 통해서 실제 Entity에 접근 가능
+          <br>
+
+          ```Java
+          try {
+              Member member = new Member();
+              member.setName("memberA");
+
+              entityManager.persist(member);
+
+              entityManager.flush();
+              entityManager.clear();
+
+              Member findMember = entityManager.getReference(Member.class, member.getId());
+
+              Systme.out.println("before findMember = " + findMember.getClass());
+              System.out.println("after findMener = " + findMember.getClass());
+
+              transaction.commit();
+          }
+          ```
+          <br>
+
+          ```SQL
+          before findMember = class hellojpa.Member$HibernateProxy$iciMAbVb
+          after findMember = class hellojpa.Member$HibernateProxy$iciMAbVb
+          ```
+      <br>
+
+      * Proxy Entity는 원본 Entity를 상속받는다.
+        * 따라서 타입 체크시 주의해야한다.(`==` 비교 실피, 대신 `instance of` 사용)
+          <br>
+
+          ```Java
+          try {
+              Member member1 = new Member();
+              member1.setName("member1");
+
+              entityManager.persist(member1);
+
+              Member member2 = new Member();
+              member2.setName("member2");
+
+              entityManager.persist(member2);
+
+              entityManager.flush();
+              entityManager.clear();
+
+              Member m1 = entityManager.find(Member.class, member1.getId());
+              Member m2 = entityManager.fine(Member.class, member2.getId());
+
+              System.out.println("m1 == m2: " + (m1.getClass() == m2.getClass()));
+
+              transaction.commit();
+          }
+          ``` 
+          <br>
+
+          ```SQL
+          m1 == m2: true
+          ```
+          <br>
+
+          ```Java
+          Member m1 = entityManager.find(Member.class, member.getId());
+          Member m2 = entityManager.getReference(Member.class, member.getId());
+
+          Systme.out.println("m1 == m2: " + (m1 == m2));
+          ```
+          <br>
+
+          ```SQL
+          m1 == m2: flase
+          ```
+          <br>
+
+          ```Java
+          try {
+              Member member1 = new Member();
+              member1.setName("member1");
+
+              entityManager.persist(member1);
+
+              Member member2 = new Member();
+              member2.setName("member2");
+
+              entityManager.persist(member2);
+
+              entityManager.flush();
+              entityManager.clear();
+
+              Member m1 = entityManager.find(Member.class, member1.getId());
+              Member m2 = entityManager.getReference(Member.class, member2.getId());
+
+              locig(m1, m2);
+
+              transaction.commit();
+          } catch(Exception e) {
+              transaction.rollback();
+          } finally {
+              entityManager.close();
+          }
+          entityManagerFatory.clase();
+
+          private static void logic(Member m1, Member m2) {
+              System.out.pritln("m1 == m2: " + m1 instanceof Member));
+              Systme.out.pritln("m1 == m2: " + m2 instanceof Member));
+          }
+          ```
+      <br>
+
+      * 영속성 컨텍스트에 찾는 Entity 이미 있으면 `entityManager.getReference()`를 호출해도 실제 Entity 반환
         <br>
 
         ```Java
@@ -2857,18 +2938,17 @@
 
             entityManager.persist(member1);
 
-            Member member2 = new Member();
-            member2.setName("member2");
-
-            entityManager.persist(member2);
-
             entityManager.flush();
             entityManager.clear();
 
-            Member m1 = entityManager.find(Member.class, member1.getId());
-            Member m2 = entityManager.fine(Member.class, member2.getId());
+            Member findMember = entityManager.find(Member.class, member1.getId());
 
-            System.out.println("m1 == m2: " + (m1.getClass() == m2.getClass()));
+            //영속성 컨텍스트에 올라가게 된다
+            System.out.println("findMember = " + findMember.getClass());
+
+            Member reference = entityManager.getReference(Member.class, member1.getId());
+
+            System.out.prtinln("reference = " + reference.getClass());
 
             transaction.commit();
         }
@@ -2876,99 +2956,156 @@
         <br>
 
         ```SQL
-        m1 == m2: true
+        indMember = class hellojpa.Member
+        reference = class hellojpa.Member
         ```
-        <br>
+          <br>
 
-        ```Java
-        Member m1 = entityManager.find(Member.class, member.getId());
-        Member m2 = entityManager.getReference(Member.class, member.getId());
+          * reference가 Proxy Entity가 아닌 Member Entity인 두가지 이유가 존재한다
+            1. 이미 Member Entity를 영속성 컨텍스트 1차 캐시에 올려두었는데 굳이 Proxy Entity를 가져와봤자 성능상 이점이 없다. 따라서 영속성 컨텍스트에 이미 조회한고자 하는 Entity가 존재한다면 entityManager.getReference()를 호출해도 영속성 컨텍스트 1차 캐시에 존재하는 대상 Entity를 반환해서 성능 최적화를 시킨다
+            2. reference가 실제 Entity던 Proxy Entity던 상관없이 JPA는 `==` 비교대상이 한 영속성 컨텍스트에서 가져온 Entity이며, PK가 같으면 항상 `true`를 반환해 주어야 한다. 이것은 JPA가 기본적으로 제공하는 메커니즘중 하나다.(JPA는 항상 한 트랜젝션 안에서의 Entity 동일성을 보장한다)
+              <br>
+              
+              ```Java
+              try {
+                  Mmeber member = new Member();
+                  member.setName("member");
 
-        Systme.out.println("m1 == m2: " + (m1 == m2));
-        ```
-        <br>
+                  entityManager.persist(member);
 
-        ```SQL
-        m1 == m2: flase
-        ```
-        <br>
+                  entityManager.flush();
+                  entityManager.clear();
 
-        ```Java
-        try {
-            Member member1 = new Member();
-            member1.setName("member1");
+                  Member findMember = entityManager.getReference(Member.class, member.getId());
+                  System.out.println("findMember = " + findMember.getClass());
 
-            entityManager.persist(member1);
+                  Member referce = entityManger.getReference(Member.calss, member.getId());
+                  System.out.println("reference = " + reference.getClass());
 
-            Member member2 = new Member();
-            member2.setName("member2");
+                  transaction.commit();
+              }
+              ```
+              <br>
 
-            entityManager.persist(member2);
+              ```SQL
+              findMember = class hellojpa.Member$HibernateProxy$iNEUVy98
+              reference = class hellojpa.Member$HibernateProxy$iNEUVy98
+              ```
+              * findMember == reference: true를 보장하기 위해서 같은 Proxy가 반환되었다
+              <br>
+              <br>
 
-            entityManager.flush();
-            entityManager.clear();
+              ```Java
+              try {
+                  Member member = new Member();
+                  member.setName("mamber");
 
-            Member m1 = entityManager.find(Member.class, member1.getId());
-            Member m2 = entityManager.getReference(Member.class, member2.getId());
+                  entityManager.persist(member);
 
-            locig(m1, m2);
+                  entityManeger.flush();
+                  entityManager.clear();
 
-            transaction.commit();
-        } catch(Exception e) {
-            transaction.rollback();
-        } finally {
-            entityManager.close();
-        }
-        entityManagerFatory.clase();
+                  Member refMember = entityManager.getReference(Member.class, member.getId());
+                  System.out.println("refMenber = " + refMember.getClass());
 
-        private static void logic(Member m1, Member m2) {
-            System.out.pritln("m1 == m2: " + m1 instanceof Member));
-            Systme.out.pritln("m1 == m2: " + m2 instanceof Member));
-        }
-        ```
-    <br>
+                  Member findMember = entityManager.find(Member.class, member.getId());
+                  System.out.println("findMember = " + findMember.getClass());
 
-    * 영속성 컨텍스트에 찾는 Entity 이미 있으면 `entityManager.getReference()`를 호출해도 실제 Entity 반환
+                  Systme.out.println("refMember == findMember: " + (refMember == findMember));
+
+                  transaction.commit();
+              }
+              ``` 
+              <br>
+
+              ```SQL
+              refMember = class hellojpa.Member$HibernateProxy$y3WuDHYI
+              Hibernate: 
+                  select
+                      member0_.MEMBER_ID as MEMBER_I1_3_0_,
+                      member0_.createBy as createBy2_3_0_,
+                      member0_.createDate as createDa3_3_0_,
+                      member0_.lastModifiedBy as lastModi4_3_0_,
+                      member0_.lastModifiedDate as lastModi5_3_0_,
+                      member0_.USERNAME as USERNAME6_3_0_,
+                      member0_.TEAM_ID as TEAM_ID7_3_0_,
+                      team1_.TEAM_ID as TEAM_ID1_7_1_,
+                      team1_.createBy as createBy2_7_1_,
+                      team1_.createDate as createDa3_7_1_,
+                      team1_.lastModifiedBy as lastModi4_7_1_,
+                      team1_.lastModifiedDate as lastModi5_7_1_,
+                      team1_.name as name6_7_1_ 
+                  from
+                      Member member0_ 
+                  left outer join
+                      Team team1_ 
+                          on member0_.TEAM_ID=team1_.TEAM_ID 
+                  where
+                      member0_.MEMBER_ID=?
+              findMember = class hellojpa.Member$HibernateProxy$y3WuDHYI
+              refMember == findMember: true            
+              ```
+              * `Member findMember = entityManager.find(Member.class, member.getId())`로 조회를 했는데 findMember도 Proxy Entity로 반환되었다!!!
+              * Proxy Entity가 한 번 조회가 되면 entityManager.find()호출을 해도 Proxy Entity를 반환한다(true를 보장하기 위함)
+              * 중요한 것은 개발과정에서 Proxy Entity던 실제 Entity던 개발에 문제가 없도록 설계하는 것이 중요하다.
       <br>
 
-      ```Java
-      try {
-          Member member1 = new Member();
-          member1.setName("member1");
-
-          entityManager.persist(member1);
-
-          entityManager.flush();
-          entityManager.clear();
-
-          Member findMember = entityManager.find(Member.class, member1.getId());
-
-          //영속성 컨텍스트에 올라가게 된다
-          System.out.println("findMember = " + findMember.getClass());
-
-          Member reference = entityManager.getReference(Member.class, member1.getId());
-
-          System.out.prtinln("reference = " + reference.getClass());
-
-          transaction.commit();
-      }
-      ``` 
-      <br>
-
-      ```SQL
-      indMember = class hellojpa.Member
-      reference = class hellojpa.Member
-      ```
+      * 영속성 컨텍스트의 도움을 받을 수 없는 준영속 상태일 떄, Proxy Entity를 초기화하면 문제 발생(실무에서 정말 많이 겪는 문제)
         <br>
 
-        * reference가 Proxy Entity가 아닌 Member Entity인 두가지 이유가 존재한다
-          1. 이미 Member Entity를 영속성 컨텍스트 1차 캐시에 올려두었는데 굳이 Proxy Entity를 가져와봤자 성능상 이점이 없다. 따라서 영속성 컨텍스트에 이미 조회한고자 하는 Entity가 존재한다면 entityManager.getReference()를 호출해도 영속성 컨텍스트 1차 캐시에 존재하는 대상 Entity를 반환해서 성능 최적화를 시킨다
-          2. reference가 실제 Entity던 Proxy Entity던 상관없이 JPA는 `==` 비교대상이 한 영속성 컨텍스트에서 가져온 Entity이며, PK가 같으면 항상 `true`를 반환해 주어야 한다. 이것은 JPA가 기본적으로 제공하는 메커니즘중 하나다.(JPA는 항상 한 트랜젝션 안에서의 Entity 동일성을 보장한다)
+          ```Java
+          try {
+              Member member = new Member();
+              member.setName("member");
+
+              entityManager.persist(member);
+
+              entityManager.flush();
+              entityManager.claer();
+
+              Member refMember = entityManager.getReference(Member.class, member.getId());
+              System.out.prtinln("refMember = " + refMenber.getClass()); //Proxy
+
+              refMemnber.getName(); //DB에 쿼리가 나가면서 프록시 객체 초기화
+
+              transaction.commit();
+          }
+          ```
+          <br>
+
+          ```SQL
+          refMember = class hellojpa.Member$HibernateProxy$6IYlvUiq
+          Hibernate: 
+              select
+                  member0_.MEMBER_ID as MEMBER_I1_3_0_,
+                  member0_.createBy as createBy2_3_0_,
+                  member0_.createDate as createDa3_3_0_,
+                  member0_.lastModifiedBy as lastModi4_3_0_,
+                  member0_.lastModifiedDate as lastModi5_3_0_,
+                  member0_.USERNAME as USERNAME6_3_0_,
+                  member0_.TEAM_ID as TEAM_ID7_3_0_,
+                  team1_.TEAM_ID as TEAM_ID1_7_1_,
+                  team1_.createBy as createBy2_7_1_,
+                  team1_.createDate as createDa3_7_1_,
+                  team1_.lastModifiedBy as lastModi4_7_1_,
+                  team1_.lastModifiedDate as lastModi5_7_1_,
+                  team1_.name as name6_7_1_ 
+              from
+                  Member member0_ 
+              left outer join
+                  Team team1_ 
+                      on member0_.TEAM_ID=team1_.TEAM_ID 
+              where
+                  member0_.MEMBER_ID=?
+          ```        
+          <br>
+
+          * Proxy Entity의 초기화는 연속성 컨텍스트에 의하여 이루어진다. 영속성 컨텍스트를 꺼버린다면?(비영속)
             <br>
-            
+
             ```Java
             try {
-                Mmeber member = new Member();
+                Member member = new Member();
                 member.setName("member");
 
                 entityManager.persist(member);
@@ -2976,131 +3113,87 @@
                 entityManager.flush();
                 entityManager.clear();
 
-                Member findMember = entityManager.getReference(Member.class, member.getId());
-                System.out.println("findMember = " + findMember.getClass());
-
-                Member referce = entityManger.getReference(Member.calss, member.getId());
-                System.out.println("reference = " + reference.getClass());
-
-                transaction.commit();
-            }
-            ```
-            <br>
-
-            ```SQL
-            findMember = class hellojpa.Member$HibernateProxy$iNEUVy98
-            reference = class hellojpa.Member$HibernateProxy$iNEUVy98
-            ```
-            * findMember == reference: true를 보장하기 위해서 같은 Proxy가 반환되었다
-            <br>
-            <br>
-
-            ```Java
-            try {
-                Member member = new Member();
-                member.setName("mamber");
-
-                entityManager.persist(member);
-
-                entityManeger.flush();
-                entityManager.clear();
-
                 Member refMember = entityManager.getReference(Member.class, member.getId());
-                System.out.println("refMenber = " + refMember.getClass());
+                System.out.println("refMember = " + refMember.getClass()); //Proxy Entity
 
-                Member findMember = entityManager.find(Member.class, member.getId());
-                System.out.println("findMember = " + findMember.getClass());
+                entityManager.detach(refMmeber); //영속성 컨텟트스에서 끄집어 낸다, 영속성 컨텍스트에서 관리하지 않는다
+                //entityMamager.close();
 
-                Systme.out.println("refMember == findMember: " + (refMember == findMember));
+                System.out.println("refMember = " + refMember.getName());
 
                 transaction.commit();
+            } catch(Exception e) {
+                transaction.rollback();
+                System.out.println("e = " + e);
+            } finally {
+                entityManager.close();
             }
+            entityManagerFactory.close();
             ``` 
             <br>
 
             ```SQL
-            refMember = class hellojpa.Member$HibernateProxy$y3WuDHYI
-            Hibernate: 
-                select
-                    member0_.MEMBER_ID as MEMBER_I1_3_0_,
-                    member0_.createBy as createBy2_3_0_,
-                    member0_.createDate as createDa3_3_0_,
-                    member0_.lastModifiedBy as lastModi4_3_0_,
-                    member0_.lastModifiedDate as lastModi5_3_0_,
-                    member0_.USERNAME as USERNAME6_3_0_,
-                    member0_.TEAM_ID as TEAM_ID7_3_0_,
-                    team1_.TEAM_ID as TEAM_ID1_7_1_,
-                    team1_.createBy as createBy2_7_1_,
-                    team1_.createDate as createDa3_7_1_,
-                    team1_.lastModifiedBy as lastModi4_7_1_,
-                    team1_.lastModifiedDate as lastModi5_7_1_,
-                    team1_.name as name6_7_1_ 
-                from
-                    Member member0_ 
-                left outer join
-                    Team team1_ 
-                        on member0_.TEAM_ID=team1_.TEAM_ID 
-                where
-                    member0_.MEMBER_ID=?
-            findMember = class hellojpa.Member$HibernateProxy$y3WuDHYI
-            refMember == findMember: true            
+            e = org.hibernate.LazyInitializationException: could not initialize proxy [hellojpa.Member#24] - no Session
             ```
-            * `Member findMember = entityManager.find(Member.class, member.getId())`로 조회를 했는데 findMember도 Proxy Entity로 반환되었다!!!
-            * Proxy Entity가 한 번 조회가 되면 entityManager.find()호출을 해도 Proxy Entity를 반환한다(true를 보장하기 위함)
-            * 중요한 것은 개발과정에서 Proxy Entity던 실제 Entity던 개발에 문제가 없도록 설계하는 것이 중요하다.
+            * Hibernate는 org.hibernate.LazyInitializationException 예외를 터트림  
+            * 일반적으로 트랜잭션이 시작하고 끝나는 라이브 사이클과 영속성 컨텍스트가 시작하고 끝나는 라이프 사이클을 맞춘다
+            * 실무에서 트랜잭션이 끝나고서 Proxy Entity를 조회할 때 보면 `no Session` Error를 확인할 수 있따.
     <br>
 
-    * 영속성 컨텍스트의 도움을 받을 수 없는 준영속 상태일 떄, Proxy Entity를 초기화하면 문제 발생(실무에서 정말 많이 겪는 문제)
-      <br>
+    * ### _프록시 확인_ 
+      * 프록시 인스턴스의 초기화 여부 확인
+        * `entityManagerFactory.getPersistenceUnitUtil().isLoaded(Object entity)`
+          <br>
 
-        ```Java
-        try {
-            Member member = new Member();
-            member.setName("member");
+          ```Java
+          try {
+              Member member = new Member();
+              member.setName("member");
 
-            entityManager.persist(member);
+              entityManager.persis(member);
 
-            entityManager.flush();
-            entityManager.claer();
+              entityManager.flush();
+              entityManager.clear();
 
-            Member refMember = entityManager.getReference(Member.class, member.getId());
-            System.out.prtinln("refMember = " + refMenber.getClass()); //Proxy
+              Member refMember = entityManager.getReference(Member.class, member.getId());
+              System.out.println("refMember = " + refMember.getCalss());
 
-            refMemnber.getName(); //DB에 쿼리가 나가면서 프록시 객체 초기화
+              System.out.println("isLoaded = " + entityManagerFactory.getPersistenceUnitUtil().isLoaded(refMember));
 
-            transaction.commit();
-        }
-        ```
-        <br>
+              transaction.commit();
+          }
+          ``` 
+          <br>
 
-        ```SQL
-        refMember = class hellojpa.Member$HibernateProxy$6IYlvUiq
-        Hibernate: 
-            select
-                member0_.MEMBER_ID as MEMBER_I1_3_0_,
-                member0_.createBy as createBy2_3_0_,
-                member0_.createDate as createDa3_3_0_,
-                member0_.lastModifiedBy as lastModi4_3_0_,
-                member0_.lastModifiedDate as lastModi5_3_0_,
-                member0_.USERNAME as USERNAME6_3_0_,
-                member0_.TEAM_ID as TEAM_ID7_3_0_,
-                team1_.TEAM_ID as TEAM_ID1_7_1_,
-                team1_.createBy as createBy2_7_1_,
-                team1_.createDate as createDa3_7_1_,
-                team1_.lastModifiedBy as lastModi4_7_1_,
-                team1_.lastModifiedDate as lastModi5_7_1_,
-                team1_.name as name6_7_1_ 
-            from
-                Member member0_ 
-            left outer join
-                Team team1_ 
-                    on member0_.TEAM_ID=team1_.TEAM_ID 
-            where
-                member0_.MEMBER_ID=?
-        ```        
-        <br>
+          ```SQL
+          isLoaded = false
+          ```
+          <br>
 
-        * Proxy Entity의 초기화는 연속성 컨텍스트에 의하여 이루어진다. 영속성 컨텍스트를 꺼버린다면?(비영속)
+          ```Java
+          try {
+              Member member = new Member();
+              member.setName("member");
+
+              entityManager.persis(member);
+
+              entityManager.flush();
+              entityManager.clear();
+
+              Member refMember = entityManager.getReference(Member.class, member.getId());
+              System.out.println("refMember = " + refMember.getCalss());
+              refMember.getName(); //Proxy Entity initialization
+
+              System.out.println("isLoaded = " + entityManagerFactory.getPersistenceUnitUtil().isLoaded(refMember));
+
+              transaction.commit();
+          }
+          ```         
+          <br>
+
+          ```SQL
+          isLoaded = true
+          ```
           <br>
 
           ```Java
@@ -3113,89 +3206,86 @@
               entityManager.flush();
               entityManager.clear();
 
-              Member refMember = entityManager.getReference(Member.class, member.getId());
-              System.out.println("refMember = " + refMember.getClass()); //Proxy Entity
+              Member refMember = entityManager.gerReference(Member.class, member.getId());
+              System.out.println("refMember = " + refMember.getClass());
 
-              entityManager.detach(refMmeber); //영속성 컨텟트스에서 끄집어 낸다, 영속성 컨텍스트에서 관리하지 않는다
-              //entityMamager.close();
-
-              System.out.println("refMember = " + refMember.getName());
+              Hibernate.initialize(refMember);  //강제 초기화
 
               transaction.commit();
-          } catch(Exception e) {
-              transaction.rollback();
-              System.out.println("e = " + e);
-          } finally {
-              entityManager.close();
           }
-          entityManagerFactory.close();
-          ``` 
+          ```
           <br>
 
           ```SQL
-          e = org.hibernate.LazyInitializationException: could not initialize proxy [hellojpa.Member#24] - no Session
+          Hibernate: 
+              select
+                  member0_.MEMBER_ID as MEMBER_I1_3_0_,
+                  member0_.createBy as createBy2_3_0_,
+                  member0_.createDate as createDa3_3_0_,
+                  member0_.lastModifiedBy as lastModi4_3_0_,
+                  member0_.lastModifiedDate as lastModi5_3_0_,
+                  member0_.USERNAME as USERNAME6_3_0_,
+                  member0_.TEAM_ID as TEAM_ID7_3_0_,
+                  team1_.TEAM_ID as TEAM_ID1_7_1_,
+                  team1_.createBy as createBy2_7_1_,
+                  team1_.createDate as createDa3_7_1_,
+                  team1_.lastModifiedBy as lastModi4_7_1_,
+                  team1_.lastModifiedDate as lastModi5_7_1_,
+                  team1_.name as name6_7_1_ 
+              from
+                  Member member0_ 
+              left outer join
+                  Team team1_ 
+                      on member0_.TEAM_ID=team1_.TEAM_ID 
+              where
+                  member0_.MEMBER_ID=?        
           ```
-          * Hibernate는 org.hibernate.LazyInitializationException 예외를 터트림  
-          * 일반적으로 트랜잭션이 시작하고 끝나는 라이브 사이클과 영속성 컨텍스트가 시작하고 끝나는 라이프 사이클을 맞춘다
-          * 실무에서 트랜잭션이 끝나고서 Proxy Entity를 조회할 때 보면 `no Session` Error를 확인할 수 있따.
+      <br>
+
+      * 프록시 클래스 확인 방법
+        * `entity.getClass().getName()`
+        * 출력(...Javasist... or HibernateProxy...)
+      * 프록시 강제 초기화
+        * `org.hibernate.Hibernate.initialize(entity);`
+      * 참고
+        * JPA 표준은 강제 초기화가 존재하지 않는다
+        * 강제 호출: `member.getName()`
+  <br>
   <br>
 
-  * ## _프록시 확인_ 
-    * 프록시 인스턴스의 초기화 여부 확인
-      * `entityManagerFactory.getPersistenceUnitUtil().isLoaded(Object entity)`
-        <br>
+  * ## _즉시 로딩과 지연 로딩_ 
+    <br>
 
-        ```Java
-        try {
-            Member member = new Member();
-            member.setName("member");
+    * ### Member Entity를 조회할 떄 Team Entity도 할께 조회해야 할까?
+      ![](img/img316.png)
+      <br>
 
-            entityManager.persis(member);
+      * 단순히 Member Entity 정보만 사용하는 비즈니스 로직
+        * println(member.getName()); 
+    <br>
 
-            entityManager.flush();
-            entityManager.clear();
+    * ### 지연 로딩 LAZY을 사용해서 프록시로 조회
+      ```Java
+      @Entity
+      public class Member extends BaseEntity {
 
-            Member refMember = entityManager.getReference(Member.class, member.getId());
-            System.out.println("refMember = " + refMember.getCalss());
+          @Id
+          @GaneratedValue
+          private Long id;
 
-            System.out.println("isLoaded = " + entityManagerFactory.getPersistenceUnitUtil().isLoaded(refMember));
+          @Column(name = "usernmae")
+          private String name;
 
-            transaction.commit();
-        }
-        ``` 
-        <br>
+          @ManyToOne(fetch = FetchType.LAZY)
+          @JoinColumn(name = "team_id")
+          private Team team;
 
-        ```SQL
-        isLoaded = false
-        ```
-        <br>
+          //defatult Constructor
 
-        ```Java
-        try {
-            Member member = new Member();
-            member.setName("member");
-
-            entityManager.persis(member);
-
-            entityManager.flush();
-            entityManager.clear();
-
-            Member refMember = entityManager.getReference(Member.class, member.getId());
-            System.out.println("refMember = " + refMember.getCalss());
-            refMember.getName(); //Proxy Entity initialization
-
-            System.out.println("isLoaded = " + entityManagerFactory.getPersistenceUnitUtil().isLoaded(refMember));
-
-            transaction.commit();
-        }
-        ```         
-        <br>
-
-        ```SQL
-        isLoaded = true
-        ```
-        <br>
-
+          //Getter, Setter
+      }
+      ```  
+      * team Reference를 Proxy Entity로 조회한다. 즉 Member Entity만 DB에서 조회한다
         ```Java
         try {
             Member member = new Member();
@@ -3206,10 +3296,51 @@
             entityManager.flush();
             entityManager.clear();
 
-            Member refMember = entityManager.gerReference(Member.class, member.getId());
-            System.out.println("refMember = " + refMember.getClass());
+            Member findMember = entityMember.find(Member.class, member.getId());
 
-            Hibernate.initialize(refMember);  //강제 초기화
+            transaction.commit();
+        }
+        ``` 
+        <br>
+
+        ```SQL
+        select
+            member0_.MEMBER_ID as MEMBER_I1_3_0_,
+            member0_.createBy as createBy2_3_0_,
+            member0_.createDate as createDa3_3_0_,
+            member0_.lastModifiedBy as lastModi4_3_0_,
+            member0_.lastModifiedDate as lastModi5_3_0_,
+            member0_.USERNAME as USERNAME6_3_0_,
+            member0_.team_TEAM_ID as team_TEA7_3_0_ 
+        from
+            Member member0_ 
+        where
+            member0_.MEMBER_ID=?
+        ```
+        <br>
+
+        ```Java
+        try {
+            Team team = new Team();
+            team.setName("TeamA");
+
+            entityManager.persist(team);
+
+            Member member = new Member();
+            member.setName("member");
+            member.setTeam(team);
+
+            entityManager.persis(member);
+
+            entityManager.flush();
+            entityManager.clear();
+
+            Member findMember = entityManager.find(Member.class, member.getId());
+            System.out.prtinln("findMember = " + findMember.getTeam().getClass());
+
+            System.out.println("=====================")
+            findMember.getTeam().getName();
+            System.out.println("=====================")
 
             transaction.commit();
         }
@@ -3217,360 +3348,331 @@
         <br>
 
         ```SQL
-        Hibernate: 
-            select
-                member0_.MEMBER_ID as MEMBER_I1_3_0_,
-                member0_.createBy as createBy2_3_0_,
-                member0_.createDate as createDa3_3_0_,
-                member0_.lastModifiedBy as lastModi4_3_0_,
-                member0_.lastModifiedDate as lastModi5_3_0_,
-                member0_.USERNAME as USERNAME6_3_0_,
-                member0_.TEAM_ID as TEAM_ID7_3_0_,
-                team1_.TEAM_ID as TEAM_ID1_7_1_,
-                team1_.createBy as createBy2_7_1_,
-                team1_.createDate as createDa3_7_1_,
-                team1_.lastModifiedBy as lastModi4_7_1_,
-                team1_.lastModifiedDate as lastModi5_7_1_,
-                team1_.name as name6_7_1_ 
-            from
-                Member member0_ 
-            left outer join
-                Team team1_ 
-                    on member0_.TEAM_ID=team1_.TEAM_ID 
-            where
-                member0_.MEMBER_ID=?        
+        select
+            member0_.MEMBER_ID as MEMBER_I1_3_0_,
+            member0_.createBy as createBy2_3_0_,
+            member0_.createDate as createDa3_3_0_,
+            member0_.lastModifiedBy as lastModi4_3_0_,
+            member0_.lastModifiedDate as lastModi5_3_0_,
+            member0_.USERNAME as USERNAME6_3_0_,
+            member0_.team_TEAM_ID as team_TEA7_3_0_ 
+        from
+            Member member0_ 
+        where
+            member0_.MEMBER_ID=?
+        findMember = class hellojpa.Team$HibernateProxy$HKa35KmH
+        =======================
+
+        select
+            team0_.TEAM_ID as TEAM_ID1_7_0_,
+            team0_.createBy as createBy2_7_0_,
+            team0_.createDate as createDa3_7_0_,
+            team0_.lastModifiedBy as lastModi4_7_0_,
+            team0_.lastModifiedDate as lastModi5_7_0_,
+            team0_.name as name6_7_0_ 
+        from
+            Team team0_ 
+        where
+            team0_.TEAM_ID=?
+        =======================
         ```
+        * Member Entity를 조회할때 DB에서 Member Entity를 가져왔으며
+        * `findMember.getTeam().getCalss()`
+          * Team Entity를 호출해서 Team Entity가 Proxy Entity로 호출된것을 확인할 수 있다(초기화 되지 않은 상태)
+          * findMember = class hellojpa.Team$HibernateProxy$HKa35KmH
+        * Team Proxy Entity를 조회하는 순간 Proxy Entity가 초기화 과정을 진행하여 영속성 컨텍스트에 요청에서 DB를 통해 실제 Entity 객체를 생성하는 것을 확인할 수 있다.
+        * 비즈니스 로직상 Member Entity에 있는 값 만을 조회하는 경우가 많아면 이 방법을 선택하는 것이 좋다
     <br>
 
-    * 프록시 클래스 확인 방법
-      * `entity.getClass().getName()`
-      * 출력(...Javasist... or HibernateProxy...)
-    * 프록시 강제 초기화
-      * `org.hibernate.Hibernate.initialize(entity);`
-    * 참고
-      * JPA 표준은 강제 초기화가 존재하지 않는다
-      * 강제 호출: `member.getName()`
+    * ### 지연 로딩
+      ![](img/img317.png)
+    <br>
+
+    * ### 지연 로징 LAZY을 사용해서 프록시로 조회
+      ![](img/img318.png) 
+      * Member member = entityManager.find(Member.class, 1L);
+      ![](img/img319.png) 
+      * Team team = member.getTeam();
+      * team.getName(); //실제 team을 사용하는 시점에 초기화(DB 조회)
+    <br>
+
+    * ### Member Entity와 Team Entity을 자주 함께 사용한다면?
+      ![](img/img319.png)  
+      * 비즈니스 로직상 Member Entity와 Team Entity에 있는 값을 같이 조회하는 경우가 많다면, Member와 Team 각각 따로 쿼리가 두번씩 계속 나가게 되면서 네트워크를 따로 타게된다. 이러한 경우 성능상 손해를 보게된다.
+    <br>
+
+    * ### 즉시 로딩 EAGER를 사용해서 함께 조회
+      ```Java
+      @Entity
+      public class Member extends BaseEntity {
+
+          @Id
+          @GeneratedValue
+          private Long ig;
+
+          @Column(name = "username")
+          private String name;
+
+          @ManyToOne(fetch = FetchType.EAGER)
+          @JoinColumn(name = "team_id")
+          private Team team;
+
+          //default Constructor
+
+          //Getter, Setter
+      }
+      ``` 
+      <br>
+
+      ```Java
+      try {
+          Team team = new Team();
+          team.setName("TeamA");
+
+          entityManager.persist(team);
+
+          Member member = new Member();
+          member.setName("member");
+          member.setTeam(team);
+
+          entityManager.persis(member);
+
+          entityManager.flush();
+          entityManager.clear();
+
+          Member findMember = entityManager.find(Member.class, member.getId());
+          System.out.prtinln("findMember = " + findMember.getTeam().getClass());
+
+          System.out.println("=====================")
+          findMember.getTeam().getName();
+          System.out.println("=====================")
+
+          transaction.commit();
+      }      
+      ```
+      * `Member findMember = entityManager.find(Member.class, member.getId());`
+        * Member Entity와 Team Entity를 DB에서 JOIN해서 한번의 Query로 데이터를 가져온다
+          ```SQL
+          select
+              member0_.MEMBER_ID as MEMBER_I1_3_0_,
+              member0_.createBy as createBy2_3_0_,
+              member0_.createDate as createDa3_3_0_,
+              member0_.lastModifiedBy as lastModi4_3_0_,
+              member0_.lastModifiedDate as lastModi5_3_0_,
+              member0_.USERNAME as USERNAME6_3_0_,
+              member0_.team_TEAM_ID as team_TEA7_3_0_,
+              team1_.TEAM_ID as TEAM_ID1_7_1_,
+              team1_.createBy as createBy2_7_1_,
+              team1_.createDate as createDa3_7_1_,
+              team1_.lastModifiedBy as lastModi4_7_1_,
+              team1_.lastModifiedDate as lastModi5_7_1_,
+              team1_.name as name6_7_1_ 
+          from
+              Member member0_ 
+          left outer join
+              Team team1_ 
+                  on member0_.team_TEAM_ID=team1_.TEAM_ID 
+          where
+              member0_.MEMBER_ID=?          
+          ``` 
+        <br>
+
+        * 이 경우에는 즉시로딩(`@ManayToOne(fetch = FetchType.EAGER)`)이므로 별도의 Proxy Entity호출이 발생하지 않느다
+          ```SQL
+          findMember = class hellojpa.Team
+          ```
+      <br>
+
+      * `findMember.getTeam().getName();`
+        * 이미 초기화가 끝나있는상태(초기화가 필요 없는 상태)이므로 위의 코드를 호출하면 실제 DB에서 가져욘 값을 출력한다.
+          ```SQL
+          =======================
+          System.out.prtinln("team = " + findMember.getTeam().getName())
+          으로 변경해서 환인
+          =======================
+          ```      
+    <br>
+
+    * ### 즉시 로딩
+      ![](img/img320.png)
+    <br>
+
+    * ### 즉시 로딩(EAGER), Member Entity 조회시 항상 Team Entity도 조회
+      ![](img/img321.png)    
+      * JPA 구현체는 가능하면 조인을 사용해서 SQL 한번에 함께 조회
+    <br>
+
+    * ### 프록시와 즉시 로딩 주의
+      * `가급적 지연 로딩만 사용(특히 실무에서)`
+        * 즉시 로딩을 적용하면 예상하지 못한 SQL이 발생
+          * 현제 예제에서는 JOIN TABLE이 2개여서 비교적 간단하게 보이지만, 실무에서는 수십개의 테이블이 돌아가면서 JOIN된 테이블이 여러개가 있는 경우가 다분하다.
+          * 따라서 즉시 로딩으로 설정하면 JOIN된 테이블들에 대한 엄청난 길이의 Query문이 발생하게 된다
+          * 그러므로 실무에서는 지연 로딩으로 속칭 발라내야 한다
+      * `즉시 로딩은 JPQL에서 N + 1 문제를 일으킨다`
+        ```Java
+        try { 
+            Team team  = new Team();
+            team.setName("TeamA");
+
+            entityManager.persist(team);
+
+            Member member = new Member();
+            member.setName("member");
+            member.setTeam(team);
+
+            entityManager.persist(member);
+
+            entityManager.flush();
+            entityManager.clear();
+
+            List<Member> members = entityManager.createQuery("select m form Member m", Member.class).getResultList();
+
+            transaction.commit();
+        }
+        ``` 
+        <br>
+
+        ```SQL
+        select
+            team0_.TEAM_ID as TEAM_ID1_7_0_,
+            team0_.createBy as createBy2_7_0_,
+            team0_.createDate as createDa3_7_0_,
+            team0_.lastModifiedBy as lastModi4_7_0_,
+            team0_.lastModifiedDate as lastModi5_7_0_,
+            team0_.name as name6_7_0_ 
+        from
+            Team team0_ 
+        where
+            team0_.TEAM_ID=?
+
+        select
+            team0_.TEAM_ID as TEAM_ID1_7_0_,
+            team0_.createBy as createBy2_7_0_,
+            team0_.createDate as createDa3_7_0_,
+            team0_.lastModifiedBy as lastModi4_7_0_,
+            team0_.lastModifiedDate as lastModi5_7_0_,
+            team0_.name as name6_7_0_ 
+        from
+            Team team0_ 
+        where
+            team0_.TEAM_ID=?        
+        ```
+        * `@ManyToOne(fetch = FetchType.EAGER)` 즉시 로딩으로 설정했는데 쿼리가 두번 나가는 것을 확인할 수 있다.
+        * `entityManager.find()`는 DB TABLE의 PK를 지정해서 데이터를 가져오는 방법이므로 JPA가 내부적으로 다 찾아서 실행할 수 있다.
+        * JPQL은 `select m from Member m`이 우선 SQL로 변역(SELECT * FORM MEMBER)이 된다 -> Member Entity만 Select 한다
+        * Member Entity를 가져와봤더니 Team Entity가 EAGER로 설전된것을 확인
+          * 즉시 로딩(EAGER)이란것은 일단 데이터를 가져올 때 무조건 값이 다 설정되어 있어야 한다.
+          * 그렇다면 `select m from Member m`에서 Member 쿼리가 나가고 만약 Member의 개수가 10개면 10개만큼 EAGER를 가져오기위한 별도의 Query가 나가게된다
+        * 정리
+          1. SQL로 변역(select * from Member)
+          2. Member를 가져옴
+          3. Member를 보니 EAGER로 설정되어 있으므로 Team도 가져와야함
+            * LAZY설정이면 Proxy Entity를 집어 넣으면 된다
+            * 즉 EAGER설정 이므로 `List<Member> members = `로 변환하는 시점에 Team의 값이 다 설정되어 있어야 한다
+          4. Team의 개수만큼 별도의 SQL(select * form Team where TEAM_ID = xxx)이 나가게 된다
+            ```Java
+            try {
+                Team teamA = new Team();
+                teamA.setName("teamA");
+
+                entityManager.persist(teamA);
+
+                Team teamB = new Team();
+                teamB.setName("teamB");
+
+                entityManager.persist(teamB);
+
+                Member member1 = new Member();
+                member1.setName("member1");
+                member1,setTeam(teamA);
+
+                entityManageer.persist(member1);
+
+                Member member2 = new Member();
+                member2.setName("member2");
+                member2.setTeam(teamB);
+
+                entityManager.persist(member2);
+
+                entityManager.flush();
+                entityManager.clear();
+
+                List<Member> members = entityManager.createQuery("select m form Member m", Member.class).getResultList();
+
+                transaction.commit();
+            }
+            ```
+            <br>
+
+            ```SQL
+            select
+                m 
+            from
+                Member m */ select
+                    member0_.MEMBER_ID as MEMBER_I1_3_,
+                    member0_.createBy as createBy2_3_,
+                    member0_.createDate as createDa3_3_,
+                    member0_.lastModifiedBy as lastModi4_3_,
+                    member0_.lastModifiedDate as lastModi5_3_,
+                    member0_.USERNAME as USERNAME6_3_,
+                    member0_.team_TEAM_ID as team_TEA7_3_ 
+                from
+                    Member member0_
+            ```
+            * Member는 한번에 가져온다
+            <br>
+
+            ```SQL
+            select
+                team0_.TEAM_ID as TEAM_ID1_7_0_,
+                team0_.createBy as createBy2_7_0_,
+                team0_.createDate as createDa3_7_0_,
+                team0_.lastModifiedBy as lastModi4_7_0_,
+                team0_.lastModifiedDate as lastModi5_7_0_,
+                team0_.name as name6_7_0_ 
+            from
+                Team team0_ 
+            where
+                team0_.TEAM_ID=?
+
+            select
+                team0_.TEAM_ID as TEAM_ID1_7_0_,
+                team0_.createBy as createBy2_7_0_,
+                team0_.createDate as createDa3_7_0_,
+                team0_.lastModifiedBy as lastModi4_7_0_,
+                team0_.lastModifiedDate as lastModi5_7_0_,
+                team0_.name as name6_7_0_ 
+            from
+                Team team0_ 
+            where
+                team0_.TEAM_ID=?
+            ``` 
+            * Member가 둘이면서 서로 다른 팀이고 영속성 컨텍스트에도 존재하지 않기때문에 Team을 따로 가져와야 한다
+      * `@ManayToOne, @OneToOne은 default = EAGER -> LAZY로 설정`
+      * @OneToMany, @ManyToMany는 default = LAZY 
   <br>
   <br>
 
-* # _즉시 로딩과 지연 로딩_ 
+  * ## _지연 로딩 활용_
+  <br>
+  <br>
+
+  * ## _영속성 전이: CASCADE_
+  <br>
+  <br>
+
+  * ## _고아 객체_
+  <br>
+  <br>
+
+  * ## _영속석 전이 + 고아객체, 생명주기_
+
+
+
 
        
 
-  * ### 즉시 로딩과 지연 로딩
-* 지연 로딩 LAZY을 사용해서 프록시로 조회
-```Java
-@Entity
-public class Member extends BaseEntity {
 
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
-
-    @Column(name = "USERNAME")
-    private String name;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn
-    private Team team;
-```
-team 을 프록시 객체로 조회한다. 즉 Member class 만 DB에서 조회한다
-```Java
-          try {
-            Member member1 = new Member();
-            member1.setName("member1");
-
-            em.persist(member1);
-
-            em.flush();
-            em.clear();
-
-            Member m = em.find(Member.class, member1.getId());
-
-
-            tx.commit();
-        } 
-```
-```SQL
-Hibernate: 
-    select
-        member0_.MEMBER_ID as MEMBER_I1_3_0_,
-        member0_.createBy as createBy2_3_0_,
-        member0_.createDate as createDa3_3_0_,
-        member0_.lastModifiedBy as lastModi4_3_0_,
-        member0_.lastModifiedDate as lastModi5_3_0_,
-        member0_.USERNAME as USERNAME6_3_0_,
-        member0_.team_TEAM_ID as team_TEA7_3_0_ 
-    from
-        Member member0_ 
-    where
-        member0_.MEMBER_ID=?
-```
-```Java
-          try {
-              Team team = new Team();
-              team.setName("teamA");
-
-              em.persist(team);
-
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setTeam(team);
-
-            em.persist(member1);
-
-            em.flush();
-            em.clear();
-
-            Member m = em.find(Member.class, member1.getId());
-
-              System.out.println("m = " + m.getTeam().getClass());
-
-              System.out.println("=======================");
-              m.getTeam().getName();
-              System.out.println("=======================");
-            tx.commit();
-        } 
-```
-```SQL
-Hibernate: 
-    select
-        member0_.MEMBER_ID as MEMBER_I1_3_0_,
-        member0_.createBy as createBy2_3_0_,
-        member0_.createDate as createDa3_3_0_,
-        member0_.lastModifiedBy as lastModi4_3_0_,
-        member0_.lastModifiedDate as lastModi5_3_0_,
-        member0_.USERNAME as USERNAME6_3_0_,
-        member0_.team_TEAM_ID as team_TEA7_3_0_ 
-    from
-        Member member0_ 
-    where
-        member0_.MEMBER_ID=?
-m = class hellojpa.Team$HibernateProxy$HKa35KmH
-=======================
-Hibernate: 
-    select
-        team0_.TEAM_ID as TEAM_ID1_7_0_,
-        team0_.createBy as createBy2_7_0_,
-        team0_.createDate as createDa3_7_0_,
-        team0_.lastModifiedBy as lastModi4_7_0_,
-        team0_.lastModifiedDate as lastModi5_7_0_,
-        team0_.name as name6_7_0_ 
-    from
-        Team team0_ 
-    where
-        team0_.TEAM_ID=?
-=======================
-```
-MEmber 를 조히할떄는 Member 엔티티를 가져오고 
-team 이 프록시로 나온것을 확인할 수 있다
-team 을 건들이는 시점에 프록시 객체가 초기화 되면에 DB에서 가져오는 것을 확인할 수 있다
-즉 지연로딩으로 설정하면 연관된 것을 프록시로 가져온다
-비즈니스 로직상 Member 에 있는 값만 출력하는 경우가 많다면 이렇게 가는것이 좋다
-* Member와 Team을 자주 함꼐 사용한다면?
-반대로 비즈니스 로직상 Member와 Team 에 있는 값을 출력해야 하는 경우가 많다면 멤버 따로 팀 따로 쿼리가 두번씩 꼐속 나가게 되면서 네트워크를 따로 타게 된다 이런 경우 성능상 손해를 보게 된다
-* 즉시 로딩 EAGER를 사용해서 함꼐 조회
-```Java
-@Entity
-public class Member extends BaseEntity {
-
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
-
-    @Column(name = "USERNAME")
-    private String name;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn
-    private Team team;
-``` 
-```Java
-Member m = em.find(Member.class, member1.getId());
-```
-이 시점에서
-```SQL
-Hibernate: 
-    select
-        member0_.MEMBER_ID as MEMBER_I1_3_0_,
-        member0_.createBy as createBy2_3_0_,
-        member0_.createDate as createDa3_3_0_,
-        member0_.lastModifiedBy as lastModi4_3_0_,
-        member0_.lastModifiedDate as lastModi5_3_0_,
-        member0_.USERNAME as USERNAME6_3_0_,
-        member0_.team_TEAM_ID as team_TEA7_3_0_,
-        team1_.TEAM_ID as TEAM_ID1_7_1_,
-        team1_.createBy as createBy2_7_1_,
-        team1_.createDate as createDa3_7_1_,
-        team1_.lastModifiedBy as lastModi4_7_1_,
-        team1_.lastModifiedDate as lastModi5_7_1_,
-        team1_.name as name6_7_1_ 
-    from
-        Member member0_ 
-    left outer join
-        Team team1_ 
-            on member0_.team_TEAM_ID=team1_.TEAM_ID 
-    where
-        member0_.MEMBER_ID=?
-```
-member 랑 team을 조인해서 한번의 쿼리로 전부 가져온다 
-이 경우는 즉시로딩이기 떄문에 프록시가 필요가 없다
-```SQL
-m = class hellojpa.Team
-```
-이미 초기화가 끝나있는 상태이다 즉, 초기화가 필요가 없다
-m.getTeam().getName();하면 실제 가져온 값을 출력하는 것이다 sout으로 변경해서 확인
-
-```SQL
-=======================
-=======================
-```
-* 프록시와 즉시로딩 주의
-실무에서는 즉시 로딩을 사용하면 안된다
-즉시로딩을 적용하면 예상하지 못한 SQL 발생
-지금 예제에서는 join 테이블이 2개여서 간단해 보이지만 실무에서는 수십개의 테이블이 돌아가면서 join 된 테이블이 여러개가 있는 경우다 다분하다 따라서 즉시로딩을 해버리면 조인된 테이블들에 대한 쿼리문이 엄천난 길이의 쿼리문에 발생하게 된다
-따라서 지연로딩으로 속칭 발라내야 한다
-즉시 로딩은 JPQL에서 N + 1 문제를 일으킨다
-```Java
-            try {
-              Team team = new Team();
-              team.setName("teamA");
-
-              em.persist(team);
-
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setTeam(team);
-
-            em.persist(member1);
-
-            em.flush();
-            em.clear();
-
-//            Member m = em.find(Member.class, member1.getId());
-
-                List<Member> members = em.createQuery("select m from Member m", Member.class).getResultList();
-
-                tx.commit();
-```
-```SQL
-Hibernate: 
-    select
-        team0_.TEAM_ID as TEAM_ID1_7_0_,
-        team0_.createBy as createBy2_7_0_,
-        team0_.createDate as createDa3_7_0_,
-        team0_.lastModifiedBy as lastModi4_7_0_,
-        team0_.lastModifiedDate as lastModi5_7_0_,
-        team0_.name as name6_7_0_ 
-    from
-        Team team0_ 
-    where
-        team0_.TEAM_ID=?
-Hibernate: 
-    select
-        team0_.TEAM_ID as TEAM_ID1_7_0_,
-        team0_.createBy as createBy2_7_0_,
-        team0_.createDate as createDa3_7_0_,
-        team0_.lastModifiedBy as lastModi4_7_0_,
-        team0_.lastModifiedDate as lastModi5_7_0_,
-        team0_.name as name6_7_0_ 
-    from
-        Team team0_ 
-    where
-        team0_.TEAM_ID=?
-```
-EAGER 로 설정했는데 쿼리가 두번 나가는 것을 확인할 수 있다
-em.find 는 PK를 찎어서 가져오는 것이기 떄문에 JPA가 내부적으로 다 찾아서 할 수 있다
-그런데 JPQL은 "select m from Member m" 이 우선 SQL로 번역(SELECT * FROM MEMBER)이 된다 그러면 Member만 select 한다
-그럼 Member를 가져와봤더니 team 이 EAGER 가 설정 되어있는것을 확인
-즉시로딩(EAGER)라는 것은 일단 가져올때 무조건 값이 다 들어가 있어야 한다
-그렇다면 "select m from Member m"에서 Member 쿼리가 나가고 만약 member의 개수가 10개면 그 10개 만큼 EAGER를 가져오기 위해서 별도로 나간다..
-다시 말하면
-1. SQL로 번역(select * from Member)
-2. Mmeber를 가져옴
-3. Member를 보니까 EAGER 이므로 Team 도 가져와야됨, 레이즈면 프록시를 집어 넣으면 됨
-4. 즉 EAGER 이므로 List<Member> members = 이 반환하는 시점에 Team이 다 들어가 잇어야 한다 
-5. 그렇다면 그것만큼 별도의 SQL(select * form Team where TEAM_ID = xxx)이 나가게 된다
-```Java
- try {
-              Team teamA = new Team();
-              teamA.setName("teamA");
-
-              em.persist(teamA);
-
-              Team teamB = new Team();
-              teamB.setName("teamB");
-
-              em.persist(teamB);
-
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setTeam(teamA);
-
-            em.persist(member1);
-
-            Member member2 = new Member();
-            member2.setName("member2");
-            member2.setTeam(teamB);
-
-            em.persist(member2);
-
-            em.flush();
-            em.clear();
-
-//            Member m = em.find(Member.class, member1.getId());
-
-                List<Member> members = em.createQuery("select m from Member m", Member.class).getResultList();
-
-                tx.commit();
-        } 
-``` 
-```SQL
-Hibernate: 
-    /* select
-        m 
-    from
-        Member m */ select
-            member0_.MEMBER_ID as MEMBER_I1_3_,
-            member0_.createBy as createBy2_3_,
-            member0_.createDate as createDa3_3_,
-            member0_.lastModifiedBy as lastModi4_3_,
-            member0_.lastModifiedDate as lastModi5_3_,
-            member0_.USERNAME as USERNAME6_3_,
-            member0_.team_TEAM_ID as team_TEA7_3_ 
-        from
-            Member member0_
-```
-Mmeber는 한번에 가져온다 
-MEmber가 둘 이면서 서로 다른팀이고 영속성 컨텍스트에도 존재하지 않기때문에 따로따로 가져와야 한다
-```SQL
-Hibernate: 
-    select
-        team0_.TEAM_ID as TEAM_ID1_7_0_,
-        team0_.createBy as createBy2_7_0_,
-        team0_.createDate as createDa3_7_0_,
-        team0_.lastModifiedBy as lastModi4_7_0_,
-        team0_.lastModifiedDate as lastModi5_7_0_,
-        team0_.name as name6_7_0_ 
-    from
-        Team team0_ 
-    where
-        team0_.TEAM_ID=?
-Hibernate: 
-    select
-        team0_.TEAM_ID as TEAM_ID1_7_0_,
-        team0_.createBy as createBy2_7_0_,
-        team0_.createDate as createDa3_7_0_,
-        team0_.lastModifiedBy as lastModi4_7_0_,
-        team0_.lastModifiedDate as lastModi5_7_0_,
-        team0_.name as name6_7_0_ 
-    from
-        Team team0_ 
-    where
-        team0_.TEAM_ID=?
-```
 N + 1 문제
 결과가 10개면 N은 10 1은 최적회(select m from Member m")
 즉 처음 쿼리 하나를 날렸는데 추가쿼리 N개가 나간다 
