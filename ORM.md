@@ -3872,5 +3872,708 @@ delete form Child where id=?
   * ### 영속성 전이 + 고아 객체, 생명주기
   * ### 실전 예제 - 5.연관관계 관리 
 
+---
+---
+<br>
+<br>
+
+* # _값 타입_     
+<br>
+
+* ## _기본값 타입_
+  * ### JPA의 데이터 타입 분류
+    JPA의 최상위 타입으로는 엔티티 타입과 값 타입이 존재한다 
+    * 데이터가 변해도 식별자로 지속해서 추적 가능
+  * ### 값 타입 분류
+    값 타입에는 기본값 타입, 임베디드 타입, 컬렉션 값 타입이 존재한다
+    기본값 타입
+    자바가 제공하는 기본적인 값을 세팅해서 사용할 수 있는 타입
+    임베디드 타입과 컬렉션 값 타입은 JPA에서 무엇인가를 정의해서 사용해야 한다
+  * ### 기본값 타입
+    기본값 타입의 특징은 생명주기를 엔티티에 의존한다는 것이다
+    값 타입의 value자체는 절대고 공유하면 안된다
+    예) side Effect
+  * ### 참고: 자바의 기본 타입은 절대 공유X
+    클래스는 문제가 무엇이냐면 래퍼런스를 끌고온다... 즉 공유가 된다 
+<br>
+<br>
+
+* ## _임베디드 타입(복합 값 타입)_
+  * ### 임베디드 타입
+    임베디드 타입 역시 엔티티가 아니므로 추적과 변경이 안된다
+    * 회원 엔티티는 이름, 근무 시작일, 근무 종료일, 주소 도시, 주소 번지, 주소 우편번호를 가진다.
+    공통적인 속성들이 눈에 들어온다(근무 시작일 근무 종료일 / 주소 도시, 주소 번지, 주소 우편번호)
+    공통으로 클레스 타입을 만들어서 사용할 수 있지 않을까?
+    * 회원 엔티티는 이름, 근무 기간, 집 주소를 가진다.
+    이렇게 묶어낼 수 있는게 임베디드 타입이다
+  * ## 임베디드 타입의 장접
+    임베디드 타입도 값 타입이다 생명주기 의존
+  * ## 임벧드 타입과 테이블 매핑
+    DB입장에서는 바뀌는게 없다 매핑에만 중점을 두자
+    DB는 데이터를 잘 관리하는것이 목적이므로 이렇게 설계하는것이 맞다 
+    객체는 데이터 뿐만 아니라 메소드라 하는 기능(행위)까지 가지고 있으므로 입베디드 타입으로 묶었을때 이득이 많다 
+```Java
+package hellojpa;
+
+import javax.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    //기간 Period
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+
+    //주소 
+    private String city;
+    private String street;
+    private String zipcode;
+
+}
+
+```     
+```SQL
+        create table Member (
+       MEMBER_ID bigint not null,
+        city varchar(255),
+        endDate timestamp,
+        USERNAME varchar(255),
+        startDate timestamp,
+        street varchar(255),
+        zipcode varchar(255),
+        TEAM_ID bigint,
+        primary key (MEMBER_ID)
+    )
+```
+* ### 임베디드 타입 사용법
+@Embeddable, @Embedded중 둘중 하나는 생량 가능하지만 영한이는 둘다 쓰는것을 권장
+```Java
+package hellojpa;
+
+import javax.persistence.Embeddable;
+import java.time.LocalDateTime;
+
+@Embeddable
+public class Period {
+
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+
+    public LocalDateTime getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDateTime startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDateTime getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDateTime endDate) {
+        this.endDate = endDate;
+    }
+}
+
+```
+```JAva
+package hellojpa;
+
+import javax.persistence.Embeddable;
+
+@Embeddable
+public class Address {
+
+    private String city;
+    private String street;
+    private String zipcode;
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getStreet() {
+        return street;
+    }
+
+    public void setStreet(String street) {
+        this.street = street;
+    }
+
+    public String getZipcode() {
+        return zipcode;
+    }
+
+    public void setZipcode(String zipcode) {
+        this.zipcode = zipcode;
+    }
+}
+
+```
+```Java
+package hellojpa;
+
+import javax.persistence.*;
+import java.time.LocalDateTime;
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    //기간 Period
+    @Embedded
+    private Period workPeriod;
+
+    //주소
+    @Embedded
+    private Address homeAddress;
+
+}
+```
+```SQL
+   create table Member (
+       MEMBER_ID bigint not null,
+        city varchar(255),
+        street varchar(255),
+        zipcode varchar(255),
+        USERNAME varchar(255),
+        endDate timestamp,
+        startDate timestamp,
+        TEAM_ID bigint,
+        primary key (MEMBER_ID)
+    )
+```
+테이블은 그래도 유지되며 Member 는 좀더 객체지향 스럽게 사용할 수 있다
+```Java
+package hellojpa;
+
+import javax.persistence.EntityManager;
+import javax.persistence.EntityManagerFactory;
+import javax.persistence.EntityTransaction;
+import javax.persistence.Persistence;
+
+public class JpaMain {
+
+    public static void main(String[] args) {
+        EntityManagerFactory emf = Persistence.createEntityManagerFactory("hello");
+
+        EntityManager em = emf.createEntityManager();
+
+        EntityTransaction tx = em.getTransaction();
+        tx.begin();
+
+        try {
+            Member member = new Member();
+            member.setName("hello");
+            member.setHomeAddress(new Address("city", "street", "zipcode"));
+            member.setWorkPeriod(new Period());
+
+            em.persist(member);
+        } catch (Exception e) {
+            tx.rollback();
+            System.out.println("e = " + e);
+        } finally {
+            em.close();
+        }
+        emf.close();
+    }
+}
+
+```
+DB 확인
+* ### 임베디드 타입과 테이블 매핑
+* ### 임베디드 타입과 연관관계
+PhoneNmuber라는 임베디드 타입이 PhoneEntity라는 엔티티를 가질 수 있다
+PhoneNmuber입장에서는 PhoneEntity의 FK값만 들고 있으면 된다 
+```JAVA
+@Embeddable
+public class Address {
+
+    private String city;
+    private String street;
+    @Column(name = "ZIPCODEL") //가능
+    private String zipcode;
+
+    private Member member;
+
+```
+* ### @AttributeOverride: 속성 재정의
+한 엔티티 안에서 같은 타입(값)을 사용하면?
+```Java
+
+    //주소
+    @Embedded
+    private Address homeAddress;
+    
+    @Embedded
+    private Address workAddress;
+
+``` 
+```SQL
+Repeatde column Error...
+```
+```JAva
+   //주소
+    @Embedded
+    private Address homeAddress;
+
+    @Embedded
+    @AttributeOverrides({
+            @AttributeOverride(name = "city",
+                    column = @Column(name = "work_city")), //DB Colum을 따로 매핑
+            @AttributeOverride(name = "street",
+                    column = @Column(name = "work_street")),
+            @AttributeOverride(name = "zipcode",
+                    column = @Column(name = "work_zipcode"))
+    })
+```
+<br>
+<br>
+
+* ## _값 타입과 불변 객체_
+  * ### 값 타입 공유 참조
+    * 임베디드 타입 같은 값 타입을 여러 엔티티에서 공유할 수 있지만 위험하다
+    회원 1과 회원2 가 같은 값 타입인 주소를 보고 있다
+    city의 값 OldCity를 NewCity로 변경하게 되면 회원1과 회원2가 들고있는 각각의 테이블의 city Colum의 값이 NewCity로 변경된다
+```Java
+        try {
+            Address address = new Address("city", "street", "zipcode");
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
+            em.persist(member1);
+
+            Member member2 = new Member();
+            member2.setName("member2");
+            member2.setHomeAddress(address);
+            em.persist(member2);
+
+        }
+```  
+```SQL
+insert Query가 두 번 나가는 것을 확인, DB 확인
+member1, member2 둘다 똑같은 주소를 들고있다 
+```
+member1의 주소만 변경하고 싶은 코드 작성
+```Java
+        try {
+            Address address = new Address("city", "street", "zipcode");
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
+            em.persist(member1);
+
+            Member member2 = new Member();
+            member2.setName("member2");
+            member2.setHomeAddress(address);
+            em.persist(member2);
+
+            //member1의 주소만 변경하고싶은 목적의 코드작성
+            member1.getHomeAddress().setCity("newCity");
+
+        }
+```
+```SQL
+update Query가 두번 나가는 것을 확인, DB에 member1과 member2의 City 컬럼의 값이 똑같이 변경되었다..
+```
+이러한 side Effect에 의한 버그는 잡기가 정말 힘들다
+만약 공유해서 사용하고 싶은 경우에는 Address 를 값타입이 아닌 엔티티로 만들어야 한다
+* ### 값 타입 복사
+  * address 라는 것이 있다면 newAddress 라는 것으로 복사해서 사용해야 한다
+```JAva
+       try {
+            Address address = new Address("city", "street", "zipcode");
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
+            em.persist(member1);
+
+            Address copyAddress = new Address(address.getCity(), address.getStreet(), address.getZipcode());
+
+            Member member2 = new Member();
+            member2.setName("member2");
+            member2.setHomeAddress(copyAddress);
+            em.persist(member2);
+
+            //member1의 주소만 변경하고싶은 목적의 코드작성
+            member1.getHomeAddress().setCity("newCity");
+
+        } 
+```
+```SQL
+update 쿼리는 두번 나갈 것이고 member1의 city만 변경된 것을 확인할 수 있따
+```
+* ### 객체 타입의 한계
+실수로 복사한 값타입을 사용하지 않았다면...
+```Java
+       try {
+            Address address = new Address("city", "street", "zipcode");
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
+            em.persist(member1);
+
+            Address copyAddress = new Address(address.getCity(), address.getStreet(), address.getZipcode());
+
+            Member member2 = new Member();
+            member2.setName("member2");
+            member2.setHomeAddress(address);
+            //member2.setHomeAddress(member.getHomeAddress());
+            em.persist(member2);
+
+            //member1의 주소만 변경하고싶은 목적의 코드작성
+            member1.getHomeAddress().setCity("newCity");
+
+        } 
+```
+컴파일러 레벨에서 막을 수 잇는 방법이 있는가??? ->> 객체의 공유 참조는 피할 수 없다
+* ### 객체 타입의 한계
+기본타입은  `=` 대입 연산자를 사용하면 `복사`가 된다 따라서 아무런 문제가 발생하지 않는다
+자바의 기본타입은 값을 넘기기 떄문에 값을 복사해서 넘어간다
+객체타입은 a와 b가 같은 Address 라는 인스턴스를 가리킨다 따라서 같은 인스턴스를 바라보고 있으므로 한 쪾에서 값을 변경하면 결론적으로 둘다 값이 변경된다...
+자바의 객체타입은 참조를 복사해서 넘긴다 .. 참조를 복사하면 뭐하나.. 가리키는 인스턴스가 하나인데,, --> 참조를 막을 수 있는 방법이 없다..
+* ### 불변 객체
+Address Eneity에 Setter를 전부 지우거나 내부적으로 사용할 떄는 Setter의 접근 지정자를 private으로 설정한다
+만약 이 상태에서 참조가 된 값 타입을 사용하게 되면 컴파일 오류가 발생하면서 컴파일러 레벨에서 오류를 잡을 수 있다
+만약 값을 바꾸고 싶다면???
+```JAva
+      try {
+            Address address = new Address("city", "street", "zipcode");
+
+            Member member1 = new Member();
+            member1.setName("member1");
+            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
+            em.persist(member1);
+
+            Address newAddress = new Address("NewCity", address.getStreet(), address.getZipcode());//변경하고 싶은 Column의 값만 직접 입력, 필요하면 내부적으로 copy메소드를 생성해서 상용
+            member1.setHomeAddress(newAddress); //완전히 새롭게 세팅해야 한다
+
+        } 
+```
+<br>
+<br>
+
+* ## _값 타입의 비교_
+* ### 값 타입의 비교
+* 값 타입: 인스턴스가 달라도 그 안에 값이 같으면 같은 것으로 봐야 한다
+기본 타입에서 == 비교는 true 가 나온다
+객체 타입에서 == 비교는 false가 나온다
+```Java
+package hellojpa;
+
+public class ValueMain {
+
+    public static void main(String[] args) {
+
+        int a = 10;
+        int b = 10;
+
+        System.out.println("a == b: " + (a == b));
+
+        Address address1 = new Address("city", "street", "zipcode");
+        Address address2 = new Address("city", "street", "zipcode");
+
+        System.out.println("address1 == address2: " + (address1 == address2));
+    }
+}
+
+```
+```
+a == b: true
+address1 == address2: false
+```
+동일성 비교와 동등성 비교를 구분해서 사용해야 한다
+```Java
+package hellojpa;
+
+public class ValueMain {
+
+    public static void main(String[] args) {
+
+        int a = 10;
+        int b = 10;
+
+        System.out.println("a == b: " + (a == b));
+
+        Address address1 = new Address("city", "street", "zipcode");
+        Address address2 = new Address("city", "street", "zipcode");
+
+        System.out.println("address1 == address2: " + (address1 == address2));
+        System.out.println("address1 equals address2: " + (address1.equals(address2)));
+    }
+}
+
+```
+```
+a == b: true
+address1 == address2: false
+address1 equals address2: false
+```
+false가 나오네..? 지금은 false가 나오는게 맞다!!
+equal의 default는 == 이기 떄문이다 따라서 Overrride 해야한다 재정의를 어떻게 하느냐가 문제
+```JAva
+@Embeddable
+public class Address {
+
+    private String city;
+    private String street;
+    private String zipcode;
+
+    private Member member;
+
+    public Address() {
+    }
+
+    public Address(String city, String street, String zipcode) {
+        this.city = city;
+        this.street = street;
+        this.zipcode = zipcode;
+    }
+
+    //equals는 웬만하면 default로 생성
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        Address address = (Address) o;
+        return Objects.equals(city, address.city) && Objects.equals(street, address.street) && Objects.equals(zipcode, address.zipcode) && Objects.equals(member, address.member);
+    }
+```
+```
+a == b: true
+address1 == address2: false
+address1 equals address2: true
+```
+값 타입들의 비교는 항상 equals를 사용해야 한다
+<br>
+<br>
+
+* ## _값 타입 컬렉션_
+* ### 값 타입 컬렉션
+값 타입 컬렉션이란 값 타입을 컬렉션에 담아서 사용하는 것을 의미한다
+기존에 엔티티를 컬렉션으로 사용한 적이 있다(Parent)에서 확인
+이번에는 값타입을 컬렉션으로 넣어서 쓰는것을 값타입 컬렉션이라 한다
+Member가 favoritFoods, addressHistory 두가지 값타입을 컬렉션으로 가지고 있다
+이것은 DB테이블로 구현할 떄가 문제가 된다
+단순하게 값타입이 한개일때는 Mmeber에 필드 속성으로 해서 MEMBER 테이블에 넣었으면 됐다
+문제는 이 컬렉션이 DB에 들어가야 하는데 기본적으로 관계형 데이터베이스는 내부적으로 테이블 안에 컬렉션을 답을 구조가 없다.. 전부 Value로 값만 넣을 수 있다...
+요즘에야 DB들이 JSON을 지원하면서 가능하긴 한데 기본적으로는 안된다
+Member 입장에서 List에 Address나 이런 컬렉션들은 결국 일대 다 개념이다 
+따라서 MEMBER에 addressHistory같은 데이터를 보관한다 하면, 별도의 테이블(ADDRESS)을 뽑아야 한다(개념적으로 보면 일대 다)
+그래서 DB를 보면 FAVORITE_FOOD는 MEMBER_ID와 FOOD_NAME이 조함되서 PK를 이루어야 하며, ADDRESS의 경우 MEMBER_ID와 값타입(CITY, STREET, ZIPCODE)을 전부 다 묶어서 하나의 PK를 이루어야 한다.
+```Java
+package hellojpa;
+
+import javax.persistence.*;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
+@Entity
+public class Member {
+
+    @Id
+    @GeneratedValue
+    @Column(name = "MEMBER_ID")
+    private Long id;
+
+    @Column(name = "USERNAME")
+    private String name;
+
+    @Embedded
+    private Address homeAddress;
+
+    //참고로 Set이나 List 같은 것들을 사용할 수 있다
+    //컬렉현 하위에 있는 인터페이스들을 전부 사용할 수 있다
+    @ElementCollection//값타입 컬렉션 지정
+    @CollectionTable(name = "FAVORITE_FOOD", //테이블 명 지정
+            joinColumns = @JoinColumn(name = "MEMBER_ID") //FK로 잡을것을 지정
+    )
+    @Column(name = "FOOD_NAME") //값이 하나고 내가 정의한게 아니므로 컬럼명을 지정해준다(예외적)
+    private Set<String> favoriteFood = new HashSet();
+
+    //값타입을 컬렉션으로 여러개 저장하고싶어서...
+    @ElementCollection
+    @CollectionTable(name = "ADDRESS",
+            joinColumns = @JoinColumn(name = "MEMBER_ID")
+            //Address에 city, street.. 등 내가 지정한 것들이 있으므로 별도의 컬럼명을 지정할 필요는 없다
+    )
+    private List<Address> addressHistory = new ArrayList<>();
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Address getHomeAddress() {
+        return homeAddress;
+    }
+
+    public void setHomeAddress(Address homeAddress) {
+        this.homeAddress = homeAddress;
+    }
+
+    public Set<String> getFavoriteFood() {
+        return favoriteFood;
+    }
+
+    public void setFavoriteFood(Set<String> favoriteFood) {
+        this.favoriteFood = favoriteFood;
+    }
+
+    public List<Address> getAddressHistory() {
+        return addressHistory;
+    }
+
+    public void setAddressHistory(List<Address> addressHistory) {
+        this.addressHistory = addressHistory;
+    }
+}
+
+```
+데이터베이스 컬렉션을 같은 테이블에 저장할 수는 없다
+컬렉션들은 기본적으로 일대 대 개념이므로 DB안에는 한 테이블 안에 컬렉션들을 넣을 수 있는 방법이 없다
+따라서 정석적으로는 방법이 없으므로 일대 다로 풀어서 별도의 테이블을 만들어내야 한다
+그러면서 ADDRESS 테이블 처럼 MEMBER_ID를 조인할 수 있게 조인 키를 넣어주어야 한다
+```Java
+
+        try {
+            Member member = new Member();
+            member.setName("member1");
+            member.setHomeAddress(new Address("homeCity", "street", "10000"));
+
+            member.getFavoriteFood().add("치킨");
+            member.getFavoriteFood().add("족발");
+            member.getFavoriteFood().add("피자");
+
+            member.getAddressHistory().add(new Address("old1", "street", "10000"));
+            member.getAddressHistory().add(new Address("old2", "street", "10000"));
+
+            em.persist(member);
+            tx.commit();
+        }
+```
+값 타입 컬렉션을 따로 persist하지 않았다 
+member만 persist 하면 값 타임 컬렉션들이 다른 테이블임에도 불구하고 자동으로 같이 라이프 사이클이 돌아갔다
+왜냐하면 값타입이기 떄문이다
+값타임 컬렛션 역시 값타입처럼 본인 스스로의 라이프 사이클이 존재하지 않는다
+즉 모든 생명주기가 member에 소속된다
+쉽게 말해서 Member에 userneme도 값타입이다 .
+조회하는 방법
+```Java
+try {
+            Member member = new Member();
+            member.setName("member1");
+            member.setHomeAddress(new Address("homeCity", "street", "10000"));
+
+            member.getFavoriteFood().add("치킨");
+            member.getFavoriteFood().add("족발");
+            member.getFavoriteFood().add("피자");
+
+            member.getAddressHistory().add(new Address("old1", "street", "10000"));
+            member.getAddressHistory().add(new Address("old2", "street", "10000"));
+            em.persist(member);
+
+            em.flush();
+            em.clear();
+
+            System.out.println("-=======================");
+            Member findMember = em.find(Member.class, member.getId());
+            System.out.println("-=======================");
+
+            tx.commit();
+        }
+```
+member를 조회해서 Member만 가지고 온다
+즉 컬렉션들은 전부 지연 로딩이라는 뜻이다
+homeAddress는 Member에 소속된 값타입이기 떄문에 같이 불러와진다 
+```Java
+List<Address> addressHistory = findMember.getAddressHistory();
+for(Address address : addressHistory){
+  System.out.println("address = " + address).getCity();
+} 
+
+Set<String> favoriteFoods = findMember.getFavoritFood();
+for(String favoriFood : favoritFoods){
+  sout
+}
+```
+* 값 타입 수정 예제
+```Java
+            System.out.println("-=======================");
+            Member findMember = em.find(Member.class, member.getId());
+
+            //homeCity --> newCity
+//            findMember.getHomeAddress().setCity("newCity"); //값 타입은 사이드 이펙트가 발생할 수 있으므로 이런식으로 코드를 작성하면 안된다
+
+            Address a = findMember.getHomeAddress();
+            findMember.setHomeAddress(new Address("newCity", a.getStreet(), a.getZipcode()));  //값타입은 어드레스 인스턴스 자체를 통체로 갈아 끼워야 한다
+
+            //값타입 컬렉션 업데이트
+            //치킨 --> 한식
+            //스트링 자체가 값타입이므로 스트링은 통체로 갈아 끼워야 한다 업데이트라는 것 자체를 하면 안된다(할 수도 없고,,,)
+            findMember.getFavoriteFood().remove("치킨");
+            findMember.getFavoriteFood().add(("한식"));
+
+            System.out.println("-=======================");
+```
+컬렉션의 값만 변경해도 실제 데이터베이스 쿼리가 날라가면서 뭐가 변경됐는지 알게되며 JPA가 알아서 바꿔준다
+핵심은 값타입 컬렉션들은 Member에 의존관계를 맞기는 것이다
+```Java
+          //값타입이기떄문에 address 인스턴스를 통으로 갈아 끼워야 한다
+            //컬렉션마다 다르긴 하지만 기본적으로 컬렉션들을 대상을 찾을 떄 equals를 사용한다
+            //따라서 equals, hashcode 가 제대로 구현되어었지 않으면 망한다(기본값을 쓰자)
+            findMember.getAddressHistory().remove(new Address("old1", "street", "10000"));
+            findMember.getAddressHistory().add(new Address("newCity1", "street", "10000"));
+```
+MEMBER_ID에 소속된 ADDRESS 테이블을 전부다 지웠다..
+그 이후 insert를 두 번한다???
+remove에서 old1을 지웠다 old2랑 newCity1이 남아있다
+
+<br>
+<br>
+
+* ## _실전 예제 - 6.값 타입 매핑_
+<br>
+<br>
+
 
 
