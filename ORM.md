@@ -1170,39 +1170,43 @@
     * 참조가 없으므로 UML도 잘못됨
 ---
 ---      
-* # 연관관계 매핑 기초
-* ## 목표
+<br>
+<br>
+
+* # _연관관계 매핑 기초_
+* ## _목표_
   * `객체와 테이블 연관관계의 차이를 이해`
   * `객체의 참조와 테이블의 외래 키를 매핑`
   * 용어 이해
     * `방향`(Direction): 단방향, 양방향
     * `다중성`(Multiplicity): 다대일(N:1), 일대다(1:N), 일대일(1:1), 다대대(N:M)
     * `연관관계의 주인`(Owner): 객체 양방향 연관관계는 관리 주인이 필요하다.
-* ## 연관관계가 필요한 이유
+<br>
+<br>
+
+* ## _연관관계가 필요한 이유_
   ![](img/img277.png)
   * ### 예제 시나리오
     * 회원과 팀이 있다
     * 회원은 하나의 팀에만 소속될 수 있다
     * 회원과 팀은 다대일 관계다. 
+  <br>
+  <br>
+
   * ### 객체를 테이블에 맞추어 모델링(연관관계가 없는 객체)
     ![](img/img278.png)
+  <br>
+
   * ### 참조 대신에 외래 키를 그대로 사용
     ```Java
-    package hellojpa;
-
-    import javax.persistence.*;
-
     @Entity
-    @Table(name = "MEMBER")
     public class Member {
 
         @Id
         @Column(name = "member_id")
-        @GeneratedValue(strategy = GenerationType.AUTO)
+        @GeneratedValue
         private Long id;
-
         private String name;
-
         private Long teamId;
 
         //default Constructor
@@ -1211,19 +1215,13 @@
     }
     ```
     ```Java
-    package hellojpa;
-
-    import javax.persistence.*;
-
     @Entity
-    @Table(name = "TEAM")
     public class Team {
         
         @Id
         @Column(name = "team_id")
-        @GeneratedValue(strategy = GenerationType.AUTO)
+        @GeneratedValue
         private Long id;
-        
         private String name;
         
         //default Constructor
@@ -1231,6 +1229,8 @@
         //Getter, Setter
     }
     ```
+  <br>
+
   * ### 외래 키 식별자를 직접 다룸
     ```Java
     try {
@@ -1250,6 +1250,9 @@
         transaction.commit();
     } 
     ``` 
+  <br>
+
+
   * ### 식별자로 다시 조회, 객체지향적인 방법이 아니다..
     ```Java
       //조회
@@ -1263,29 +1266,31 @@
       System.out.println("findTeam.Id = " + findTeam.getId());
       System.out.println("findTeam.Name = " + findTeam.getId());
     ``` 
+  <br>
+
   * ### 객체를 테이블에 맞추어 데이터 중심으로 모델링하면, 협력 관계를 만들 수 없다
     * `테이블은 외래 키로 조인`을 사용해서 연관된 테이블을 찾는다
     * `객체는 참조`를 사용해서 연관된 객체를 찾는다
     * 테이블과 객체 사이에는 이러한 큰 간격이 있다.
-* ## 단방향 연관관계
+<br>
+<br>
+
+* ## _단방향 연관관계_
   * ### 객체 지향 모델링(객체 연관관계 사용)
     ![](img/img279.png)
-    * 객체 연관관계에서 TEAM_ID가 아닌 Team의 참조값을 그대로 가져온다
+    * 객체 연관관계에서 Team.id가 아닌 Team의 참조값을 그대로 가져온다
+  <br>
+
   * ### 객체의 참조와 테이블의 외래 키를 매핑
     ```Java
     @Entity
-    @Table(name = "MEMBER")
     public class Member {
 
         @Id
         @Column(name = "member_id")
-        @GeneratedValue(strategy = GenerationType.AUTO)
+        @GeneratedValue
         private Long id;
-
         private String name;
-
-    //    @Column(name = "team_id")
-    //    private Long teamId;
 
         @ManyToOne
         @JoinColumn(name = "team_id")
@@ -1315,6 +1320,14 @@
         transaction.commit();
     }
     ```  
+    ```SQL
+    alter table Member 
+       add constraint FK5nt1mnqvskefwe0nj9yjm4eav 
+       foreign key (team_id) 
+       references Team
+    ```
+  <br>
+
   * ### 참조로 연관관계 조회 - 객체 그래프 탐색
     ```Java
     entityManager.flush();
@@ -1328,68 +1341,92 @@
     System.out.println("findTeam = " + findTeam.getName());
     ```
     ```SQL
-    Hibernate: 
-        select
-            member0_.PK as PK1_0_0_,
-            member0_.USERNAME as USERNAME2_0_0_,
-            member0_.TEAM_ID as TEAM_ID3_0_0_,
-            team1_.PK as PK1_1_1_,
-            team1_.TEAMNAME as TEAMNAME2_1_1_ 
-        from
-            MEMBER member0_ 
-        left outer join
-            TEAM team1_ 
-                on member0_.TEAM_ID=team1_.PK 
-        where
-            member0_.PK=?
-    findTeam = TeamB
+    select
+        member0_.member_id as member_i1_0_0_,
+        member0_.team_id as team_id3_0_0_,
+        member0_.username as username2_0_0_,
+        team1_.team_id as team_id1_1_1_,
+        team1_.name as name2_1_1_ 
+    from
+        Member member0_ 
+    left outer join
+        Team team1_ 
+            on member0_.team_id=team1_.team_id 
+    where
+        member0_.member_id=?
     ``` 
     * 영속석 컨텍스트의 1차 캐시가 아닌 DB에서 데이터를 직접 가져오고 싶은 경우
-      * entityManager.flush();
-        * 영속석 컨텍스트의 전송 지연 SQL에 쌓인 QUERY SQL을 DB에 보낸다
-      * entityManager.clear();
+      * `entityManager.flush();`
+        * 영속석 컨텍스트의 전송 지연 SQL에 쌓인 Query SQL을 DB에 보낸다
+      * `entityManager.clear();`
         * 영속성 컨텍스트의 1차 캐시의 내용을 모두 지운다
+  <br>
+  <br>
+
   * ### 연관관계 수정
     ```Java
-    //새로운 팀B
-    Team teamB = new Team();
-    teamB.setName("TeamB");
-    entityManager.persist(teamB);
+    try {
+        Team team = new Team();
+        team.setName("teamB");
 
-    //회원1에 새로운 팀 B 설정
-    member.setTeam(teamB);
+        entityManager.persist(team);
+
+        Member findMember = entityManager.find(Member.class, 2L);
+        findMember.setTeam(team);
+
+        entityManager.persis(memberl;
+    }
     ```
-* ## 양방향 연관관계와 연관관계의 주인
+    ```SQL
+    insert 
+          into
+              Team
+              (name, team_id) 
+          values
+              (?, ?)
+
+    update
+              Member 
+          set
+              team_id=?,
+              username=? 
+          where
+              member_id=?
+    ```
+<br>
+<br>
+
+* ## _양방향 연관관계와 연관관계의 주인_
   * ### 양방향 매핑
     ![](img/img281.png)
-    * 테이블 연관관계
+    * `테이블 연관관계`
       * 단방향 매핑과 양방향 매핑의 테이블 연관관계에는 차이가 없다.
       * 멤버 테이블에서 멤버의 팀을 알고싶으면 
         * MEMBER.TEAM_ID(FK)를 TEMA.TEAM_ID(PK)와 JOIN
       * 팀 테이블에서 팀에 소속된 멤버를 알고싶으면
         * TEAM.TEAM_ID(PK)를 MEMBER.TEAM_ID(FK)와 JOIN
-      * `즉 테이블의 연관관계는 외래키 하나로 양방향이 다 성립힌다.`
+      * `즉 테이블은 외래키 하나로 양방향 연관관계가 성립힌다.`
         * 사실상 테이블의 연관관계에는 방향이라는 개념이 없다고 볼 수 있다. 
-    * 객체 연관관계
+    * `객체 연관관계`
       * 단방향 매핑에서는 Member Entity에 Team team 필드(참조)가 있으므로 멤버의 팀을 확인할 수 있다.
       * 하지만 역으로 Team Entity에는 Member에 대한 필드(참조)가 없으므로 팀에 소속된 멤버를 확인할 수 없다.
-      * 그러므로 양방향 객체 연관관계를 성립시키기 위해서는 Tean Entity에 List members 컬렉션을 넣어주어야 양방향 매핑이 성립된다
-  * ### Member Entity는 당방향과 동일
+      * 그러므로 객체의 양방향 연관관계를 성립시키기 위해서는 `Tean Entity에 List members 컬렉션을 넣어주어야 양방향 매핑이 성립`된다
+  <br>
+  <br> 
+  * ### Member Entity는 당방향과 동일 
     ```Java
     @Entity
-    @Table(name = "MEMBER")
     public class Member {
 
         @Id
         @Column(name = "member_id")
-        @GeneratedValue(strategy = GenerationType.AUTO)
+        @GeneratedValue
         private Long id;
-
-        private String name;
 
         @ManyToOne
         @JoinColumn(name = "team_id")
         private Team team;
+        private String name;
 
         //default Structor
         
@@ -1402,14 +1439,13 @@
     public class Team {
 
         @Id
-        @Column(name = "PK")
+        @Column(name = "team_id")
         @GeneratedValue
         private Long id;
 
-        private String name;
-
         @OneToMany(mappedBy = "team")
         private List<Member> members = new ArrayList<>();
+        private String name;
 
         //default Constructor
 
@@ -1418,14 +1454,20 @@
     ```
   * ### 반대 방향으로 객체 그래프 탐색
     ```Java
-    //조회
-    Team findTeam = entityManager.find(Team.class, team.getId());
+    try {
+        Team findTeam = entityManager.find(Team.class, 3L);
+        List<Member> members = findTeam.getMembers();
+        for (Member member : members) {
+            System.out.println("id = " + member.getId());
+            System.out.println("team = " + member.getTeam().getName());
+            System.out.println("username = " + member.getUsername());
+        }
             
-    List<Member> members = findTeam.getMembers();
-    for (Member m : members) {
-        System.out.println("member = " + m.getName());
+        transaction.commit();
     }
     ```
+  <br>
+
   * ### 객체와 테이블이 관계를 맺는 차이
     ![](img/img282.png) 
     * `객체 연관관계 = 2개`
@@ -1433,6 +1475,9 @@
       * 팀 -> 회원 연관관계 1개(단방향)
     * `테이블 연관관계 = 1개`
       * 회원 <-> 팀의 연관관계 1개(양방향)
+  <br>
+  <br>
+
   * ### 객체의 양방향 관계
     * 객체의 `양방향 관계는 사실 양방향 관계가 아니라 서로 다른 단방향 관계 2개다.`
     * 객체를 양방향으로 참조하려면 `단방향 연관관계를 2개` 만들어야 한다.
@@ -1448,6 +1493,9 @@
       ``` 
       * A -> B(a.getB())
       * B -> A(b.getA())
+  <br>
+  <br> 
+
   * ### 테이블의 양방향 연관관계
     * 테이블은 `외래 키 하나`로 두 테이블의 연관관계를 관리
     * MEMBER.TEAM_ID(FK) 외래 키 하나로 양방향 연관관계를 가진다(양쪽으로 조인할 수 있다.)
@@ -1455,9 +1503,15 @@
       SELECT * FROM MEMBER M JOIN TEAM T ON M.TEAM_ID = T.TEAM_ID
       SELECT * FROM TEAM T JOIN MEMBER M ON T.TEAM_ID = M.TEAM_ID
       ``` 
+  <br>
+  <br>
+
   * ### 둘 중 하나로 외래 키를 관리해야 한다.
     ![](img/img283.png)
-    * 만약 멤버를 바꾸고 싶거나 새로운 팀에 들어가고싶은 상황이 주어졌다고 가정해보자. 그렇다면 객체 연관관계에서 Member Entity의 Team team의 필드값을 변경해야하나, Team Entity의 List members 컬렉션의 값을 변경해야 하나? 하는 딜레메가 생기게 된다
+    * 만약 멤버를 바꾸고 싶거나 새로운 팀에 들어가고싶은 상황이 주어졌다고 가정해보자. 그렇다면 객체 연관관계에서 Member Entity의 Team team의 필드값을 변경해야하나, Team Entity의 List members 컬렉션의 값을 변경해야 하나? 하는 딜레마가 생기게 된다
+  <br>
+  <br>
+   
   * ### 연관관계의 주인(Owner)
     * `양방향 매핑 규칙`
       * 객체의 두 관계중 하나를 연관관계의 주인으로 지정
