@@ -1511,168 +1511,195 @@
     * 만약 멤버를 바꾸고 싶거나 새로운 팀에 들어가고싶은 상황이 주어졌다고 가정해보자. 그렇다면 객체 연관관계에서 Member Entity의 Team team의 필드값을 변경해야하나, Team Entity의 List members 컬렉션의 값을 변경해야 하나? 하는 딜레마가 생기게 된다
   <br>
   <br>
-   
+
   * ### 연관관계의 주인(Owner)
     * `양방향 매핑 규칙`
       * 객체의 두 관계중 하나를 연관관계의 주인으로 지정
       * `연관관계의 주인만 외래 키를 관리(등록, 수정)`
       * `주인이 아닌쪽은 읽기만 가능`
-      * 주인은 mappedBy 속성 사용X
-      * 주인이 아니면 mappedBy 속성으로 주인 지정
+      * 주인은 mappedBy 속성을 사용해서는 안된다
+      * 주인이 아니면 mappedBy 속성으로 주인 지정(어떤 참조 필드에 의하여 매핑되었다)
+  <br>
+  <br>
+   
   * ### 누구를 주인으로?
     ![](img/img284.png) 
-    * 외래 키가 있는 곳을 주인으로 정해라
-    * 여기서는 `Member.team`이 연관관계의 주인
-  * ### 양방향 매핑시 가장 많이 하는 실수(연관관계의 주인에 값을 입력하지 않음)
+    * `FK가 존재하는 테이블과 매핑된 Entity의 참조(필드)가 객체의 양방향 연관관계의 주인`이다.
+    * 여기서는 Member.team이 연관관계의 주인
+    <br>
+
     ```Java
     @Entity
-    @Table(name = "MEMBER")
     public class Member {
 
         @ManyToOne
-        @JoinColumn(name = "TEAM_ID")
+        @JoinColumn(name = "team_id")
         private Team team;
     }
     ```
     ```Java
     @Entity
-    @Table(name = "TEAM")
     public class Team {
 
         @OneToMany(mappedBy = "team")
         private List<Member> members = new ArrayList<>();
     }
     ``` 
-    * 연관관계의 주인 필드에는 mappedBy를 사용할 수 없는데, Tean Entity에는 List members 컬렉션에는 mappedBy가 지정되어있는 것으로 보아 List members는 연관관계의 주인이 아니라는 것을 알 수 있으며, `mappedBy = "team"`이라 지정하므로서 Member Entity의 team 필드에 의해 매핑되었다는 것을 해석을 통해서도 직관적으로 알 수 있다.
+    * 연관관계의 주인 필드에는 mappedBy를 설정할 수 없다.
+    * Tean Entity List members 컬렉션에는 mappedBy가 지정되어있는 것으로 보아 List members는 연관관계의 주인이 아니라는 것을 확인할 수 있다.
+    * `mappedBy = "team"`이라 지정하므로서 Member Entity의 team 필드에 의해 매핑되었다는 것을 해석을 통해 직관적으로 알 수 있다.
     * 그런다면 다른 상황에서는 어떤 필드를 연관관계의 주인으로 지정해야하는가?
-      * 영햔이가 정해준 가이드라인: `FK가 있는 테이블과 매핑된 엔티티의 필드를 연관관계의 주인으로 정해라!!!`
-      * 왜?
-        * DB 입장에서는 FK가 있는 곳이 "다"이며, FK 가 없는 곳이 "1"이다.
-        * 그 말은 DB의 "다"쪽이 연관관계의 주인이 되어야 성능 이슈가 없고 설계도 깔끔해진다하네..
+      * 영햔이가 정해준 가이드라인: `FK가 있는 테이블과 매핑된 엔티티의 필드(참조)를 연관관계의 주인으로 정해라!!!`
+      * DB 입장에서는 FK가 있는 곳이 "N"이며, FK 가 없는 곳이 "1"이다.
+      * 그 말은 DB의 "N"쪽이 연관관계의 주인이 되어야 성능 이슈가 없고 설계도 깔끔해진다하네...
+  <br>
+  <br>
+
+  * ### 양방향 매핑시 가장 많이 하는 실수(연관관계의 주인에 값을 입력하지 않음)
     ```Java
     try {
         Member member = new Member();
-        member.setName("Jeon");
-        member.setAge(29);
+        member.setUsername("전성규");
+
         entityManager.persist(member);
 
         Team team = new Team();
-        team.setName("TeamA");
-        team.getMembers().add(member); //역방향(연관관계 주인이 아닌)만 연관관계 설정
+        team.setName("강남대학교");
+        team.getMembers().add(member);
+
         entityManager.persist(team);
 
-          ransaction.commit();
+        transaction.commit();
     }
     ``` 
-    ![](img/img287.png)
-    * MEMBER TABLE에 있는 TEAM_ID의 값이 null
-    * 연관관계의 주인은 Member.team `team.getMembers().add(member);`는 mappedBy로 지정된 읽기 전용이다.
-    * 즉 JAP에서 UPDATE, INSERT QUERY를 날릴때 mappedBy의 변경은 신경쓰지 않는다.
+    ![](img/img322.png)
+    * MEMBER TABLE에 있는 TEAM_ID의 값이 null인것을 확인할 수 있다
+    * 연관관계의 주인은 Member Entity의 Team team필드(참조)이며, Team Entity의 List members 컬렉션은 연관관계의 주인이 아니다.
+    * `team.getMembers().add(member);`는 mappedBy로 지정된 읽기 전용이다.
+    * 즉 JAP에서 UPDATE, INSERT Query를 날릴때 mappedBy로 지정된 참조의 변경은 고려하지 않는다.
+  <br>
+  <br>
+
   * ### 양방향 매핑시 연관관계의 주인에 값을 입력해야 한다(순수한 객체 관계를 고려하면 항상 양쪽다 값을 입력해야 한다.)
     ```Java
     try {
         Team team = new Team();
-        team.setName("TeamA");
+        team.setName("강남대학교");
+
         entityManager.persist(team);
 
         Member member = new Member();
-        member.setName("Jeon");
-        member.setAge(29);
-        member.setTeam(team);  //연관관계의 주인에 값을 설정
+        member.setUsername("전성규");
+        member.setTeam(team); //연관관계 주인에 값을 설정
+
         entityManager.persist(member);
 
         transaction.commit();
     }
     ``` 
-    ![](img/img288.png)
+    ![](img/img323.png)
     * 연관관계의 주인 필드에 값을 주입(`member.setTeam(team);`)하므로 DB의 MEMBER.TEAM_ID의 값이 정상적으로 입력되었다.
-  * ### 양방향 연관관계 주의 - 실습
-    * `순수 객체 상태를 고려해서 항상 양쪾에 값을 설정하자`
+  <br>
+  <br>
+
+  * ### 양방향 연관관계의 주의 - 실습
+    * `순수 객체 상태를 고려해서 항상 양쪽에 값을 설정하자`
       ```Java
       try {
           Team team = new Team();
-          team.setName("TeamA");
+          team.setName("강남대학교");
+
           entityManager.persist(team);
 
           Member member = new Member();
-          member.setName("Jeon");
-          member.setAge(29);
+          member.setUsername("전성규");
           member.setTeam(team);
+
           entityManager.persist(member);
 
           entityManager.flush();
           entityManager.clear();
 
           Team findTeam = entityManager.find(Team.class, team.getId());
-          System.out.println("========== SELECT QUERY START LINE ==========");
+
+          System.out.println("========= Select Query Start Line ==========");
           List<Member> members = findTeam.getMembers();
           for (Member m : members) {
-              System.out.println("m = " + m.getName());
+              System.out.println("m = " + m.getTeam().getName());
           }
-          System.out.println("========== SELECT QUERY END LINE ==========");
-
-          transaction.commit();
-        }
-      ``` 
-      ```SQL
-      ========== SELECT QUERY START LINE ==========
-      Hibernate: 
-          select
-              members0_.TEAM_ID as TEAM_ID4_0_0_,
-              members0_.MEMBER_ID as MEMBER_I1_0_0_,
-              members0_.MEMBER_ID as MEMBER_I1_0_1_,
-              members0_.MEMBAER_AGE as MEMBAER_2_0_1_,
-              members0_.MEMBER_NAME as MEMBER_N3_0_1_,
-              members0_.TEAM_ID as TEAM_ID4_0_1_ 
-          from
-              MEMBER members0_ 
-          where
-              members0_.TEAM_ID=?
-      m = Jeon
-      ========== SELECT QUERY END LINE ==========
-      ```  
-      * JPA가 members의 데이터를 가져오는 시점에 SELECT QUERY를 한 번 날린다
-      * 하지만 객체 관계를 고려하면 이 부분은 문제가 발생한다
-      ```Java
-      try {
-          Team team = new Team();
-          team.setName("TeamA");
-          entityManager.persist(team);
-
-          Member member = new Member();
-          member.setName("Jeon");
-          member.setAge(29);
-          member.setTeam(team);
-          entityManager.persist(member);
-
-          //entityManager.flush();
-          //entityManager.clear();
-
-          Team findTeam = entityManager.find(Team.class, team.getId()); //1차 캐시
-          System.out.println("========== SELECT QUERY START LINE ==========");
-          List<Member> members = findTeam.getMembers();
-          for (Member m : members) {
-              System.out.println("m = " + m.getName());
-          }
-          System.out.println("========== SELECT QUERY END LINE ==========");
+          System.out.println("========= Select Query End Line ==========");
 
           transaction.commit();
       }
-      ```
+      ``` 
       ```SQL
-      ========== SELECT QUERY START LINE ==========
-      ========== SELECT QUERY END LINE ==========
-      ```
-      * entityManager.flush(), entityManager.clear()를 주석처리하게 되면 team 은 영속성 컨텍스트의 1차 캐시에 저장되어인는 상태가 되며, team.members 컬렉션에는 아무 데이터도 존재하지 않는다.
-      * 이러한 결과를 초래하므로, 양방향 연관관계 설정에서 객체지향을 고려한다면 양방향 다 값을 설정하는것이 올바르다
-    * 연관관계 편의 메소드를 생성하자
+      ========= Select Query Start Line ==========
+          select
+              members0_.team_id as team_id3_0_0_,
+              members0_.member_id as member_i1_0_0_,
+              members0_.member_id as member_i1_0_1_,
+              members0_.team_id as team_id3_0_1_,
+              members0_.username as username2_0_1_ 
+          from
+              Member members0_ 
+          where
+              members0_.team_id=?
+      m = 강남대학교
+      ========= Select Query End Line ==========
+      ```  
+      * `entityManger.flush()`, `entityManager.clear()`
+        * 영속성 컨텍스트에는 Member Entity와 Team Entity의 데이터는 전부 사라지게된다.
+      * `entityManager.find(Team.class, team.getId())`
+        * DB로부터 Team Entity의 데이터를 가져오며, 영속성 컨텍스트 1차 캐시에 Team Entity의 데이터를 등록한다
+      * `findTeam.getMembers()`
+        * Member Entity에 대한 데이터가 없으므로 JPA가 DB로 Select Query를 보내서 조회한 Team에 해당하는 Member의 id의 필드값과 일치하는 Member 테이블의 데이터를 가져온다(select Query 발생)
+        * Member Entity를 조회(역방향 조회)
+      * 하지만 객체 관계를 고려하면 이 부분은 문제가 발생한다
+        ```Java
+        try {
+            Team team = new Team();
+            team.setName("강남대학교");
+
+            entityManager.persist(team);
+
+            Member member = new Member();
+            member.setUsername("전성규");
+            member.setTeam(team);
+
+            entityManager.persist(member);
+
+            //entityManager.flush();
+            //entityManager.clear();
+
+            Team findTeam = entityManager.find(Team.class, team.getId());
+
+            System.out.println("========= Select Query Start Line ==========");
+            List<Member> members = findTeam.getMembers();
+            for (Member m : members) {
+                System.out.println("m = " + m.getTeam().getName());
+            }
+            System.out.println("========= Select Query End Line ==========");
+
+            transaction.commit();
+        }
+        ```
+        ```SQL
+        ========== Select Query Start Line ==========
+        ========== Select Query End Line ==========
+        ```
+        * `entityManager.flush()`, `entityManager.clear()`주석처리
+          * Team Entity와 Member Entity의 데이터는 영속성 컨텍스트의 1차 캐시에 저장되어있는 상태가 된다.
+        * team.members 컬렉션에는 아무 데이터도 존재하지 않는다.
+        * 이러한 결과를 초래하므로, 양방향 연관관계 설정에서 객체지향을 고려한다면 양방향 다 값을 설정하는것이 올바르다
+    <br>
+
+    * `연관관계 편의 메소드를 생성하자`
       ```Java
       @Entity
-      @Table(name ="MEMBER")
       public class Member{
 
           @ManyToOne
-          @JoinColumn(name ="TEAM_ID")
+          @JoinColumn(name ="team_id")
           private Team team;
 
           public void changeTeam(Team team) {
@@ -1700,48 +1727,68 @@
         * setXXX가 Java의 getter, setter 관례때문에 로직이 없는 단순한 상황에서만 사용한다.
     * 양방향 매핑시에 무한 루프를 조심하자
       * 예: toString(), lombok, JSON 생성 라이브러리
+  <br>
+  <br>
+
   * ### 양방향 매핑 정리
     * `단방향 매핑만으로도 이미 연관관계 매핑은 완료`
     * 양방향 매핑은 반대 방향으로 조회(객체 그래프 탐색) 기능이 추가된 것 뿐
     * JPQL에서 역방향으로 탐색할 일이 많음
     * 단방향 매핑을 잘 하고 양방향은 필요할 때 추가해도 된다(테이블에 영향을 주지 않는다)
+  <br>
+  <br>
+
   * ### 연관관계 주인을 정하는 기준
     * 비즈니스 로직을 기준으로 연관관계의 주인을 선택하면 안된다
     * `연관관계의 주인은 외래 키의 위치를 기준으로 정해야 한다`
-* ## 실전 예제 - 2.연관관계 매핑 시작
+<br>
+<br>
+
+* ## _실전 예제 - 2.연관관계 매핑 시작_
   * ### 테이블 구조
     ![](img/img285.png) 
   * ### 객체 구조
     ![](img/img286.png) 
+<br>
+
 ---
 ---
-* ## 다양한 연관관계 매핑
-  * ### 연관관계 매핑시 고려사항 3가지
-    * 다중성
-      * 다대일: @ManyToOne
-      * 일대다: @OneToMany
-      * 일대일: @OneToOne
-      * 다대다: @ManyToMany
-    * 단방향, 양방향
-      * 테이블
-        * 외래 키 하나로 양쪽 조인 가능
-        * 사실 방향이라는 개념이 없다
-      * 객체
-        * 참조용 필드가 있는 쪽으로만 참조 가능
-        * 함쪽만 참조하면 단방향
-        * 양쪽이 서로 참조하면 양방향
-          * Member Entity에 Tema에 대한 참조가 있고, Team Entity에 Member에 대한 참조가 있다면, 참조 입장에서는 단방향이 두 개 있는 것이다.
-          * 마치 양쪽에서 참조를 거니까 양방향인것처럼 보일뿐, 사실을 단방향이 두 개 있는 것이다.
-    * 연관관계의 주인
-      * 테이블을 외래 키 하나로 두 테이블이 연관관계를 맺는다.
-      * 객체 양방향 관계는 A -> B, B -> A 처럼 참조가 2군데
-      * 객체 양방향 관계는 참조가 2군데 있음, 둘중 테이블의 외래 키 를 관리할 곳을 지정해야한다.
-      * 연관관계의 주인: 외래 키를 관리하는 참조
-      * 주인의 반대편: 외래 키에 영향을 주지 않음, 단순 조회만 가능하다.
-  * ### 다대일[N:1]
+<br>
+
+* # _다양한 연관관계 매핑_
+<br>
+
+* ## 연관관계 매핑시 고려사항 3가지
+  * 다중성
+    * 다대일: `@ManyToOne`
+    * 일대다: `@OneToMany`
+    * 일대일: `@OneToOne`
+    * 다대다: `@ManyToMany`
+  * 단방향, 양방향
+    * 테이블
+      * 외래 키 하나로 양쪽 조인 가능
+      * 사실 방향이라는 개념이 없다
+    * 객체
+      * 참조용 필드가 있는 쪽으로만 참조 가능
+      * 한쪽만 참조하면 단방향
+      * 양쪽이 서로 참조하면 양방향
+        * Member Entity에 Team에 대한 참조(필드)가 있고, Team Entity에 Member에 대한 참조가 있다면, 참조 입장에서는 단방향이 두 개 있는 것이다.
+        * 마치 양쪽에서 참조를 거니까 양방향인것처럼 보일뿐, 사실을 단방향이 두 개 있는 것이다.
+  * 연관관계의 주인
+    * 테이블을 외래 키 하나로 두 테이블이 연관관계를 맺는다.
+    * 객체 양방향 관계는 A -> B, B -> A 처럼 참조가 2군데
+    * 객체 양방향 관계는 참조가 2군데 있음, 둘중 테이블의 외래 키 를 관리할 곳을 지정해야한다.
+    * 연관관계의 주인: 외래 키를 관리하는 참조
+    * 주인의 반대편: 외래 키에 영향을 주지 않음, 단순 조회만 가능하다.
+<br>
+
+* ## 다대일[N:1]
+  <br>
+
+  * ### 다대일 단방향
     ![](img/img289.png)
     * DB입장에서 연관관계는 MEMBER(N) : TEAM(1)이며, `'N'쪽에 외래키(FK)가 존재해야 한다.`
-    * `외래키(FK)가 존재하는 테이블의 Entity에 역방향 Entity의 참조를 넣어두고 매핑한다.`
+    * `외래키(FK)가 존재하는 테이블과 매핑된 Entity에 역방향 Entity의 참조를 넣어두고 매핑한다.`
       ```Java
       @Entity
       public class Member{
@@ -1754,7 +1801,6 @@
           @ManyToOne
           @JoinColum(name = "team_id")
           private Team team;
-
           private String name;
 
           //default Constructor
@@ -1762,7 +1808,6 @@
           //Getter, Setter
       }
       ``` 
-
       ```Java
       @Entity
       public class Team{
@@ -1777,35 +1822,45 @@
           //Getter, Setter
       }
       ```
-    * 다다일 단방향 정리
+    <br>
+    
+    * ### 다다일 단방향 정리
       * 가장 많이 사용되는 연관관계
-      * 다대일의 반대는 일대다
-  * ### 다대일 양방향
-    ![](img/img290.png)
-    ```Java
-    @Entity
-    public class Team{
+      * 다대일의 반대는 일대다   
+    <br>
+  
+    * ### 다대일 양방향
+      ![](img/img290.png)
+      ```Java
+      @Entity
+      public class Team{
 
-        @Id
-        @Column(name = "team_id")
-        @GeneratedValue
-        private Long ing;
+          @Id
+          @Column(name = "team_id")
+          @GeneratedValue
+          private Long ing;
 
-        @OneToMany(mappedBy = "team")
-        private Lisg<Member> members = new ArrayList<>();
+          @OneToMany(mappedBy = "team")
+          private Lisg<Member> members = new ArrayList<>();
 
-        //default Constructor
+          //default Constructor
 
-        //Getter, Setter
-    }
-    ``` 
-    * 역방항 Entity 필드에 연관관계 주인 Entity 참조를 추가한다
-    * 역방향쪽에 연관관계를 추가한다해서 테이블에 영향을 미치지 않는다.
-    * 다대일 양방향 정리
+          //Getter, Setter
+      }
+      ``` 
+      * 역방항 Entity에 연관관계 주인 Entity 참조를 추가한다
+      * 역방향쪽에 연관관계를 추가한다해서 테이블에 영향을 미치지 않는다.
+    <br>
+
+    * ### 다대일 양방향 정리
       * 외래 키가 있는 쪽이 연관관계의 주인이다.
       * 양쪽을 서로 참조하도록 개발
-  * ### 일대다[1:N]
-    * 일대다 단방향
+  <br>
+
+  * ## 일대다[1:N]
+    <br>
+     
+    * ### 일대다 단방향
       ![](img/img291.png)
       * 테이블 연관관계를 TEAM(1) : MEMBER(N)이며, 다대일 단방향 연관관계처럼 FK가 존재하는 테이블과 매핑된 Entity 연관관계의 주인이 아닌 Team Entity가 연관관계의 주인으로 설정된 모델이다.
       * 즉 Team Entity(1)가 연관관계의 주인으로서 주 방향에서 외래키를 관리한다
