@@ -4001,407 +4001,424 @@ delete form Child where id=?
 
 * ## _기본값 타입_
   * ### JPA의 데이터 타입 분류
-    JPA의 최상위 타입으로는 엔티티 타입과 값 타입이 존재한다 
-    * 데이터가 변해도 식별자로 지속해서 추적 가능
+    * JPA의 최상위 타입으로는 `엔티티 타입`, `값 타입`이 존재한다.
+    * `엔티티 타입`
+      * `@Entity`로 정의하는 객체
+      * 데이터가 변해도 식별자로 지속해서 추적이 가능하다.
+        * 회원 Entity의 키나 나이 값을 변경해도 실별자로 인식이 가능하다
+    * `갑 타입`
+      * int, Integer, String처럼 단순히 값으로 사용하는 자바 기본 타입이나 객체
+      * 식벌자가 없고 값만 있으므로 변경시 추적이 불가능하다.
+        * 숫자 100을 200으로 변경하면 완전히 다른 값으로 대체된다.   
+  #  
   * ### 값 타입 분류
-    값 타입에는 기본값 타입, 임베디드 타입, 컬렉션 값 타입이 존재한다
-    기본값 타입
-    자바가 제공하는 기본적인 값을 세팅해서 사용할 수 있는 타입
-    임베디드 타입과 컬렉션 값 타입은 JPA에서 무엇인가를 정의해서 사용해야 한다
+    * 값 타입에는 `기본값 타입`과 `임베디드 타입`, `컬렉션 값 타입`이 존재한다.
+    * `기본값 타입`
+      * 자바 기본 타입(int, double, ...)
+        * 자바가 제공하는 기본적인 값을 세팅해서 사용할 수 있는 타입
+      * 래퍼 클래스(Integer, Long, ...)
+      * String
+    * `임베디드 타입`(Embedded Type, 복합 값 타입)
+    * `컬렉션 값 타입`(Collection Value Type)
+      * 임베디드 타입과 컬렉션 값 타입은 JPA에서 내부적인 특정 속성을 정의해서 사용해야 한다
+  # 
   * ### 기본값 타입
-    기본값 타입의 특징은 생명주기를 엔티티에 의존한다는 것이다
-    값 타입의 value자체는 절대고 공유하면 안된다
-    예) side Effect
+    * $ex.$ String name, int age ...
+    * `생명주기를 Entity에 의존한다.`
+      * $ex.$ 회원을 삭제하면 이름, 나이 필드도 함께 삭제된다.
+    * `값 타입은 공유해서는 안된다`
+      * $ex.$ 회원 이름 변경시 다른 회원의 이름도 함께 변경되면 안된다.
+      * $ex.$ Side Effect
+  # 
   * ### 참고: 자바의 기본 타입은 절대 공유X
-    클래스는 문제가 무엇이냐면 래퍼런스를 끌고온다... 즉 공유가 된다 
-<br>
-<br>
-
+    * int, double같은 기본 타입(Primitive Type)은 절대 공유되서는 안된다.
+    * 기본 타입은 항상 값을 복사한다.
+    * Integer같은 래퍼 클래스나 String같은 특수한 클래스는 공유 가능한 객체이지만 변경되지 않는다
+      * 클레스의 문제점은 Reference를 끌고온다.. 즉 공유가 된다..
+# 
 * ## _임베디드 타입(복합 값 타입)_
   * ### 임베디드 타입
-    임베디드 타입 역시 엔티티가 아니므로 추적과 변경이 안된다
-    * 회원 엔티티는 이름, 근무 시작일, 근무 종료일, 주소 도시, 주소 번지, 주소 우편번호를 가진다.
-    공통적인 속성들이 눈에 들어온다(근무 시작일 근무 종료일 / 주소 도시, 주소 번지, 주소 우편번호)
-    공통으로 클레스 타입을 만들어서 사용할 수 있지 않을까?
-    * 회원 엔티티는 이름, 근무 기간, 집 주소를 가진다.
-    이렇게 묶어낼 수 있는게 임베디드 타입이다
-  * ## 임베디드 타입의 장접
-    임베디드 타입도 값 타입이다 생명주기 의존
-  * ## 임벧드 타입과 테이블 매핑
-    DB입장에서는 바뀌는게 없다 매핑에만 중점을 두자
-    DB는 데이터를 잘 관리하는것이 목적이므로 이렇게 설계하는것이 맞다 
-    객체는 데이터 뿐만 아니라 메소드라 하는 기능(행위)까지 가지고 있으므로 입베디드 타입으로 묶었을때 이득이 많다 
-```Java
-package hellojpa;
+    * 새로운 값 타입을 직접 정의할 수 있다.
+    * JPA는 임베디드 타입(Embedded Type)이라 한다.
+    * 주로 기본 값 타입을 모아 만들어서 복합 값 타입이라고도 불린다.
+    * int, Stringr과 같은 값 타입이다.
+      * 임베디드 타입 역시 엔티티가 아니므로 추적과 변경이 불가능하다.
+    * 임베디드 타입 예시
+      * Member Entity는 이름, 근무 시작일, 근무 종료일, 주소 도시, 주소 번지, 주소 우편번호 필드를 갖는다.
+      * 공통적인 속성이 보인다
+        * 근무 시작일, 근무 종료일
+        * 주소 도시, 주소 번지, 주소 우편변호
+      * 공통적인 필드끼리 클래스 타입으로 만들어서 사용할 수 있지않을까?
+      ```Java
+      @Entity
+      public class Member {
 
-import javax.persistence.*;
-import java.time.LocalDateTime;
+          @Id
+          @Column(name = "member_id")
+          @GeneratedValue
+          private Long id;
+          private String name;
 
-@Entity
-public class Member {
+          //Period
+          private LocalDateTime startDate;
+          private LocalDateTime endDate;
 
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
+          //Address
+          private String city;
+          private String street;
+          private String zipcode;
+      }
+      ``` 
+      ```SQL
+      create table Member (
+      member_id bigint not null,
+      city varchar(255),
+      endDate timestamp,
+      member_name varchar(255),
+      startDate timestamp,
+      street varchar(255),
+      zipcode varchar(255),
+      primary key (member_id)
+      )
+      ```
+      <br>
 
-    @Column(name = "USERNAME")
-    private String name;
+      ![](img/img324.png) 
+  #    
+  * ### 임베디드 타입 사용법
+    * `@Embeddedable`: 값 타입을 정의하는 곳에 표시한다.
+    * `@Embedded`: 값 타입을 사용하는 곳에 표시한다.
+    * @Embeddedable, @Embedded 둘중 하나는 생략이 가능하지만, 영한이는 둘 다 기입하는 것을 권장한다.
+    * 기본 생성자 코드는 필수로 기입하도록 한다.
+      ```Java
+      @Embeddeable
+      public class Period {
 
-    //기간 Period
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
+          private LocalDateTiem startDate;
+          private LocalDateTiem endDate;
 
-    //주소 
-    private String city;
-    private String street;
-    private String zipcode;
+          //default Constructor
 
-}
+          //Getter, Setter
+      }
+      ``` 
+      ```Java
+      @Embeddable
+      public class Address {
 
-```     
-```SQL
-        create table Member (
-       MEMBER_ID bigint not null,
-        city varchar(255),
-        endDate timestamp,
-        USERNAME varchar(255),
-        startDate timestamp,
-        street varchar(255),
-        zipcode varchar(255),
-        TEAM_ID bigint,
-        primary key (MEMBER_ID)
-    )
-```
-* ### 임베디드 타입 사용법
-@Embeddable, @Embedded중 둘중 하나는 생량 가능하지만 영한이는 둘다 쓰는것을 권장
-```Java
-package hellojpa;
+          private String city;
+          private String street;
+          @Column(name = "ZIPCODE") //가능
+          private String zipcode;
 
-import javax.persistence.Embeddable;
-import java.time.LocalDateTime;
+          //default Constructor
 
-@Embeddable
-public class Period {
+          //Getter, Setter
+      }
+      ```
+      ```Java
+      @Entity
+      public class Member {
 
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
+          @Id
+          @Column(name = "member_id")
+          @GeneratedValue
+          private Long id;
+          private String name;
 
-    public LocalDateTime getStartDate() {
-        return startDate;
-    }
+          @Embedded
+          private Periode workPeriod;
 
-    public void setStartDate(LocalDateTime startDate) {
-        this.startDate = startDate;
-    }
+          @Embedded
+          private Address homeAddress;
 
-    public LocalDateTime getEndDate() {
-        return endDate;
-    }
+          //default Constructor
 
-    public void setEndDate(LocalDateTime endDate) {
-        this.endDate = endDate;
-    }
-}
-
-```
-```JAva
-package hellojpa;
-
-import javax.persistence.Embeddable;
-
-@Embeddable
-public class Address {
-
-    private String city;
-    private String street;
-    private String zipcode;
-
-    public String getCity() {
-        return city;
-    }
-
-    public void setCity(String city) {
-        this.city = city;
-    }
-
-    public String getStreet() {
-        return street;
-    }
-
-    public void setStreet(String street) {
-        this.street = street;
-    }
-
-    public String getZipcode() {
-        return zipcode;
-    }
-
-    public void setZipcode(String zipcode) {
-        this.zipcode = zipcode;
-    }
-}
-
-```
-```Java
-package hellojpa;
-
-import javax.persistence.*;
-import java.time.LocalDateTime;
-
-@Entity
-public class Member {
-
-    @Id
-    @GeneratedValue
-    @Column(name = "MEMBER_ID")
-    private Long id;
-
-    @Column(name = "USERNAME")
-    private String name;
-
-    //기간 Period
-    @Embedded
-    private Period workPeriod;
-
-    //주소
-    @Embedded
-    private Address homeAddress;
-
-}
-```
-```SQL
-   create table Member (
-       MEMBER_ID bigint not null,
+          //Getter, Setter
+      }
+      ```
+      ```SQL
+      create table Member (
+       member_id bigint not null,
         city varchar(255),
         street varchar(255),
         zipcode varchar(255),
-        USERNAME varchar(255),
+        username varchar(255),
         endDate timestamp,
         startDate timestamp,
-        TEAM_ID bigint,
         primary key (MEMBER_ID)
-    )
-```
-테이블은 그래도 유지되며 Member 는 좀더 객체지향 스럽게 사용할 수 있다
-```Java
-package hellojpa;
+      )
+      ```
+      * 생성된 DB 테이블은 기존과 동일하게 유지되며, Member Entity는 조금 더 객체지향 스럼게 사용할 수 있게됐다.
+      ```Java
+      try {
+          Member member = new Member();
+          member.setUsername("userA");
+          member.setHomeAddress(new Address("서울시", "서초구", "123-12"));
+          member.setWorkPeriod(new Period());
 
-import javax.persistence.EntityManager;
-import javax.persistence.EntityManagerFactory;
-import javax.persistence.EntityTransaction;
-import javax.persistence.Persistence;
+          entityManager.persist(member);
+      }
+      ``` 
+      * DB 확인
+  * ### 임베디드 타입의 장접
+    * 재사용에 용이하다.
+    * 높은 응집도를 갖는다.
+    * `Period.isWork()`처럼 해당 값 타입만 사용하는 의미있는 메소드를 만들 수 있다.
+    * 임베디드 타입을 포함한 모든 값 타입은, 값 타입을 소유한 Entity에 생명주기를 의존한다.
+  * ### 임벧드 타입과 테이블 매핑
+    ![](img/img325.png) 
+    * 임베디드 타입은 엔티티의 값일 뿐이다.
+    * 임베디드 타입을 사용하기 전화 후에 `매핑하는 테이블은 같다.`
+      * DB입장에서는 바뀌는 것이 없다.
+      * 매핑에만 중점을 두면 된다.
+    * 객체와 테이블을 아주 세밀하게(find-grained) 매핑하는 것이 가능하다.
+      * DB는 데이터를 잘 관리하는것이 목적이므로 임베디드 타입과 매핑하는 설계가 바람직하다
+      * 객체는 데이터 뿐만 아니라 메소드라 하는 기능(행위)까지 가지고 있으므로, 임베디드 타입으로 필드를 임베디드 타입으로 묶었을 때 이들이 많다.
+    * 잘 설계한 ORM 애플리케이션은 매핑한 테이블 수보다 클래스의 수가 더 많다.
+  #   
+  * ### 임베디드 타입과 연관관계
+    ![](img/img326.png) 
+    * PhoneNmuber 임베디드 타입이 PhoneEntity 엔티티를 가질 수 있다.
+    * PhoneNmuber 입장에서는 PhoneEntity의 FK값만 들고 있으면 된다.
+  # 
+  * ### @AttributeOverride: 속성 재정의
+    * 한 Entity에서 같은 값을 타입으로 사용한다면?
+      ```Java
+      @Entity
+      public class Member {
 
-public class JpaMain {
+          @Embedded
+          private Address homeAddress;
 
-    public static void main(String[] args) {
-        EntityManagerFactory emf = Persistence.createEntityManagerFactory("hello");
+          @Embedded
+          private Address workAddress;
 
-        EntityManager em = emf.createEntityManager();
+          //default Constructor
 
-        EntityTransaction tx = em.getTransaction();
-        tx.begin();
+          //Getter, Setter
+      }
+      ```
+    * 컬럼 명 중속 오류
+      ```SQL
+      Repeated column Error...
+      ```
+    * `@AttributeOverrides`, `@AttributeOverride`를 사용해서 컬럼 명 속성을 재정의 한다.
+      ```Java
+      @Entity
+      public class Member {
 
-        try {
-            Member member = new Member();
-            member.setName("hello");
-            member.setHomeAddress(new Address("city", "street", "zipcode"));
-            member.setWorkPeriod(new Period());
+          @Embedded
+          private Address homeAddress;
 
-            em.persist(member);
-        } catch (Exception e) {
-            tx.rollback();
-            System.out.println("e = " + e);
-        } finally {
-            em.close();
-        }
-        emf.close();
-    }
-}
+          @Embedded
+          @AttributeOverrieds({
+                  @AttributeOverride(name = "city",
+                          column = @Column(name = "work_city")),
+                  @AttributeOverride(name = "street",
+                          column = @Column(name = "work_street")),
+                  @AttributeOverried(name = "zipcode",
+                          column = @Column(name = "work_zipcode"))
+          })
+          private Address workAddress;
 
-```
-DB 확인
-* ### 임베디드 타입과 테이블 매핑
-* ### 임베디드 타입과 연관관계
-PhoneNmuber라는 임베디드 타입이 PhoneEntity라는 엔티티를 가질 수 있다
-PhoneNmuber입장에서는 PhoneEntity의 FK값만 들고 있으면 된다 
-```JAVA
-@Embeddable
-public class Address {
+          //default Constructor
 
-    private String city;
-    private String street;
-    @Column(name = "ZIPCODEL") //가능
-    private String zipcode;
-
-    private Member member;
-
-```
-* ### @AttributeOverride: 속성 재정의
-한 엔티티 안에서 같은 타입(값)을 사용하면?
-```Java
-
-    //주소
-    @Embedded
-    private Address homeAddress;
-    
-    @Embedded
-    private Address workAddress;
-
-``` 
-```SQL
-Repeatde column Error...
-```
-```JAva
-   //주소
-    @Embedded
-    private Address homeAddress;
-
-    @Embedded
-    @AttributeOverrides({
-            @AttributeOverride(name = "city",
-                    column = @Column(name = "work_city")), //DB Colum을 따로 매핑
-            @AttributeOverride(name = "street",
-                    column = @Column(name = "work_street")),
-            @AttributeOverride(name = "zipcode",
-                    column = @Column(name = "work_zipcode"))
-    })
-```
-<br>
-<br>
-
+          //Getter, Setter
+      }
+      ``` 
+  #    
+  * ### 임베디드 타입과 null
+    * 임베디드 타입의 값이 null이면 매핑한 컬럼 값은 모두 null이다.
+#      
 * ## _값 타입과 불변 객체_
+  * 값 타입은 복잡한 객체 세상을 조금이라도 단순화하려고 만든 개념이다. 따라서 값 타입은 단순하고 안전하게 다룰 수 있어야 한다.
+  # 
   * ### 값 타입 공유 참조
-    * 임베디드 타입 같은 값 타입을 여러 엔티티에서 공유할 수 있지만 위험하다
-    회원 1과 회원2 가 같은 값 타입인 주소를 보고 있다
-    city의 값 OldCity를 NewCity로 변경하게 되면 회원1과 회원2가 들고있는 각각의 테이블의 city Colum의 값이 NewCity로 변경된다
-```Java
-        try {
-            Address address = new Address("city", "street", "zipcode");
+    * 임베디드 타입 같은 값 타입은 여러 엔티티에서 공유할 수 있지만 위험하다
+    * 부작용(Side Effect)이 발생한다.
+     
+    ![](img/img327.png) 
+    * 회원1 Etntiy와 회원2 Entity 가 같은 값 타입인 주소를 사용하고 있다.
+    * city의 값 OldCity를 NewCity로 변경하게 되면 회원1 Entity와 회원2 Entity가 들고있는 각각의 테이블의 city Colum의 값이 NewCity로 변경된다.
+      ```Java
+      try {
+          Address address = new Address("city", "street", "zipcode");
 
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
-            em.persist(member1);
+          Member memberA = new Member();
+          memberA.setUsername("memberA");
+          memberA.setHomeAddress(address);
 
-            Member member2 = new Member();
-            member2.setName("member2");
-            member2.setHomeAddress(address);
-            em.persist(member2);
+          entityManager.persist(memberA);
 
-        }
-```  
-```SQL
-insert Query가 두 번 나가는 것을 확인, DB 확인
-member1, member2 둘다 똑같은 주소를 들고있다 
-```
-member1의 주소만 변경하고 싶은 코드 작성
-```Java
-        try {
-            Address address = new Address("city", "street", "zipcode");
+          Member memberB = new Member();
+          memberB.setUsername("memberB");
+          memberB.setHomeAddress(address);
 
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
-            em.persist(member1);
+          entityManager.persist(memberB);
+      }
+      ``` 
+      ```SQL
+      insert 문이 두 번 호출된 것을 확인할 수 있다.
+      memberA, memberB 둘다 똑같은 주소를 들고있다.
+      DB 확인
+      ```
+      ```Java
+      try {
+          Address address = new Address("city", "street", "zipcode");
 
-            Member member2 = new Member();
-            member2.setName("member2");
-            member2.setHomeAddress(address);
-            em.persist(member2);
+          Member memberA = new Member();
+          memberA.setUsername("memberA");
+          memberA.setHomeAddress(address);
 
-            //member1의 주소만 변경하고싶은 목적의 코드작성
-            member1.getHomeAddress().setCity("newCity");
+          entityManager.persist(memberA);
 
-        }
-```
-```SQL
-update Query가 두번 나가는 것을 확인, DB에 member1과 member2의 City 컬럼의 값이 똑같이 변경되었다..
-```
-이러한 side Effect에 의한 버그는 잡기가 정말 힘들다
-만약 공유해서 사용하고 싶은 경우에는 Address 를 값타입이 아닌 엔티티로 만들어야 한다
-* ### 값 타입 복사
-  * address 라는 것이 있다면 newAddress 라는 것으로 복사해서 사용해야 한다
-```JAva
-       try {
-            Address address = new Address("city", "street", "zipcode");
+          Member memberB = new Member();
+          memberB.setUsername("memberB");
+          memberB.setHomeAddress(address);
 
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
-            em.persist(member1);
+          entityManager.persist(memberB);
 
-            Address copyAddress = new Address(address.getCity(), address.getStreet(), address.getZipcode());
+          //memberA의 주소만 변경하고 싶은 목적의 코드 작성
+          memberA.getHomeAddress().setCity("newCity");
+      }
+      ```
+      ```SQL
+      update 쿼리가 두 번 나가는 것을 확인
+      DB에 memberA와 memberB의 CITY 컬럼의 값이 똑같이 변경...
+      ```
+      * 이러한 Side Effect에 의한 버그는 디버깅하기 정말 어렵다..
+      * 만약 공유해서 사용하고 싶은 경우에는 Address를 값타입이 아닌 엔티티로 만들어야 한다.
+  #
+  * ### 값 타입 복사
+    * 값 타입의 실제 인스턴스의 값을 공유하는 것은 위험하다.
+    * 대신 값(인스턴스)를 복사해서 사용
+      ![](img/img328.png)
+      * address라는 것이 있다면, newAddress라는 것으로 복사해서 사용해야 한다.
+    ```Java
+    try {
+          Address address = new Address("city", "street", "zipcode");
 
-            Member member2 = new Member();
-            member2.setName("member2");
-            member2.setHomeAddress(copyAddress);
-            em.persist(member2);
+          Member memberA = new Member();
+          memberA.setUsername("memberA");
+          memberA.setHomeAddress(address);
 
-            //member1의 주소만 변경하고싶은 목적의 코드작성
-            member1.getHomeAddress().setCity("newCity");
+          entityManager.persist(memberA);
 
-        } 
-```
-```SQL
-update 쿼리는 두번 나갈 것이고 member1의 city만 변경된 것을 확인할 수 있따
-```
-* ### 객체 타입의 한계
-실수로 복사한 값타입을 사용하지 않았다면...
-```Java
-       try {
-            Address address = new Address("city", "street", "zipcode");
+          Address  copyAddress = Address(address.getCity(), 
+          address.getStreet(), address.getZipcode());
 
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
-            em.persist(member1);
+          Member memberB = new Member();
+          memberB.setUsername("memberB");
+          memberB.setHomeAddress(copyAddress);
 
-            Address copyAddress = new Address(address.getCity(), address.getStreet(), address.getZipcode());
+          entityManager.persist(memberB);   
 
-            Member member2 = new Member();
-            member2.setName("member2");
-            member2.setHomeAddress(address);
-            //member2.setHomeAddress(member.getHomeAddress());
-            em.persist(member2);
-
-            //member1의 주소만 변경하고싶은 목적의 코드작성
-            member1.getHomeAddress().setCity("newCity");
-
-        } 
-```
-컴파일러 레벨에서 막을 수 잇는 방법이 있는가??? ->> 객체의 공유 참조는 피할 수 없다
-* ### 객체 타입의 한계
-기본타입은  `=` 대입 연산자를 사용하면 `복사`가 된다 따라서 아무런 문제가 발생하지 않는다
-자바의 기본타입은 값을 넘기기 떄문에 값을 복사해서 넘어간다
-객체타입은 a와 b가 같은 Address 라는 인스턴스를 가리킨다 따라서 같은 인스턴스를 바라보고 있으므로 한 쪾에서 값을 변경하면 결론적으로 둘다 값이 변경된다...
-자바의 객체타입은 참조를 복사해서 넘긴다 .. 참조를 복사하면 뭐하나.. 가리키는 인스턴스가 하나인데,, --> 참조를 막을 수 있는 방법이 없다..
-* ### 불변 객체
-Address Eneity에 Setter를 전부 지우거나 내부적으로 사용할 떄는 Setter의 접근 지정자를 private으로 설정한다
-만약 이 상태에서 참조가 된 값 타입을 사용하게 되면 컴파일 오류가 발생하면서 컴파일러 레벨에서 오류를 잡을 수 있다
-만약 값을 바꾸고 싶다면???
-```JAva
+          memberA.getHomeAddress().setCity("newCity");
+    }
+    ``` 
+    ```SQL
+    update 쿼리는 두번 나갈것이고  memberA의 city만 변경된 것을 확인
+    ```
+  #
+  * ### 객체 타입의 한계
+    * 항상 값을 복사해서 사용하면 공유 참조로 인해 발생하는 부작용을 피할 수 없다.
+    * 문제는 임베디드 타입처럼 `직접 정의한 값 타입은 자바의 기본 타입이 아니라 객체 타입`이다.
+    * 자바 기본 타입에 값을 대입하면 값을 복사한다.
+    * `객체 타입은 참조 값을 직접 대입하는 것을 막을 방법이 없다.`
+    * `객체의 공유 참조는 피할 수 없다.`
+    * 실수로 복사한 값을 사용하지 않을경우...
+      ```Java
       try {
             Address address = new Address("city", "street", "zipcode");
 
-            Member member1 = new Member();
-            member1.setName("member1");
-            member1.setHomeAddress(address);  //member1 과 member2가 같은 address를 사용하고 있다
-            em.persist(member1);
+            Member memberA = new Member();
+            memberA.setUsername("memberA");
+            memberA.setHomeAddress(address);
 
-            Address newAddress = new Address("NewCity", address.getStreet(), address.getZipcode());//변경하고 싶은 Column의 값만 직접 입력, 필요하면 내부적으로 copy메소드를 생성해서 상용
-            member1.setHomeAddress(newAddress); //완전히 새롭게 세팅해야 한다
+            entityManager.persist(memberA);
 
-        } 
-```
-<br>
-<br>
+            Address  copyAddress = Address(address.getCity(), 
+            address.getStreet(), address.getZipcode());
 
+            Member memberB = new Member();
+            memberB.setUsername("memberB");
+            memberB.setHomeAddress(address);
+
+            entityManager.persist(memberB);   
+
+            memberA.getHomeAddress().setCity("newCity");
+      }      
+      ```    
+      * 컴파일러 레벨에서 막을 수 있는 방법이 있는가? --> 객체의 공유 참조는 피할 수 없다.
+    * 기본 타임(Primitive Type)
+      ```Java
+      int a = 10;
+      int b = a; //기본 타입은 값을 복사
+      b = 4;
+      ``` 
+      * 기본 타입은 대입연산자(`=`)를 사용하면 `복사`가 된다.
+      * 자바의 기본 타입은 값을 복사해서 넘어간다.
+    * 객체 타입
+      ```Java
+      Address a = new Address("Old");
+      Address b = a; //객체 타입은 참조를 전달
+      b.setCity("New");
+      ``` 
+      * 객체 타입은 a와 b가 같은 Address라는 인스턴스를 가리킨다.
+      * a와 b가 같은 인스턴스를 참조하고 있으므로 한 쪽에서 값을 변경하면 결론적으로 a와 b둘 다 값이 변경된다.
+    * 자바의 객체 타입은 참조를 복사해서 넘어간다... 값을 복사하는것도 아니고 참조를 복사해서 뭐하나.. 가리키는 인스턴스가 하나뿐인데...
+      * 참조를 막을 수 있는 방법이 없다...
+  # 
+  * ### 불변 객체
+    * 객체 타입을 수정할 수 없게 만들면 `부작용을 원천 차단`할 수 있다.
+    * `값 타입은 불면 객체(immutable object)로 설계해야 한다.`
+    * `불면 객체`: `생성 시점 이후 절대 값을 변경할 수 없는 객체`
+    * 생성자로만 값을 설정하고 수정자(Setter)를 만들지 않으면 된다.
+      * Address Entity에 Setter를 전부 지우거나 내부적으로 사용할 떄는 Setter의 접근 지정자를 private으로 설정한다.
+      * 만약 이 상태에서 참조가 된 값 타입을 사용하게 되면 컴파일 오류가 발생하면서 컴파일러 레벨에서 오류를 잡을 수 있다.
+      * 값을 바꾸고 싶다면?
+        ```Java
+        try {
+            Address address = new Address("city", "street", "zipcode");
+
+            Member memberA = new Member();
+            memberA.setUsername("mamberA");
+            memberA.setHomeAddress(address);
+
+            entityManager.persist(memberA);
+
+            //변경하고 싶은 Column의 값만 직접 입력
+            //필요하다면 내부적으로 copy 메소드를 생성해서 사용
+            Address newAddress = new Address("NewCity", address.getStreet(). address.getZipcode());
+
+            //완전히 새롭게 세팅해야 한다
+            memberA.setHomeAddress(newAddress);
+          
+        }
+        ```
+    * 참고
+      * Integer, String은 자바가 제공하는 대표적인 불변 객체이다
+    * `불변이라는 작은 제약으로 부작용이라는 큰 재앙을 막을 수있다.`
+# 
 * ## _값 타입의 비교_
-* ### 값 타입의 비교
-* 값 타입: 인스턴스가 달라도 그 안에 값이 같으면 같은 것으로 봐야 한다
-기본 타입에서 == 비교는 true 가 나온다
-객체 타입에서 == 비교는 false가 나온다
+  * ### 값 타입의 비교
+    * 값 타입: 인스턴스가 달라도 그 안에 값이 같으면 같은 것으로 봐야 한다
+      ```Java
+      int a = 10;
+      int b = 10;
+      ``` 
+      ```Java
+      Address a = new Address("서울시");
+      Address b = new Address("서울시")'
+      ```
+    * `동일성(identity)비교`: 인스턴스의 참조 값을 비교, `==`사용
+      * 기본 타입에서 == 비교는 true 가 나온다
+      * 객체 타입에서 == 비교는 false가 나온다
+    * `동등성(equivalence)비교`: 인스턴스의 값을 비교, `equals()`사용
+    * 값 타입은 a.equals(b)를 사용해서 동등성 비교를 해야한다.
+    * 값 타입의 equals()메소드를 적적하게 재정의(주로 모든 필드 사용)
+
 ```Java
 package hellojpa;
 
