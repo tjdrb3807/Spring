@@ -1777,7 +1777,7 @@
   * 연관관계의 주인
     * 테이블을 외래 키 하나로 두 테이블이 연관관계를 맺는다.
     * 객체 양방향 관계는 A -> B, B -> A 처럼 참조가 2군데
-    * 객체 양방향 관계는 참조가 2군데 있음, 둘중 테이블의 외래 키 를 관리할 곳을 지정해야한다.
+    * `객체 양방향 관계는 참조가 2군데` 있음, `둘중 테이블의 외래 키 를 관리할 곳을 지정`해야한다.
     * 연관관계의 주인: 외래 키를 관리하는 참조
     * 주인의 반대편: 외래 키에 영향을 주지 않음, 단순 조회만 가능하다.
 <br>
@@ -1838,7 +1838,7 @@
           @Id
           @Column(name = "team_id")
           @GeneratedValue
-          private Long ing;
+          private Long int;
 
           @OneToMany(mappedBy = "team")
           private Lisg<Member> members = new ArrayList<>();
@@ -1857,17 +1857,15 @@
       * 양쪽을 서로 참조하도록 개발
   <br>
 
-  * ## 일대다[1:N]
-    <br>
-     
+  * ## _일대다[1:N]_
     * ### 일대다 단방향
       ![](img/img291.png)
-      * 테이블 연관관계를 TEAM(1) : MEMBER(N)이며, 다대일 단방향 연관관계처럼 FK가 존재하는 테이블과 매핑된 Entity 연관관계의 주인이 아닌 Team Entity가 연관관계의 주인으로 설정된 모델이다.
-      * 즉 Team Entity(1)가 연관관계의 주인으로서 주 방향에서 외래키를 관리한다
+      * 테이블 연관관계는 TEAM(1) : MEMBER(N)이며, 다대일 단방향 연관관계처럼 FK가 존재하는 테이블과 매핑된 Entity가 연관관계의 주인이 아닌 `Team Entity가 연관관계의 주인`으로 설정된 모델이다.
+      * 즉 Team Entity(1)가 연관관계의 주인으로서 `주 방향에서 외래키를 관리`한다
       * 영한이는 이 모델 사용을 권장하지 않는다.
         * Team Entity가 List Members 컬렉션을 갖고있으며, Member Entity는 Team을 알고싶지 않다는 전제조건이 깔려있다.
-        * DB 입장에서는 무조건 테이블 연관관계 'N'방향에 FK가 세팅되어야 한다
-        * 이러한 경우 Team Entity의 List members의 값을 수정하였을때 다른 테이블(MEMBER)에 있는 FK(TEAM_ID)를 update 처리해야 한다
+        * DB 입장에서는 무조건 테이블 연관관계 `'N'방향에 FK가 세팅`되어야 한다
+        * 위의 예제 경우 `Team Entity의 List members의 값을 수정하였을때 다른 테이블(MEMBER)에 있는 FK(TEAM_ID를 update 처리`해야 한다
       ```Java
       @Entity
       public class Memeber{
@@ -1876,8 +1874,7 @@
           @Column(name = "member_id")
           @GeneratedValue
           private Long id;
-
-          private String name;
+          private String username;
 
           //default Constructor
 
@@ -1897,7 +1894,6 @@
           @OneToMany
           @JoinColumn(name = "team_id")
           private List<Member> members = new ArrayList<>();
-
           private String name;
 
           //default Constructor
@@ -1906,18 +1902,20 @@
       }
       ```
       ```Java
-      try{
-          Member member = new Member();
-          member.setName("memberA");
-          entityManager.persist(member);
+        try {
+            Member member = new Member();
+            member.setUsername("전성규");
 
-          Team team = new Team();
-          team.setName("TeamA");
-          team.getMembers().add(member);
-          entityManager.persist(team);
+            entityManager.persist(member);
 
-          transaction.commit();
-      }
+            Team team = new Team();
+            team.setName("강남대학교");
+            team.getMembers().add(member);
+
+            entityManager.persist(team);
+
+            transaction.commit();
+        }
       ```
       * `team.getMembers().add(member);`
         * TEAM 테이블에 INSERT 될 내용이 아니다..
@@ -1930,24 +1928,26 @@
               MEMBER_ID=?
       ```
       * UPDATE Query가 추가로 나가는 이유
-        * `Team team = new Team()`, `team.setName("TeamA")`는 연관관계가 바뀌더라도 이 부분을 수정할떄는 그냥 TEAM 테이블에 INSERT 됟다.
-        * `team.getMembers().add(member)`는 Team Entity를 저장하는데 TEAM TABLE의 TEAM_ID를 SQL로 할 방법이 없다...
-        * 그러므로 옆테이블(MEMBER)에 UPDATE Qurey를 보내는 방법 밖에 없다.
-        * 따라서 UPDATE Query가 한번 더 호출되는 것이다(성능상의 큰 차이는 없다)
+        * `Team team = new Team()`, `team.setName("TeamA")`
+          * 연관관계가 바뀌더라도 이 부분을 수정할떄는 그냥 TEAM 테이블에 INSERT 된다.
+        * `team.getMembers().add(member)`
+          * Team Entity를 저장하는데 TEAM TABLE의 TEAM_ID를 SQL로 할 방법이 없다...
+          * 옆테이블(MEMBER)에 UPDATE Qurey를 보내는 방법 밖에 없다.
+          * 따라서 UPDATE Query가 한번 더 호출되는 것이다(성능상의 큰 차이는 없다)
       * 영한이가 이 방법을 잘 사용하지 않는 이유
-        * 실무에서는 최소 수십개의 테이블이 엮여서 돌가는 상황이다. 
-        * 이러한 상황에서 다른 테이블의 UPDATE Query가 날라감으로 인하여 운영상의 문제와 복잡도를 초례한다
+        * 실무에서는 최소 수십개의 테이블이 엮여서 돌아가는 상황이다. 
+        * 이러한 상황에서 다른 테이블의 UPDATE Query가 날아감으로 인하여 운영상의 문제와 복잡도를 초례한다
         * 그래서 영한이는 `일대다 단방향을 하게되면 다대일 양방향을 사용하는 전략`을 세운다
-    * 일대다 단방향 정리
-      * 일대다 단방향은 인대다(1:N)에서 일(1)이 연관관계의 주인이다
-      * 테이블 일대다 관계는 항상 다(N) 쪽에 외래 키가 있다
+    * ### 일대다 단방향 정리
+      * 일대다 단방향은 일대다(1:N)에서 `일(1)이 연관관계의 주인`이다
+      * 테이블 일대다 관계는 항상 `다(N) 쪽에 외래 키가 있다`
       * 객체와 테이블의 차이 때문에 반대편 테이블의 외래 키를 관리하는 특이한 구조
       * `@JoinColumn`을 반드시 사용해야한다. 그렇지 않으면 조인 테이블 방식을 사용함(중간에 테이블 하나 추가함)
-      * 일대대 단방향 매핑의 단점
-        * Entity가 관리하는 FK가 다른 테이블에 존재한다
+      * 일대다 단방향 매핑의 단점
+        * `주인   Entity가 관리하는 FK가 다른 테이블에 존재`한다
         * 연관관계 관리를 위해 추가로 UPDATE SQL 실행
       * 일대다 단방향 매핑보다는 `다대일 양방향 매핑을 사용`하자
-    * 일대다 양방향
+    * ### 일대다 양방향
       ![](img/img292.png)
       ```Java
       @Entity
@@ -1993,14 +1993,16 @@
       * 읽기 전용 필드를 사용해서 양방향 처럼 사용하는 방법
         * `@JoinColumn(insertable = false, updatable = false)`
       * `다대일 양방향을 사용하자`
-  * ### 일대일[1:1]
-    * 일대일 관계
+  <br>
+
+  * ## _일대일[1:1]_
+    * ### 일대일 관계
       * 일대일 관계는 그 반대도 일대일
       * 주 테이블이나 대상 테이블 중에 외래 키 선택 가능
         * 주 테이블에 외래 키
         * 대상 테이블에 외래 키
-      * 외래 키에 데이터베이스 유니크(UNI) 제약조건 추자
-    * 일대일: 주 테이블에 외래 키 단방향
+      * `외래 키에 데이터베이스 유니크(UNI) 제약조건 추가`
+    * ### 일대일: 주 테이블에 외래 키 단방향
       ![](img/img293.png)
       ```Java
       @Entity
@@ -2038,27 +2040,26 @@
           //Getter, Setter
       }
       ```
-      ```SQL
-      Hibernate: 
-          
-          create table Locker (
-            LOCKER_ID bigint not null,
-              name varchar(255),
-              primary key (LOCKER_ID)
-          )
-      Hibernate: 
-          
-          create table Member (
-            MEMBER_ID bigint not null,
-              USERNAME varchar(255),
-              LOCKER_ID bigint,
-              TEAM_ID bigint,
-              primary key (MEMBER_ID)
-          )
+      ```SQL 
+      create table Locker (
+        locker_id bigint not null,
+          name varchar(255),
+          primary key (locker_id)
+      )
+
+      create table Member (
+        member_id bigint not null,
+          username varchar(255),
+          locker_id bigint,
+          team_id bigint,
+          primary key (member_id)
+      )
       ```   
       * MEMBER Table에 LOCKER_ID 가 들어간 것을 확인할 수 있다.
       * 다대일(@ManyToOne) 단방향 매핑과 유사
-    * 일대일: 주 테이블에 외래 키 양방향  
+    <br>
+
+    * ### 일대일: 주 테이블에 외래 키 양방향  
       ![](img/img294.png)  
       ```Java
       @Entity
@@ -2081,38 +2082,38 @@
       }
       ``` 
       * 다대일 양향뱡 매핑 처럼 `외래 키가 있는 곳이 연관관계의 주인`
-      * 반대편은 mappedBy 적용
-    * 일대일: 대상 테이블에 외래 키 당방향
-      ![](img/img259.png) 
+      * `반대편은 mappedBy 적용`
+    * ### 일대일: 대상 테이블에 외래 키 당방향
+      ![](img/img295.png) 
       * `단방향 관계는 JPA 지원X`
-    * 일대일: 대상 테이블에 외래 키 양방향
+    * ### 일대일: 대상 테이블에 외래 키 양방향
       ![](img/img296.png) 
       * Locker Entity의 Member member 참조를 연관관계의 주인으로 잡아서 연결
       * 일대일 관계는 자신 엔티티의 외래 키는 직접 관리해야 한다.
-    * 일대일 정리
+    * ### 일대일 정리
       * 주 테이블에 외래 키
         * 주 객체가 대상 객체의 참조를 가지는 것 처럼, 주 테이블에 외래 키를 두고 대상 테이블을 찾음
         * 객체지향 개발자 선호
         * JPA 매핑 편리
         * 장점: 주 테이블에만 조회해도 대상 테이블에 데이터가 있는지 확인 가능
-        * 단점: 값이 없으면 외래 키에 null 허용
+        * 단점: `값이 없으면 외래 키에 null 허용`
       * 대상 테이블에 외래 키
         * 대상 테이블에 외래 키가 존재
         * 전통적인 데이터베이스 개발자 선호
         * 장점: 주 데이블과 대상 테이블을 일대일에서 일대다 관꼐로 변경할 때 테이블 구조 유지
         * 단정: 프록시 기능의 한계로 지연 로딩으로 설정해도 항상 즉시 로딩됨
-  * ### 다대다[N:M]
-    * 다대다
+  * ## _다대다[N:M]_
+    * ### 다대다
       ![](img/img297.png)
       * 실무에서는 사용해서는 안되며, 왜 사용하면 안되는지에 초점을 맞추도록!
-      * 관계형 데이터베이스는 정규화된 테이블 2개로 다대다 관계를 표현할 수 없다
-      * 연결 테이블을 추가해서 일대가, 다대일 관계로 풀어내야한다. 
+      * 관계형 데이터베이스는 `정규화된 테이블 2개로 다대다 관계를 표현할 수 없다`
+      * `연결 테이블을 추가해서 일대다, 다대일 관계로 풀어내야한다. `
       ![](img/img298.png)
-      * 객체는 컬렉션을 사영해서 객체 2개로 다대다 관계를 성립시킬 수 있다.
+      * 객체는 컬렉션을 사용해서 객체 2개로 다대다 관계를 성립시킬 수 있다.
       * `@ManyToMany`사용
       * `@JoinTable`로 연결 테이블 지정
       * 다대다 매핑: 단방향, 양방향 가능
-    * 다대다 단방향
+    * ### 다대다 단방향
       ```Java
       @Entity
       public class Product{
@@ -2129,7 +2130,6 @@
           //Getter, Setter
       }
       ``` 
-
       ```Java
       @Entity
       public class Member{
@@ -2174,7 +2174,9 @@
             references Member
       ```
       * 외래 키 제약조건으로 생기는 SQL
-    * 다대다 양방향
+    <br> 
+
+    * ### 다대다 양방향
       ```Java
       @Entity
       public class Product{
@@ -2281,14 +2283,10 @@
 <br>
 <br>
 
-* ## 고급 매핑
-
-<br>
-
-* ### 상속관계 매핑
-  <br> 
-
-  * 상속관계 매핑
+* # _고급 매핑_
+* ## _상속관계 매핑_ 
+ 
+  * ### 상속관계 매핑
     * 관계형 데이터베이스는 상속 관계가 존재하지 않는다.
     * 슈퍼타입, 서브타입 관계라는 모델링 기법이 객체 상속과 유사     
       <br>
@@ -2296,249 +2294,92 @@
       ![](img/img306.png)  
       <br>
 
-    * 상속관계 매핑: 객체의 상속과 구조와 DB의 슈퍼타입 서브타입 관계를 매핑
-    * 슈퍼타입 서브타입 놀리 모델을 실제 물리 모델로 구현하는 방법
+    * 상속관계 매핑: 객체의 상속 구조와 DB의 슈퍼타입 서브타입 관계를 매핑
+    * 슈퍼타입 서브타입 논리 모델을 실제 물리 모델로 구현하는 방법
       * 각각 테이블로 변환 -> `조인 전략`
       * 통합 테이블로 변환 -> `단일 테이블 전략`
       * 서브타입 테이블로 변환 -> `구현 클래스마다 테이블 전략`
-
-  <br>
-
-  * 주요 어노테이션
-    * @Inheritance(strategy = InheritanceType.XXX)
+  * ### 주요 어노테이션
+    * `@Inheritance(strategy = InheritanceType.XXX)`
       * `JOINED`: 조인 전략
       * `SINGLE_TABLE`: 단일 테이블 전략 
       * `TABLE_PER_CLASS`: 구현 클래스마다 테이블 전략
-    * @DiscriminatorColumn(name = "DTYPE")
-    * @DiscriminatorValue("XXX")
+    * `@DiscriminatorColumn(name = "DTYPE")`
+    * `@DiscriminatorValue("XXX")`
   <br> 
 
-  * 조인 전략
-  <br>
-
-  ![](img/img307.png)    
-  * ITEM, ALBUM, MOVIE, BOOK 테이블을 만들어서 데이터를 나누고, 조인으로 구성한다
-  * INSERT는 두 번 나가며 PK가 같으므로 PK, FK로 조인해서 데이터를 가져온다
-  * 구분을 하기위해 ITEM 에 구분하는 컬럼 DTYPE을 둔다
-  <br>
-
-    ```Java
-    @Entity
-    public abstract class Item{
-
-        @Id
-        @Column(name = "item_id")
-        @GeneratedValue
-        private Long id;
-
-        private String namel
-
-        private int price;
-
-        //default Constructor
-
-        //Getter, Setter
-    }
-    ``` 
+  * ### 조인 전략
     <br>
 
-    ```Java
-    @Entity
-    public class Album extends Item {
-
-        private String artist;
-
-        //default Constructor
-
-        //Getter, Setter
-    }
-    ```
+    ![](img/img307.png)    
+    * ITEM, ALBUM, MOVIE, BOOK 테이블을 만들어서 데이터를 나누고, 조인으로 구성한다
+    * 자식 테이블이 부모 테이블의 PK를 받아서 PK + FK로 사용하는 전략
+      * 조회할 떄 JOIN을 자주 사용한다 
+    * INSERT는 두 번 나가며 PK가 같으므로 PK, FK로 조인해서 데이터를 가져온다
+    * 구분을 하기위해 ITEM 에 구분하는 컬럼 DTYPE을 둔다
+      * 객체는 타입으로 구분할 수 있지만 테이블은 타입 개념이 존재하지 않는다
+      * 타입글 구분할 컬럼을 추가한다
     <br>
-
-    ```Java
-    @Entity
-    public class Movie extends Item{
-
-        private String director;
-
-        private String actor;
-
-        //default Constructor
-
-        //Getter, Setter
-    }
-    ```
-    <br>
-
-    ```Java
-    @Entity
-    public class Book extends Item{
-
-        private String author;
-
-        private String isbn;
-
-        //default Constructor
-
-        //Getter, Setter
-    }
-    ```
-    <br>
-
-    ```SQL
-    Hibernate: 
-        
-        create table Item (
-          DTYPE varchar(31) not null,
-            item_id bigint not null,
-            name varchar(255),
-            price integer not null,
-            author varchar(255),
-            isbn varchar(255),
-            artiest varchar(255),
-            actor varchar(255),
-            director varchar(255),
-            primary key (item_id)
-        )
-    ```
-    * JPA의 기본 전략이 Single Table 이므로 CREATE문이 이러헥 생성된다. 
-    * 조인 전략으로 변경
-      <br>
 
       ```Java
       @Entity
-      @Inheritnace(strategy = InheritnaceType.JOINED)
-      public class Item {
+      public abstract class Item{
 
-          ...
-      }
-      ```
-      <br>
+          @Id
+          @Column(name = "item_id")
+          @GeneratedValue
+          private Long id;
 
-      ```SQL
-      Hibernate: 
-          
-          create table Album (
-            artiest varchar(255),
-              item_id bigint not null,
-              primary key (item_id)
-          )
-      Hibernate: 
-          
-          create table Book (
-            author varchar(255),
-              isbn varchar(255),
-              item_id bigint not null,
-              primary key (item_id)
-          )
+          private String name;
 
-      Hibernate: 
-          
-          create table Item (
-            item_id bigint not null,
-              name varchar(255),
-              price integer not null,
-              primary key (item_id)
-          )
+          private int price;
 
-      Hibernate: 
-          
-          create table Movie (
-            actor varchar(255),
-              director varchar(255),
-              item_id bigint not null,
-              primary key (item_id)
-          )
-      ```
-      <br>
+          //default Constructor
 
-    * 실행
-    <br>
-
-      ```Java
-      try {
-          Movie movie = new Movie();
-          movie.setDirector("봉준호");
-          movie.setActor("송강호");
-          movie.setName("기생충");
-
-          entityManager.persist(movie);
-
-          transaction.commint();
-      } 
-      ```
-      <br>
-      
-      ```SQL
-      Hibernate: 
-          /* insert hellojpa.mapping.Movie
-              */ insert 
-              into
-                  Item
-                  (name, price, item_id) 
-              values
-                  (?, ?, ?)
-      Hibernate: 
-          /* insert hellojpa.mapping.Movie
-              */ insert 
-              into
-                  Movie
-                  (actor, director, item_id) 
-              values
-                  (?, ?, ?)
-      ```
-      <br>
-
-    * 조회
-      ```Java
-      try {
-          Movie movie = new Movie();
-          movie.setDirector("봉준호");
-          movie.setActor("송강호");
-          movie.setName("기생충");
-          movie.setPrice(10000);
-
-          entityManager.persist(movie);
-
-          entityManager.flush();
-          entityManager.clear();
-
-          Movie findMovie = entityManager.find(Movie.class, movie.getId());
-          System.out.println("findMovie = " + findMovie);
+          //Getter, Setter
       }
       ``` 
       <br>
 
-      ```SQL
-      Hibernate: 
-          select
-              movie0_.item_id as item_id1_2_0_,
-              movie0_1_.name as name2_2_0_,
-              movie0_1_.price as price3_2_0_,
-              movie0_.actor as actor1_3_0_,
-              movie0_.director as director2_3_0_ 
-          from
-              Movie movie0_ 
-          inner join
-              Item movie0_1_ 
-                  on movie0_.item_id=movie0_1_.item_id 
-          where
-              movie0_.item_id=?
-      findMovie.name = 기생충
-      ```
-      <br>
-      
-      * 조회할때 join이 필요하다면 join을 지원하며 INSERT SQL을 두번 날리는 것 까지 지원한다
-      <br>
-
-    * DTYPE
       ```Java
       @Entity
-      @Inheritance(strategy = InheritanceType.JOINED)
-      @DiscriminatorColumn
-      public abstract Item {
+      public class Album extends Item {
 
-          ...
+          private String artist;
+
+          //default Constructor
+
+          //Getter, Setter
+      }
+      ```
+      <br>
+
+      ```Java
+      @Entity
+      public class Movie extends Item{
+
+          private String director;
+
+          private String actor;
+
+          //default Constructor
+
+          //Getter, Setter
+      }
+      ```
+      <br>
+
+      ```Java
+      @Entity
+      public class Book extends Item{
+
+          private String author;
+
+          private String isbn;
+
+          //default Constructor
+
+          //Getter, Setter
       }
       ```
       <br>
@@ -2551,32 +2392,190 @@
               item_id bigint not null,
               name varchar(255),
               price integer not null,
+              author varchar(255),
+              isbn varchar(255),
+              artiest varchar(255),
+              actor varchar(255),
+              director varchar(255),
               primary key (item_id)
           )
       ```
-      ![](img/img308.png)
-      * `@DiscriminatorColumn`의 default는 Entity 이름이다
-      * 이름은 변경하고 싶다면
-      <br>
+      * JPA의 기본 전략이 Single Table 이므로 CREATE문이 단일 테이블 전략으로 생성된다. 
+      * 조인 전략으로 변경
+        <br>
 
         ```Java
         @Entity
-        @Inheritance(strategy = InheritnaceType.JOINED)
-        @DiscriminatorValue("M")
-        public class Movie extends Item {
+        @Inheritnace(strategy = InheritnaceType.JOINED)
+        public class Item {
 
-          ...
+            ...
+        }
+        ```
+        <br>
+
+        ```SQL
+        Hibernate: 
+            
+            create table Album (
+              artiest varchar(255),
+                item_id bigint not null,
+                primary key (item_id)
+            )
+        Hibernate: 
+            
+            create table Book (
+              author varchar(255),
+                isbn varchar(255),
+                item_id bigint not null,
+                primary key (item_id)
+            )
+
+        Hibernate: 
+            
+            create table Item (
+              item_id bigint not null,
+                name varchar(255),
+                price integer not null,
+                primary key (item_id)
+            )
+
+        Hibernate: 
+            
+            create table Movie (
+              actor varchar(255),
+                director varchar(255),
+                item_id bigint not null,
+                primary key (item_id)
+            )
+        ```
+        <br>
+
+      * 실행
+      <br>
+
+        ```Java
+        try {
+            Movie movie = new Movie();
+            movie.setDirector("봉준호");
+            movie.setActor("송강호");
+            movie.setName("기생충");
+
+            entityManager.persist(movie);
+
+            transaction.commint();
+        } 
+        ```
+        <br>
+        
+        ```SQL
+        Hibernate: 
+            /* insert hellojpa.mapping.Movie
+                */ insert 
+                into
+                    Item
+                    (name, price, item_id) 
+                values
+                    (?, ?, ?)
+        Hibernate: 
+            /* insert hellojpa.mapping.Movie
+                */ insert 
+                into
+                    Movie
+                    (actor, director, item_id) 
+                values
+                    (?, ?, ?)
+        ```
+        <br>
+
+      * 조회
+        ```Java
+        try {
+            Movie movie = new Movie();
+            movie.setDirector("봉준호");
+            movie.setActor("송강호");
+            movie.setName("기생충");
+            movie.setPrice(10000);
+
+            entityManager.persist(movie);
+
+            entityManager.flush();
+            entityManager.clear();
+
+            Movie findMovie = entityManager.find(Movie.class, movie.getId());
+            System.out.println("findMovie = " + findMovie);
         }
         ``` 
-    * 장점
-      * 테이블 정규화(테이터가 정규화)
-      * 외래 키 참조 무결성 제약 조건 활용가능
-        * 제약 조건을 Item에 걸어서 맞출 수 있다
-      * 저장공간 효율화
-    * 단점
-      * 조회시 조인을 많이 사용, 성능 저하
-      * 저회 쿼리가 복잡함
-      * 데이터 저장시 INSERT SQL 2번 호출
+        <br>
+
+        ```SQL
+        Hibernate: 
+            select
+                movie0_.item_id as item_id1_2_0_,
+                movie0_1_.name as name2_2_0_,
+                movie0_1_.price as price3_2_0_,
+                movie0_.actor as actor1_3_0_,
+                movie0_.director as director2_3_0_ 
+            from
+                Movie movie0_ 
+            inner join
+                Item movie0_1_ 
+                    on movie0_.item_id=movie0_1_.item_id 
+            where
+                movie0_.item_id=?
+        findMovie.name = 기생충
+        ```
+        <br>
+        
+        * 조회할때 join이 필요하다면 join을 지원하며 INSERT SQL을 두번 날리는 것 까지 지원한다
+        <br>
+
+      * DTYPE
+        ```Java
+        @Entity
+        @Inheritance(strategy = InheritanceType.JOINED)
+        @DiscriminatorColumn
+        public abstract Item {
+
+            ...
+        }
+        ```
+        <br>
+
+        ```SQL
+        Hibernate: 
+            
+            create table Item (
+              DTYPE varchar(31) not null,
+                item_id bigint not null,
+                name varchar(255),
+                price integer not null,
+                primary key (item_id)
+            )
+        ```
+        ![](img/img308.png)
+        * `@DiscriminatorColumn`의 default는 Entity 이름이다
+        * 이름은 변경하고 싶다면
+        <br>
+
+          ```Java
+          @Entity
+          @Inheritance(strategy = InheritnaceType.JOINED)
+          @DiscriminatorValue("M")
+          public class Movie extends Item {
+
+            ...
+          }
+          ``` 
+      * 장점
+        * 테이블 정규화(테이터가 정규화)
+        * 외래 키 참조 무결성 제약 조건 활용가능
+          * 제약 조건을 Item에 걸어서 맞출 수 있다
+        * 저장공간 효율화
+      * 단점
+        * 조회시 조인을 많이 사용, 성능 저하
+        * 저회 쿼리가 복잡함
+        * 데이터 저장시 INSERT SQL 2번 호출
   * 단일 테이블 전략
     ![](img/img309.png)
     * 논리 모델을 한 테이블로 전부 합치고 ALBUM, MOVIE, BOOK을 구분할 컬럼(DTYPE)을 둔다
@@ -2629,7 +2628,7 @@
           ...
       }
       ``` 
-      * 각 테이블바다 모든 컬럼은 둔다(중복을 허용한다)
+      * 각 테이블마다 모든 컬럼은 둔다(중복을 허용한다)
       * `@DiscriminatorColumn`이 의미가 없으므로 생략할 수 있다
       * 부모 클래스를 추상 클래스로 정의
         * `public class Item` 이라 하면 Item 을 상속과 상관없이 독단적으로 쓰는 경우가 있을 수 있다.
@@ -2698,7 +2697,7 @@
     * 공통 매핑 정보가 필요할 떄 사용(id, name)
     * 상속관계 매핑이 아니다.
     * 엔티티가 아니다.
-    * 테이블와 매핑이 아니다.
+    * 테이블과 매핑이 아니다.
       * 테이블과 관계가 없으며, 단순히 엔티티가 공통으로 사용하는 매핑 정보를 모으는 역할을 한다
       * 주로 등록일, 수정일, 등록자, 수정자 같은 전체 엔티티에서 공통으로 적용하는 정보를 모을 때 사용한다.
       * DB는 완전히 분리되어 있지만 객체 입장에서는 공통속성 필드를 상속으로 사용하고 싶은 경우 속성만 상속 받아서 사용한다
@@ -2718,7 +2717,7 @@
 
         ```Java
         @Entity
-        public class Team extends BaseEntity {
+        public class Member extends BaseEntity {
 
             ...
         }
@@ -2786,6 +2785,12 @@
 
 * # _프록시와 연관관계 관리_
   * ## _프록시_
+    * 객치는 객체 그래프로 연관된 객체들을 탐색한다.
+    * 객체가 DB에 저장되어 있으므로 연관된 객체를 마음껏 탐색하기에는 한계가 있다.
+    * JPA 구현체들을 이러한 문제를 해결해가 위해 프록시라는 기술을 사용한다.
+    * `프록시를 사용하면 연관된 객체를 처음부터 DB에서 조회하는 것이 아니라, 실제 사용하는 시점에 DB에서 조회 할 수 있다.`
+    * 하지만 자주 함께 사용하는 객체들을 JOIN을 사용해서 함께 조회하는 것이 효과적이다.
+    * JPA는 지연로딩, 즉시로딩을 지원한다
     <br>
 
     * Member Entity를 조회할 때 Team Entity도 함께 조회해야 할까?
@@ -2846,6 +2851,7 @@
             Member findMember = entityManager.getReference(Member.class, member.getId());
             System.out.println("======= getReference End Line =======");
             System.out.println("findMember.name = " + findMember.getName());
+
             System.out.println("findMember.id = " + findMember.getId());
         }
         ```
@@ -2879,8 +2885,9 @@
         findMember.id = 1
         ```
         * `entityManager.getReference()`하는 시점에는 DB에 Query가 나가지 않는다.
-        * `findMember.getId()`하는 시점에 DB에 Query가 나자기 않는다.
-          * entityManager.getReference(Member.class, `member.getId()`)로 Member Entity를 찾을때 이미 Parameter로 member.getId()를 넣을것은 Member.id 값을 안다는 의미이다. 그러므로 DB에서 값을 가져오지 않아도 Query를 날리지 않은 것이다.
+        * `findMember.getId()`하는 시점에 DB에 Query가 나가지 않는다.
+          * Entity를 Proxy로 조회(`getReference()`)할때 식별자 값(PK)을 파라미터로 전달하는데 Proxy Entity는 이 식별자 값(PK)을 보관한다.
+          * Proxy Entity는 식별자 값(PK)을 가지고 있으므로 식별자 값(PK)을 조회하는 호출(`findMember.getId()`)을 해도 Proxy를 초기화 하지 않는다
         * `findMmeber.getName()`하는 시점에 DB에 Query가 나간다
           * Member.name의 값은 DB에 저장되어 있으므로, JPA가 getNama()을 호출하는 시점에 DB에 Query를 날린다
           * 이후 findMember에 값을 채우고 출력한다
@@ -2901,7 +2908,7 @@
       ```
       * entityManager.getReference(Member.class, member.getId());로 DB에서 가져온 Member Entity의 Class 이름이 Member가 아니다?!?!?
         * entityManager.getReference()로 DB에서 가져온 Entity는 실제 Entity가 아닌 가짜 클래스 즉 `Porxy Entity`이다.
-        * Proxy Entity는 실제 Entity와 필드와 메소드 구성은 같지만 값을 비어있다.
+        * Proxy Entity는 실제 Entity와 메소드 구성은 같지만 값을 비어있다.
         * Proxy Entity는 Entity target(Reference)을 보관하고 있으며, 이는 진짜 Entity를 가리킨다.(초기에는 Entity target = null)
         * Proxy Entity를 호출하면 Proxy Entity는 실제 Entity의 메소르들 호출한다
           <br>
@@ -2915,7 +2922,7 @@
 
     * ### _프록시 객체의 초기화_
       ![](img/img315.png)
-      * entityManager.getReference(Member.class, member.getId()).getName() 호출시 Member Proxy Entity는 초기와가 된 상태가 아니라 `Entity target = null`이면 다음 순서를 진행한다.
+      * entityManager.getReference(Member.class, member.getId()).getName() 호출시 Member Proxy Entity는 초기와가 된 상태가 아니라면 `Entity target = null`이면 다음 순서를 진행한다.
         1. JPA가 영속성 컨텍스트에 Proxy Entity 초기화 요청
         2. 영속성 컨텍스트가 DB 조회
         3. 실제 Entity(Member)생성 
@@ -2956,7 +2963,7 @@
       <br>
 
       * Proxy Entity는 원본 Entity를 상속받는다.
-        * 따라서 타입 체크시 주의해야한다.(`==` 비교 실피, 대신 `instance of` 사용)
+        * 따라서 타입 체크시 주의해야한다.(`==` 비교 실패, 대신 `instance of` 사용)
           <br>
 
           ```Java
@@ -3370,7 +3377,6 @@
       <br>
 
       * 단순히 Member Entity 정보만 사용하는 비즈니스 로직
-        * println(member.getName()); 
     <br>
 
     * ### 지연 로딩 LAZY을 사용해서 프록시로 조회
@@ -3394,7 +3400,11 @@
           //Getter, Setter
       }
       ```  
-      * team Reference를 Proxy Entity로 조회한다. 즉 Member Entity만 DB에서 조회한다
+      * team Reference를 Proxy Entity로 조회한다. 
+        * EntityManagerFatory.getPersistenceUnitUtil.isLoaded(findMember.getTeam()))
+        * false
+      * 즉 Member Entity만 DB에서 조회한다
+        * EntityManager.find(Member.class, PK) 호출시 Member Entity에 해당하는 필드에 관한 Select Query가 호출되며, Member Entity와 매핑된 team 참조를 조회하기 위한 Select Query는 호출되지 않는다
         ```Java
         try {
             Member member = new Member();
