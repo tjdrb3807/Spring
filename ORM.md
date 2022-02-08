@@ -2783,119 +2783,92 @@
 <br>
 <br>
 
-* # _프록시와 연관관계 관리_
-  * ## _프록시_
-    * 객치는 객체 그래프로 연관된 객체들을 탐색한다.
-    * 객체가 DB에 저장되어 있으므로 연관된 객체를 마음껏 탐색하기에는 한계가 있다.
-    * JPA 구현체들을 이러한 문제를 해결해가 위해 프록시라는 기술을 사용한다.
-    * `프록시를 사용하면 연관된 객체를 처음부터 DB에서 조회하는 것이 아니라, 실제 사용하는 시점에 DB에서 조회 할 수 있다.`
-    * 하지만 자주 함께 사용하는 객체들을 JOIN을 사용해서 함께 조회하는 것이 효과적이다.
-    * JPA는 지연로딩, 즉시로딩을 지원한다
-    <br>
+# _프록시와 연관관계 관리_
+## _프록시_   
+>객체는 객체 그래프로 연관된 객체들을 참조를 사용해서 탐색한다.   
+하지만 객체는 DB에 저장되어 있으므로 DB로 부터 객체의 데이터를 가져오기위해 SQL을 직접 다루면 처음 실행하는 SQL에 따라 객체 그래프 탐색 범위가 정해지게되며, 객체 그래프로 연관된 객체를 탐색하기에 한계가 발생한다.   
+JPA Entity는 이러한 문제를 해결해가 위해 프록시라는 기술을 사용한다.   
+`프록시를 사용하면 연관된 객체를 처음부터 DB에서 조회하는 것이 아니라, 실제 사용하는 시점에 즉 원하는 시점에 SQL을 호출해서 DB에서 원하는 데이터를 조회 할 수 있다.`
+### _프록시 기초_ 
+__entityManager.find() vs entityManager.getReference()__   
+    
+기존까지는 영속성 컨텍스트를 통해서 데이터베이스에서 데이터를 가져오기 위해서는 `entityManager.find()`메소드를 사용했다. 이번 Chepter에서는 추가적으로 데이터베이스에서 데이터를 가져오는 `entityManager.getReference()`메소드에 대하여 알아보며 두 메소드의 차이점을 확인해보도록한다.   
 
-    * Member Entity를 조회할 때 Team Entity도 함께 조회해야 할까?
-      ![](img/img311.png) 
-      <br>
-      <br>
-      ```Java
-      try {
-          Member findMmeber = entityManager.find(Member.class, 1L);
+* `entityManager.find()`: 데이터베이스를 통해서 실제 엔티티를 조회해서 반환   
+* `entityManager.getReference()`: 데이터베이스 조회를 미루는 가짜 엔티티(Proxy Entity)를 조회해서 반환   
 
-          printMemberAndTeam(member);
-          printMember(member);
+다음 코드를 통해서 `entityManager.getReference()`의 동작 원리를 파악하도록 하자.
+* 코드 
+  ```Java
+  try {
+      System.out.println("=========== Start getReference() ===========");
+      Member proxyMemberEntity = entityManager.getReference(Member.class, 5L);
+      System.out.println("============ End getReference() ============");
 
-          transaction.commin();
-      } catch(Exception e) {
-          transaction.rollback();
-      } finally {
-          entityManager.close();
-      }
-      entityManagerFatory.colse();
+      System.out.println("ID: " + proxyMemberEntity.getId());
 
-      //어느 경우에는 Member Entity와 Team Entity를 같이 가져와서 사용
-      private static void printMemberAndTeam(Member member) {
-          String name = member.getName();
-          System.out.println("name = " + name);
+      System.out.println("=========== Start Select SQL ===========");
+      System.out.println("Username: " + proxyMemberEntity.getUsername());
+      System.out.println("=========== End Select SQL ===========");
+              
+      transaction.commit();
+  }
+  ```
+* 출력 결과와 코드 분석   
 
-          Team team = member.getTeam();
-          System.out.println("team = " + team.getMembers());
-      }
+  다음 출력 결과를 통해 세가지 사실을 파악할 수 있다. 
+  ```
+  =========== Start getReference() ===========
+  ============ End getReference() ============
+  ```
+  위의 코드작성 목적은 데이터베이스에 있는 MEMBER 테이블에서 기본 키(PK) 값이 5인 Member 엔티티를 조회해서 그 데이터를 가져오는 것이었다.   
+  그러기 위해서는 서버로부터 SELECT SQL이 나가는 것을 기대했지만 보시다시피 `entityManager.getReference(Member.class, 5L)`호출시점에 아무런 SQL문이 나가지 않았다. 이는 `getReference()`로 조회해서 반환받은것이 기존까지 사용하던 엔티티가 아닌 `프록시 엔티티`라 나타나는 현상이다.
+  ```
+  ID: 5
+  ```
+  `findMember.getId()`를 호출하는 시점에 select SQL이 호출되지 않았다.   
+  이는 데이터베이스의 엔티티를 프록시로 조회할때 자연스럽게 나타나는 출력 결과이다.   
+  기존에 `entityManager.getReference(Member.class, 5L)`을 입력해서 DB를 조회할 때 식별자 값(PK)을 파라미터로 전달했다. 이후 데이터베이스로부터 반환받는 프록시 엔티티는 이 식별자 값을 보관한다. 따라서 이미 식별자 값을 가지고 있으므로 식별자 값을 조회하는 `findMember.getId()`에서는 SQL이 호출되지 않으며, 프록시를 초기화 하지도 않는다.   
+  프록시 초기화에 대해서는 추후에 배우도록 한다.   
+  ```SQL
+  =========== Start Select SQL ===========
+  Hibernate: 
+      select
+          member0_.member_id as member_i1_1_0_,
+          member0_.locker_id as locker_i3_1_0_,
+          member0_.team_id as team_id4_1_0_,
+          member0_.username as username2_1_0_,
+          locker1_.locker_id as locker_i1_0_1_,
+          locker1_.name as name2_0_1_,
+          team2_.team_id as team_id1_4_2_,
+          team2_.name as name2_4_2_ 
+      from
+          Member member0_ 
+      left outer join
+          Locker locker1_ 
+              on member0_.locker_id=locker1_.locker_id 
+      left outer join
+          Team team2_ 
+              on member0_.team_id=team2_.team_id 
+      where
+          member0_.member_id=?
+  Username: Jeon
+  =========== End Select SQL ===========
+  ```
+  드디에 위의 코드에서 SQL문이 출력된 결과를 확인해 볼 수 있다.   
+  현재 반환받은 프록시(proxyMemberEntity)의 username필드에는 값이 존재하지 않는다. 정확히는 필드가 존재하지 않는다. 따라서 `proxyMemberEntity.getUsername()`이 호출시 username값을 DB에 조회하기 위해 select SQL이 호출된다.   
+<br> 
 
-      //어느 경우에는 Member Entity만 가져와서 사용(Team Entity 정보를 가져오고 싶지 않음)
-      private static void printMember(Member member) {
-          System.out.println("member = " + member.getName());
-      }
-      ```
-    <br>
+### _프록시 특징_   
+프록시는 실제 클래스를 상속받아서 만들어진다.
 
-    * ### _프록시 기초_
-      <br>
 
-      * entityManager.find() vs entityManager.getReference()
-      * `entityManager.find()`: 데이터베이스를 통해서 실제 Entity 객체 제회 
-      * `entityManager.getReference()`: `데이터베이스 조회를 미루는 가짜(Proxy) Entity 객체 조회`
-        ![](img/img312.png)
-        <br>
 
-        ```Java
-        try {
-            Member member = new Member();
-            member.setName("memberA");
 
-            entityManager.persist(member);
 
-            entityManager.flush();
-            entityManager.clear();
-
-            System.out.println("======= getReference Start Line =======");
-            Member findMember = entityManager.getReference(Member.class, member.getId());
-            System.out.println("======= getReference End Line =======");
-            System.out.println("findMember.name = " + findMember.getName());
-
-            System.out.println("findMember.id = " + findMember.getId());
-        }
-        ```
-        <br>
-
-        ```SQL
-        ======= getReference Start Line =======
-        ======= getReference End Line =======
-        select
-            member0_.MEMBER_ID as MEMBER_I1_3_0_,
-            member0_.createBy as createBy2_3_0_,
-            member0_.createDate as createDa3_3_0_,
-            member0_.lastModifiedBy as lastModi4_3_0_,
-            member0_.lastModifiedDate as lastModi5_3_0_,
-            member0_.USERNAME as USERNAME6_3_0_,
-            member0_.TEAM_ID as TEAM_ID7_3_0_,
-            team1_.TEAM_ID as TEAM_ID1_7_1_,
-            team1_.createBy as createBy2_7_1_,
-            team1_.createDate as createDa3_7_1_,
-            team1_.lastModifiedBy as lastModi4_7_1_,
-            team1_.lastModifiedDate as lastModi5_7_1_,
-            team1_.name as name6_7_1_ 
-        from
-            Member member0_ 
-        left outer join
-            Team team1_ 
-                on member0_.TEAM_ID=team1_.TEAM_ID 
-        where
-            member0_.MEMBER_ID=?
-        findMember.name = memberA
-        findMember.id = 1
-        ```
-        * `entityManager.getReference()`하는 시점에는 DB에 Query가 나가지 않는다.
-        * `findMember.getId()`하는 시점에 DB에 Query가 나가지 않는다.
-          * Entity를 Proxy로 조회(`getReference()`)할때 식별자 값(PK)을 파라미터로 전달하는데 Proxy Entity는 이 식별자 값(PK)을 보관한다.
-          * Proxy Entity는 식별자 값(PK)을 가지고 있으므로 식별자 값(PK)을 조회하는 호출(`findMember.getId()`)을 해도 Proxy를 초기화 하지 않는다
-        * `findMmeber.getName()`하는 시점에 DB에 Query가 나간다
-          * Member.name의 값은 DB에 저장되어 있으므로, JPA가 getNama()을 호출하는 시점에 DB에 Query를 날린다
-          * 이후 findMember에 값을 채우고 출력한다
-            * 여기서 값을 채운다는 표현을 사용하였는데 사실을 조금 더 복잡한 매커니즘이 존재한다. 그 매커니즘에 대해서 알아보도록 하자.
-    <br>
-    <br>
-
-    * ### _프록시 특징_
+  ![](img/img312.png)
+ 
+   * ### _프록시 특징_
       * 실제 클래스를 상속 받아서 만들어진다
         ![](img/img313.png)
       <br>
@@ -4404,113 +4377,121 @@ delete form Child where id=?
 * ## _값 타입의 비교_
   * ### 값 타입의 비교
     * 값 타입: 인스턴스가 달라도 그 안에 값이 같으면 같은 것으로 봐야 한다
-      ```Java
-      int a = 10;
-      int b = 10;
-      ``` 
-      ```Java
-      Address a = new Address("서울시");
-      Address b = new Address("서울시")'
-      ```
     * `동일성(identity)비교`: 인스턴스의 참조 값을 비교, `==`사용
       * 기본 타입에서 == 비교는 true 가 나온다
       * 객체 타입에서 == 비교는 false가 나온다
     * `동등성(equivalence)비교`: 인스턴스의 값을 비교, `equals()`사용
     * 값 타입은 a.equals(b)를 사용해서 동등성 비교를 해야한다.
     * 값 타입의 equals()메소드를 적적하게 재정의(주로 모든 필드 사용)
+      ```Java
+      public class ValueMain {
 
-```Java
-package hellojpa;
+          public static void main(String[] args) {
 
-public class ValueMain {
+              int a = 10;
+              int b = 20;
 
-    public static void main(String[] args) {
+              System.out.println("a == b: " + (a == b));
 
-        int a = 10;
-        int b = 10;
+              Address address1 = new Address("city", "street", "zipcode");
+              Address address2 = new Address("city", "street", "zipcode");
 
-        System.out.println("a == b: " + (a == b));
+              System.out.println("address1 == address2: " + (address1 == address2));
 
-        Address address1 = new Address("city", "street", "zipcode");
-        Address address2 = new Address("city", "street", "zipcode");
+              System.out.println("address1 equals address2: " + (address1.equals(address2)));
+          }
+      }
+      ```
+      ```
+      a == b: true
+      address1 == address: false
+      address1 equals address2: false
+      ```
+      * equals() 의 default: `==`
+      * equals() 메소드를 Override(재정의)히야한다.   
+        ```Java
+        @Embeddable
+        public class Address {
 
-        System.out.println("address1 == address2: " + (address1 == address2));
-    }
-}
+            private String city;
+            private String street;
+            private String zipcode;
 
-```
-```
-a == b: true
-address1 == address2: false
-```
-동일성 비교와 동등성 비교를 구분해서 사용해야 한다
-```Java
-package hellojpa;
+            private Member member;
 
-public class ValueMain {
+            public Address() {
+            }
 
-    public static void main(String[] args) {
+            public Address(String city, String street, String zipcode) {
+                this.city = city;
+                this.street = street;
+                this.zipcode = zipcode;
+            }
 
-        int a = 10;
-        int b = 10;
-
-        System.out.println("a == b: " + (a == b));
-
-        Address address1 = new Address("city", "street", "zipcode");
-        Address address2 = new Address("city", "street", "zipcode");
-
-        System.out.println("address1 == address2: " + (address1 == address2));
-        System.out.println("address1 equals address2: " + (address1.equals(address2)));
-    }
-}
-
-```
-```
-a == b: true
-address1 == address2: false
-address1 equals address2: false
-```
-false가 나오네..? 지금은 false가 나오는게 맞다!!
-equal의 default는 == 이기 떄문이다 따라서 Overrride 해야한다 재정의를 어떻게 하느냐가 문제
-```JAva
-@Embeddable
-public class Address {
-
-    private String city;
-    private String street;
-    private String zipcode;
-
-    private Member member;
-
-    public Address() {
-    }
-
-    public Address(String city, String street, String zipcode) {
-        this.city = city;
-        this.street = street;
-        this.zipcode = zipcode;
-    }
-
-    //equals는 웬만하면 default로 생성
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Address address = (Address) o;
-        return Objects.equals(city, address.city) && Objects.equals(street, address.street) && Objects.equals(zipcode, address.zipcode) && Objects.equals(member, address.member);
-    }
-```
-```
-a == b: true
-address1 == address2: false
-address1 equals address2: true
-```
-값 타입들의 비교는 항상 equals를 사용해야 한다
-<br>
-<br>
-
+            //equals는 웬만하면 default로 생성
+            @Override
+            public boolean equals(Object o) {
+                if (this == o) return true;
+                if (o == null || getClass() != o.getClass()) return false;
+                Address address = (Address) o;
+                return Objects.equals(city, address.city) && Objects.equals(street, address.street) && Objects.equals(zipcode, address.zipcode) && Objects.equals(member, address.member);
+            }
+        ```     
+        ```
+        a == b: true
+        address1 == address2: false
+        address1 equals address2: true
+        ```
+        * 값 타입들의 비교는 항상 equals를 사용해야 한다
+#
 * ## _값 타입 컬렉션_
-* ### 값 타입 컬렉션
+  ![](img/img329.png) 
+  * Member Entity가 favoritFoods, addressHistory 두 가지 값타입을 컬렉션으로 가지고 있다.
+  * ### 값 타입 컬렉션
+    * 값 타입을 하나 이상 저장할 떄 사용한다.
+    * `@ElemnetCollection`, `@CollectionTable`을 사용한다.
+    * 데이터베이스는 컬렉션을 같은 테이블에 저장할 수 없다.
+    * 컬렉션을 저장하기 위한 별도의 테이블이 필요하다.
+  #
+  * ### 값 타입 컬렉션 사용
+    * 값 타입 저장 예제
+    * 값 타입 조회 예제
+      * 값 타입 컬렉션도 지연 로딩 전략을 사용한다.
+    * 값 타입 수정 예제
+    * 참고: 값 타입 컬렉션을 영속성 전에(Cascade) + 고아 객체 제거 기능을 필수로 가진다고 볼 수 있다.
+  #
+  * ### 값 타입 컬렉션의 제약사향
+    * 값 타입은 엔티티와 다르게 식별자 개념이 없다.
+    * 값은 변경하면 추적이 어렵다.
+    * 값 타입 컬렉션에 변경 사항이 발생하면, 주인 엔티티와 연관된 모든 데이터를 삭제하고, 값 타입 컬렉션에 있는 현재 값을 모두 다시 저장한다.
+    * 값 타입 컬렉션을 매핑하는 테이블은 모든 컬럼을 묶어서 기본 키를 구성해야 한다
+      * `null 입력X, 중복 저장X`
+  #
+  * ### 값 타입 컬렉션 대안
+    * 실무에서는 상황에 따라 `값 타입 컬렉션 대신에 일대다 관계를 고려`한다.
+    * 일대다 관계를 위한 엔티티를 만들고, 여기에서 값 타입을 사용한다.
+    * 영속성 전이(Cascade) + 고아 객체 제거를 사용해서 값 타입 컬렉션 처럼 사용한다.
+    * $ex.$ AddressEntity
+  #
+  * ### 정리
+    * `엔티티 타입의 특징` 
+      * 식별자O
+      * 생명 주기 관리
+      * 공유
+    * `값 타입 특징`
+      * 식별자X
+      * 생명 주기를 Entity에 의존
+      * 공유하지 않는 것이 안전(복사해서 사용)
+      * 불변 객체로 만드는 것이 안전
+    * 값 타입은 정말 값 타입이라 판단될 떄만 사용하도록 한다. 
+    * 엔티티와 값 타입을 혼동해서 엔티티를 값 타입으로 만들어서는 안된다.
+    * 식별자가 필요하고, 지속해서 값을 추적, 변경해야 한다면 그것은 값 타입이 아닌 엔이이이다.
+#
+* ## _실전 예제 - 6.값 타입 매핑_
+
+
+
+
 값 타입 컬렉션이란 값 타입을 컬렉션에 담아서 사용하는 것을 의미한다
 기존에 엔티티를 컬렉션으로 사용한 적이 있다(Parent)에서 확인
 이번에는 값타입을 컬렉션으로 넣어서 쓰는것을 값타입 컬렉션이라 한다
