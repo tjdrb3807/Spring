@@ -2785,7 +2785,7 @@
 
 # _프록시와 연관관계 관리_
 ## _프록시_   
->객체는 객체 그래프로 연관된 객체들을 참조를 사용해서 탐색한다.   
+객체는 객체 그래프로 연관된 객체들을 참조를 사용해서 탐색한다.   
 하지만 객체는 DB에 저장되어 있으므로 DB로 부터 객체의 데이터를 가져오기위해 SQL을 직접 다루면 처음 실행하는 SQL에 따라 객체 그래프 탐색 범위가 정해지게되며, 객체 그래프로 연관된 객체를 탐색하기에 한계가 발생한다.   
 JPA Entity는 이러한 문제를 해결해가 위해 프록시라는 기술을 사용한다.   
 `프록시를 사용하면 연관된 객체를 처음부터 DB에서 조회하는 것이 아니라, 실제 사용하는 시점에 즉 원하는 시점에 SQL을 호출해서 DB에서 원하는 데이터를 조회 할 수 있다.`
@@ -2796,6 +2796,22 @@ __entityManager.find() vs entityManager.getReference()__
 
 * `entityManager.find()`: 데이터베이스를 통해서 실제 엔티티를 조회해서 반환   
 * `entityManager.getReference()`: 데이터베이스 조회를 미루는 가짜 엔티티(Proxy Entity)를 조회해서 반환   
+
+기존까지는 find()메소드를 호출해서 엔티티를 반환받아 사용해왔다. 그렇다면 getReference()를 호출해서 반환받은 객체는 무엇일까?   
+```Java
+try {
+    Member proxyMemberEntity = entityManager.getReference(Member.class, 5L);
+      
+    System.out.println("proxyMemberEntity = " + proxyMemberEntity.getClass());
+
+    transaction.commit();
+}  
+```
+```
+proxyMemberEntity = class hellojpa.relationmapping.Member$HibernateProxy$XtW2jaMf
+```
+>보시다시피 getReferencr()로 조회해서 반환받은 객체의 클레스 이름은 기존까지 사용해도던 일반적인 엔티티의 이름이 아닌것을 확인할 수 있다.   
+`entityManger.getReference()`를 호출하여 데이터베이스로부터 가져온 엔티티는 실제 엔티티가 아닌 가짜 즉 `프록시 엔티티`이다.    
 
 다음 코드를 통해서 `entityManager.getReference()`의 동작 원리를 파악하도록 하자.
 * 코드 
@@ -2821,12 +2837,12 @@ __entityManager.find() vs entityManager.getReference()__
   =========== Start getReference() ===========
   ============ End getReference() ============
   ```
-  위의 코드작성 목적은 데이터베이스에 있는 MEMBER 테이블에서 기본 키(PK) 값이 5인 Member 엔티티를 조회해서 그 데이터를 가져오는 것이었다.   
+  >위의 코드작성 목적은 데이터베이스에 있는 MEMBER 테이블에서 기본 키(PK) 값이 5인 Member 엔티티를 조회해서 그 데이터를 가져오는 것이었다.   
   그러기 위해서는 서버로부터 SELECT SQL이 나가는 것을 기대했지만 보시다시피 `entityManager.getReference(Member.class, 5L)`호출시점에 아무런 SQL문이 나가지 않았다. 이는 `getReference()`로 조회해서 반환받은것이 기존까지 사용하던 엔티티가 아닌 `프록시 엔티티`라 나타나는 현상이다.
   ```
   ID: 5
   ```
-  `findMember.getId()`를 호출하는 시점에 select SQL이 호출되지 않았다.   
+  >`findMember.getId()`를 호출하는 시점에 select SQL이 호출되지 않았다.   
   이는 데이터베이스의 엔티티를 프록시로 조회할때 자연스럽게 나타나는 출력 결과이다.   
   기존에 `entityManager.getReference(Member.class, 5L)`을 입력해서 DB를 조회할 때 식별자 값(PK)을 파라미터로 전달했다. 이후 데이터베이스로부터 반환받는 프록시 엔티티는 이 식별자 값을 보관한다. 따라서 이미 식별자 값을 가지고 있으므로 식별자 값을 조회하는 `findMember.getId()`에서는 SQL이 호출되지 않으며, 프록시를 초기화 하지도 않는다.   
   프록시 초기화에 대해서는 추후에 배우도록 한다.   
@@ -2855,46 +2871,32 @@ __entityManager.find() vs entityManager.getReference()__
   Username: Jeon
   =========== End Select SQL ===========
   ```
-  드디에 위의 코드에서 SQL문이 출력된 결과를 확인해 볼 수 있다.   
+  >드디에 위의 코드에서 SQL문이 출력된 결과를 확인해 볼 수 있다.   
   현재 반환받은 프록시(proxyMemberEntity)의 username필드에는 값이 존재하지 않는다. 정확히는 필드가 존재하지 않는다. 따라서 `proxyMemberEntity.getUsername()`이 호출시 username값을 DB에 조회하기 위해 select SQL이 호출된다.   
-<br> 
-
 ### _프록시 특징_   
-프록시는 실제 클래스를 상속받아서 만들어진다.
+프록시는 실제 클래스를 상속받아 만들어진 엔티티이므로 실제 클래스와 겉모양이 같다.  
+이 말은 즉, 실제 클래의 필드와 메소드를 프록시도 똑같이 구성하고 있다고 할 수 있는데 정확한 프록시의 구성은 실제 클레스와는 조금 다르다.   
+
+![](img/img314.png) 
+위의 그림을 보면 프록시는 실제 클래스에 존재하는 메소드는 동일하게 가지고 있지만 `Entity target` 이라는 실제 클래스에서는 볼 수 없었던 참조필드가 보인다.   
+이는 실제 엔티티를 가리키는 즉 참조하는 역할을 하며 초기값은 `null`로 세팅되어있다.  
+또한 `getReference()`로 반환받은 프록시 엔티티의 메소드를 호출하면 프록시 엔티티는 실제 엔티티에게 권한읜 위임하여 실제 엔티티의 메소드가 호출된다.   
+하지만 프록시 엔티티의 `Entity target`의 초기값은 `null`로 세팅되어있는데 어떻게 실제 엔티티를 찾아서 `Entity target`의 값을 초기화하는 것일까?   
+이는 뒤에 나오는 프록시 객체의 초기와 에서 알아도보록 한다.  
+참고로 개발자 입장에서는 실제 엔티티와 프록시 엔티티를 구분하지 않고 사용하면 된다.   
+
+### _프록시 객체의 초기화_   
+![](img/img315.png)
 
 
 
+  
 
-
-  ![](img/img312.png)
- 
-   * ### _프록시 특징_
-      * 실제 클래스를 상속 받아서 만들어진다
-        ![](img/img313.png)
-      <br>
-
-      ```Java
-      System.out.println("findMember = " + findMember.getClass());
-      ``` 
-      ```SQL
-      findMember = class hellojpa.Member$HibernateProxy$fm6cNgm8
-      ```
-      * entityManager.getReference(Member.class, member.getId());로 DB에서 가져온 Member Entity의 Class 이름이 Member가 아니다?!?!?
-        * entityManager.getReference()로 DB에서 가져온 Entity는 실제 Entity가 아닌 가짜 클래스 즉 `Porxy Entity`이다.
-        * Proxy Entity는 실제 Entity와 메소드 구성은 같지만 값을 비어있다.
-        * Proxy Entity는 Entity target(Reference)을 보관하고 있으며, 이는 진짜 Entity를 가리킨다.(초기에는 Entity target = null)
-        * Proxy Entity를 호출하면 Proxy Entity는 실제 Entity의 메소르들 호출한다
-          <br>
           
-          ![](img/img314.png) 
-          * `entityManager.getReference(Member.class, member.getId()).getName()`을 호출하면 Proxy Entity에 있는 `Entity target = Member Entity`의 `getName()` 메소드를 호출한다
-          * 하지만 Proxy Entity의 Entity target은 초기값이 null이다.(이전에 DB에서 조회한 기록이 없기 때문이다)
-      * 사용하는 입장에서는 진짜 Entity인지 Proxy Entity인지 구분자히 않고 사용하면 된다(이론상)
-    <br>
-    <br>
-
+ 
+* 
     * ### _프록시 객체의 초기화_
-      ![](img/img315.png)
+      
       * entityManager.getReference(Member.class, member.getId()).getName() 호출시 Member Proxy Entity는 초기와가 된 상태가 아니라면 `Entity target = null`이면 다음 순서를 진행한다.
         1. JPA가 영속성 컨텍스트에 Proxy Entity 초기화 요청
         2. 영속성 컨텍스트가 DB 조회
@@ -3750,14 +3752,200 @@ __entityManager.find() vs entityManager.getReference()__
   <br>
 
   * ## _영속성 전이: CASCADE_
+    * ### 영속성 전이: CASCADE
+      * 특정 엔티티를 영속 상태(entityManager.persist())로 만들 때 연관된 엔티티도 함께 영속 상태로 만들고 싶을 때 사용한다.
+      * 예: 부모 엔티티를 저장할 때 자식 엔티티도 함께 저장
+      ```Java
+      @Entity
+      public class Parent {
+
+          @Id
+          @Column(name = "parent_id")
+          @GeneratedValue
+          private Long id;
+
+          @OneToMany(mappedBy = "parent")
+          private List<Child> childList = new ArrayList<>();
+
+          private String name;
+
+          //연관관계 편의 메소드
+          public void addChile(Chile chile) {
+              childList.add(child);
+              child.setParent(this);
+          }
+
+          //default Constructor
+
+          //Getter, Setter
+      } 
+      ``` 
+      ```Java
+      @Entity
+      public class Child {
+          
+          @Id
+          @Column(name = "child_id")
+          @GeneratedValue
+          private Long id;
+
+          @ManyToOne
+          @JoinColumn(name = "parent_id")
+          private Parent parent;
+
+          private String name;
+
+          //default Constructor
+
+          //Getter, Setter
+      }
+      ```
+      ```Java
+      try {
+          Child child1 = new Child();
+          Chile child2 = new Child();
+
+          Parent parent = new Parent();
+          parent.addChild(child1);
+          parent.addChild(child2);
+
+          System.out.println("========= Persist Start =========");
+          entityManager.persist(parent);
+          entityManager.persist(child1);
+          entityManager.persist(child2);
+          System.out.println("========= Persist End =========");
+      }
+      ```
+      * 위의 코드는 부모 엔티티(Parent)중심적인 설계가 아니다.
+      * 코드를 짤때 부모 엔티티가 자식 엔티티를 관리하며 entityManager.persist(parent)한 번의 호출로 Child Entity들은 자동으로 영속상태가 됐으면 한다.
+    * ### 영속성 전이: 저장
+      ![](img/img331.png) 
+      ```Java
+      @Entity
+      public class Parent {
+
+          @Id
+          @Column(name = "parent_id")
+          @GeneratedValue
+          private Long id;
+
+          @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
+          private List<Child> childList = new ArrayList<>();
+
+          private String name;
+
+          public void addChild(Child child){
+              childList.add(child);
+              child.setParent(this);
+          }
+
+          //default Construtor
+
+          //Getter, Setter
+      } 
+      ``` 
+      ```Java
+      try {
+          Child child1 = new Child();
+          Child child2 = new Child();
+
+          Parent parent = new Parent();
+          parent.addChild(child1);
+          parent.addChild(child2);
+
+          entityManager.persist(parent);
+
+          transaction.commit();
+      }
+      ```
+    * ### 영속성 전이: CASCADE - 주의!
+      * 영속성 전이는 연관관계 매핑을 하는 것과는 아무 관련이 없다.
+      * 엔티티를 영속화할 떄 연관된 엔티티도 함께 영속화하는 편리함을 제공할 뿐이다.
+      * 그렇다면 언제 사용하는가?
+        * 자식엔티티가 하나의 부모 엔티티에 의해서만 관리될 떄는 유용하지만, 자식 엔티티가 하나의 부모 엔티티가 아닌 여러 부모 엔티티에 의하여 관리되어진다면 CASCADE를 사용할 경우 운영이 너무 힘들어지기 때문에 전부 따로 관리해야 한다
+        * `즉 소유가자 하나일 때 CASECAED를 사용해도 좋다`
+        * 자식 엔티티가 단일 부모 엔티티에 종속절일 때 보통 라이프 사이클이 똑같으므로 CASCASD를 사용하기에 적합하다.
+        * 즉 CASCADE를 사용 적합성에는 두 가지 전재가 깔린다
+          * 단일 소유자
+          * 라이브 사이클이 같음
+    * ### CASCADE의 종류
+      * `ALL`: `모두 적용`
+      * `PERSIST`: `영속`
+      * `REMOVE`: `삭제`
+      * MERGE: 병합
+      * PERRESH: PEFRESH
+      * DETACH: DETACH
   <br>
   <br>
 
   * ## _고아 객체_
+    * ### 고아 객체
+      * 고아 객체 제거: 부모 엔티티와 연관관계가 끊어진 자식 엔티티를 자동으로 삭제
+        ```Java
+        @Entity
+        public class Parent {
+
+            @Id
+            @Column(name = "parent_id")
+            @GeneratedValue
+            private Long id;
+
+            @OneToMany(mappedBy = "parent", cascade = CascasdType.ALL,
+            orphanRemoval = true)
+            private List<Child> childList = new ArrayList<>();
+
+            private String name;
+
+            public void addChild(Child child) {
+                childList.add(child);
+                child.setParent(this);
+            }
+
+            //default Constructor
+
+            //Getter, Setter
+        }
+        ``` 
+        ```Java
+        try {
+            Child child1 = new Child();
+            Child child2 = new Child();
+
+            Parent parent = new Parent();
+            parent.addChild(child1);
+            parten.addChild(child2);
+
+            entityManger.persist(parent);
+
+            entityManger.flush();
+            entityManger.clear();
+
+            Parent findParent = entityManager.find(Parent.class, parent.getId());
+            findParent.getChildList().remove(0);
+
+            transaction.commit();
+        }
+        ```
+      * `orthanRemoval = true`
+      * Parent parent1 = em.find(Parent.class, id);
+      * parent1.getChildren().remove(0); //자식 엔티티를 컬렉션에서 제거
+      * DELETE FROM CHILD WHERE ID = ?
+    * ### 고아 객체  - 주의
+      * 참조가 제거된 엔티티는 다른 곳에서 참조하지 않는 고아 객체로 보고 삭제하는 기능
+      * `참조하는 곳이 하나일 떄 사용해야 한다`
+      * `특정 엔티티가 개인 소유할 떄 사용한다`
+      * @OneToMany, @OneToMany만 가능
+      * 참고
+        * 개념적으로 부모를 제거하면 자식은 고아가 된다. 따라서 고아 객체 제거 기능을 활성화 하면, 부모를 제거할 때 자식도 함께 제거된다. 이것은 CasecadeType.REMOVE 처럼 도작한다
   <br>
   <br>
 
   * ## _영속석 전이 + 고아객체, 생명주기_
+    * ### 영속적 전이 + 고아 객체, 생명주기
+      * `CascadeType.ALL + orphanRemovel=true`
+      * 스스로 생명주기를 관리하는 엔티티는 em.persist()로 영속화, em.remove()로 제거
+      * 두 옵션을 모두 활성화 하면 부모 엔티티를 통해서 자식의 생명 주기를 관리할 수 있따
+      * 도메인 주도 설계(DDD)의 Aggregate Root개념을 구현할 떄 유용하다
 
 
 
@@ -3808,200 +3996,46 @@ N+1 문제가 발생하지 않는다
 즉 N+1문제 대안법은 
 모든 연관관계를 지연로딩으로 전부 세팅한다 그 이후 세가지 방법이 존재한다
 가장 기본적인 방법은  jPQL fetch join: run time에 내가 원하는 애들을 동적으로 선택해서 한번에 가져온다  
-  * ### 지연 로딩 활용
-지금부터 설명은 굉장히 이론적인 것이며 실무에서는 다 지연로딩으로 발라야 한다
-  * ### 영속성 전이: CASCAED
-* 영속성 전이: 저장
-```Java
-package hellojpa;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-
-@Entity
-public class Parent {
-
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @OneToMany(mappedBy = "parent")
-    private List<Child> childList = new ArrayList<>();
-
-    //연관관계 펴의 메소드
-    public void addChild(Child child) {
-        childList.add(child);
-        child.setParent(this);
-    }
-
-
-    private String name;
-}
-```
-```JAva
-package hellojpa;
-
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.Id;
-
-@Entity
-public class Child {
-
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @ManyToOne
-    @JoinColumn(name = "parent_id")
-    private Parent parent;
-
-    private String name;
-}
-
-```
-```Java
-        try {
-            Child child1 = new Child();
-            Child child2 = new Child();
-
-            Parent parent = new Parent();
-            parent.addChild(child1);
-            parent.addChild(child2);
-
-            System.out.println("====== Persist Start ========");
-            em.persist(parent);
-            em.persist(child1);
-            em.persist(child2);
-            System.out.println("====== Persist End ========");
-
-        }
-```
-```SQL
-persist 3번 호출
-```
-parent 중심으로 개발을 하고있지 않은것 같은 느낌이 든다
-코드를 짤때 페어런트 중심으로 코드를 짜고 싶다 페어런트와 차일드를 관래해주었으면 좋겠따
-페어런트를 persist 할떄 차일드는 자동으로 persist 됏으면 좋겟따
-```Java
-@Entity
-public class Parent {
-
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL)
-    private List<Child> childList = new ArrayList<>();
-
-```
-```JAva
-try {
-            Child child1 = new Child();
-            Child child2 = new Child();
-
-            Parent parent = new Parent();
-            parent.addChild(child1);
-            parent.addChild(child2);
-
-            System.out.println("====== Persist Start ========");
-            em.persist(parent);
-            System.out.println("====== Persist End ========");
-
-        }
-```
-```SQL
-child 로 persist 된 것을 확인할 수 잇다(insert)
-```
-언제 쓰는가?
-자식이 하나의 부보에 의해서만 관래 될떄는 유용하지만
-자식이 하나의 부모가 아닌 여러 부모에 의하여 관리되며진다면 이 경우는 사용하면 안됟다
-즉 소유가자 하나일떄(라고 표현)이것을 아용해도 좋다
-그런데 다른 애들이 child를 안게되는 순간 이것을 사용하명 안된다 운영이 너무 힘들어진다..
-이때는 전부 따로따로 관리해야 한다 
-단일 엔티티에 종속적일 떄는 보통 라이프 사이클이 똑같기 때문에 사용해도 괜찮다
-즉 전재가 두가지를 만족할 떄 사용해야 하느데 라이브 사이클이 똑같을 떄 단일 소유자 일떄 사용해도 된다 
-  * ### 고아 객체
-고아가 되면 지워진다
-```Java
-
-@Entity
-public class Parent {
-
-    @Id
-    @GeneratedValue
-    private Long id;
-
-    @OneToMany(mappedBy = "parent", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Child> childList = new ArrayList<>();
-
-```
-```Java
-try {
-            Child child1 = new Child();
-            Child child2 = new Child();
-
-            Parent parent = new Parent();
-            parent.addChild(child1);
-            parent.addChild(child2);
-
-            System.out.println("====== Persist Start ========");
-            em.persist(parent);
-            System.out.println("====== Persist End ========");
-
-            em.flush();
-            em.clear();
-
-            Parent findParent = em.find(Parent.class, parent.getId());
-            findParent.getChildList().remove(0);
-
-        }
-``` 
-```SQL
-delete form Child where id=?
-```
-  * ### 영속성 전이 + 고아 객체, 생명주기
-  * ### 실전 예제 - 5.연관관계 관리 
 
 ---
 ---
 <br>
 <br>
 
-* # _값 타입_     
+# _값 타입_     
+## _기본값 타입_
+* ### JPA의 데이터 타입 분류
+  JPA의 최상위 타입으로는 `엔티티 타입`, `값 타입`이 존재한다.
+  * `엔티티 타입`
+    * `@Entity`로 정의하는 객체
+    * 데이터가 변해도 식별자로 지속해서 추적이 가능하다.
+      * 회원 Entity의 키나 나이 값을 변경해도 실별자로 인식이 가능하다
+  * `갑 타입`
+    * int, Integer, String처럼 단순히 값으로 사용하는 자바 기본 타입이나 객체
+    * 식벌자가 없고 값만 있으므로 변경시 추적이 불가능하다.
+      * 숫자 100을 200으로 변경하면 완전히 다른 값으로 대체된다.   
 <br>
 
-* ## _기본값 타입_
-  * ### JPA의 데이터 타입 분류
-    * JPA의 최상위 타입으로는 `엔티티 타입`, `값 타입`이 존재한다.
-    * `엔티티 타입`
-      * `@Entity`로 정의하는 객체
-      * 데이터가 변해도 식별자로 지속해서 추적이 가능하다.
-        * 회원 Entity의 키나 나이 값을 변경해도 실별자로 인식이 가능하다
-    * `갑 타입`
-      * int, Integer, String처럼 단순히 값으로 사용하는 자바 기본 타입이나 객체
-      * 식벌자가 없고 값만 있으므로 변경시 추적이 불가능하다.
-        * 숫자 100을 200으로 변경하면 완전히 다른 값으로 대체된다.   
-  #  
-  * ### 값 타입 분류
-    * 값 타입에는 `기본값 타입`과 `임베디드 타입`, `컬렉션 값 타입`이 존재한다.
-    * `기본값 타입`
-      * 자바 기본 타입(int, double, ...)
-        * 자바가 제공하는 기본적인 값을 세팅해서 사용할 수 있는 타입
-      * 래퍼 클래스(Integer, Long, ...)
-      * String
-    * `임베디드 타입`(Embedded Type, 복합 값 타입)
-    * `컬렉션 값 타입`(Collection Value Type)
-      * 임베디드 타입과 컬렉션 값 타입은 JPA에서 내부적인 특정 속성을 정의해서 사용해야 한다
-  # 
-  * ### 기본값 타입
-    * $ex.$ String name, int age ...
-    * `생명주기를 Entity에 의존한다.`
-      * $ex.$ 회원을 삭제하면 이름, 나이 필드도 함께 삭제된다.
-    * `값 타입은 공유해서는 안된다`
-      * $ex.$ 회원 이름 변경시 다른 회원의 이름도 함께 변경되면 안된다.
-      * $ex.$ Side Effect
+* ### 값 타입 분류
+  값 타입에는 `기본값 타입`과 `임베디드 타입`, `컬렉션 값 타입`이 존재한다.
+  * `기본값 타입`
+    * 자바 기본 타입(int, double, ...)
+      * 자바가 제공하는 기본적인 값을 세팅해서 사용할 수 있는 타입
+    * 래퍼 클래스(Integer, Long, ...)
+    * String
+  * `임베디드 타입`(Embedded Type, 복합 값 타입)
+  * `컬렉션 값 타입`(Collection Value Type)   
+임베디드 타입과 컬렉션 값 타입은 JPA에서 내부적인 특정 속성을 정의해서 사용해야 한다   
+<br>
+
+* ### 기본값 타입   
+  $ex.$ String name, int age ...   
+  * `생명주기를 Entity에 의존한다.`   
+    $ex.$ 회원을 삭제하면 이름, 나이 필드도 함께 삭제된다.
+  * `값 타입은 공유해서는 안된다`   
+    $ex.$ 회원 이름 변경시 다른 회원의 이름도 함께 변경되면 안된다.   
+    $ex.$ Side Effect
   # 
   * ### 참고: 자바의 기본 타입은 절대 공유X
     * int, double같은 기본 타입(Primitive Type)은 절대 공유되서는 안된다.
@@ -4689,8 +4723,755 @@ remove에서 old1을 지웠다 old2랑 newCity1이 남아있다
 <br>
 
 * ## _실전 예제 - 6.값 타입 매핑_
-<br>
-<br>
+---
+---
+# _객체지향 쿼리 언어(JPQL)_
+## _객체지향 쿼리 언어 소개_
+* JPA는 다양한 쿼리 방법을 지원   
+* JPQL1   
+```Java
+try {
+    List<Member> result = entityManager.createQuery("select m from Member m where m.username like '%kiim%'",
+                    Member.class)
+            .getResultList();
+    for (Member member : result) {
+        System.out.println("member = " + member);
+    }
+
+    transaction.commit();
+}
+```
+JPQL문에서 Member는 테이블이 아닌 Entity이다
+```SQL
+Hibernate: 
+    /* select
+        m 
+    from
+        Member m 
+    where
+        m.username like '%kiim%' */ select
+            member0_.member_id as member_i1_1_,
+            member0_.locker_id as locker_i3_1_,
+            member0_.team_id as team_id4_1_,
+            member0_.username as username2_1_ 
+        from
+            Member member0_ 
+        where
+            member0_.username like '%kiim%'
+```
+>주석으로 JPQL이 보인다   
+"select m from Member m where m.username like '%kiim%'"은 엔티티를 대상으로 쿼리를 한 것이다   
+실제 SQL로 번역이 되서 실행된다   
+엔티티의 매핑정보를 확인해서 적절한 SQL은 만들어낸다   
+* ### _Criteria 소개_   
+위에서 친 "select m from Member m where m.username like '%kiim%'"코드는 인텔리제이가 도와줘서 그런것이지 사실은 단순한 String 이다   
+단순 문자이므로 동적 쿼리를 만들기 엄청 어렵다   
+이런 난관의 대안법이 Criteria 이다. 꼭 이 난관 뿐 아니라도 다른 장점들도 존재한다    
+```Java
+try {
+    CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+    CriteriaQuery<Member> query = criteriaBuilder.createQuery(Member.class);
+
+    Root<Member> m = query.from(Member.class);
+
+    CriteriaQuery<Member> cq = query.select(m).where(criteriaBuilder.equal(m.get("username"), "kim"));
+    List<Member> result = entityManager.createQuery(cq).getResultList();
+
+    transaction.commit();
+}
+```
+>쿼리를 코드로 짜고있다   
+```SQL
+Hibernate: 
+    /* select
+        generatedAlias0 
+    from
+        Member as generatedAlias0 
+    where
+        generatedAlias0.username=:param0 */ select
+            member0_.member_id as member_i1_1_,
+            member0_.locker_id as locker_i3_1_,
+            member0_.team_id as team_id4_1_,
+            member0_.username as username2_1_ 
+        from
+            Member member0_ 
+        where
+            member0_.username=?
+```
+자바 코드로 SQL문을 짜기 떄문에 엄청난 장점이 있다   
+예를 들어 오타가 발생하면 컴파일러 레벨에서 오류를 잡을 수 있다   
+또하나의 장점은 조건문 등을 황용해서 동적 쿼리를 짜기에 훨신 수월하다   
+하지만 단점은 SQL스럽지 못하다는 점이다   
+실무에서는 잘 사용하지 않는다.. 코드를 보기 어려우며 유지보수가 힘들다   
+* ### _QueryDSL 소개_   
+* ### _네이티브 SQL 소개_   
+```Java
+try {
+    entityManager.createNativeQuery("select member_id, locker_id, team_id, username from MEMBER")
+            .getResultList();
+
+    transaction.commit();
+}
+```
+```SQL
+Hibernate: 
+    /* dynamic native SQL query */ select
+        member_id,
+        locker_id,
+        team_id,
+        username 
+    from
+        MEMBER
+```   
+* ### _JDBC 직접 사용, SpringJdbcTemplate 등_   
+단 영속성 컨텍스트를 적절한 시점에 강제로 플러시 필요   
+영속석 컨텍스트는 entityManager.flush()를 호출해야 쿼리를 날려서 DB에 데이터가 저장되게 된다   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("memberA");
+
+    entityManager.persist(member);
+
+    //flush()가 호출되는 시점 --> commit()호출시, Query 날라갈때
+    System.out.println(" ===========================");
+    List<Member> resultList = entityManager.createNativeQuery("select member_id, locker_id, team_id, username from MEMBER", Member.class)
+            .getResultList();
+    System.out.println(" ===========================");
+
+    for (Member member1 : resultList) {
+        System.out.println("member1 = " + member1);
+    }
+
+    transaction.commit();
+}
+```
+```SQL
+===========================
+Hibernate: 
+    /* insert hellojpa.relationmapping.Member
+        */ insert 
+        into
+            Member
+            (locker_id, team_id, username, member_id) 
+        values
+            (?, ?, ?, ?)
+```
+>flush()가 먼저 되고 Query가 호출된다   
+flush()는 commit()직전에 호출되기도 하지만 entityManager를 통해서 Query가 날라갈때고 flush()가 호출된다   
+JPA관련 기술들을 사용할 떄는 이렇게 flush()호출이 AUTO 인데 만약 JPA 관련기술이 아닌 기술을 사용한다면...   
+commti() 이전에 쿼리를 날린다면 flush()가 호출되지 않아 DB에 데이터는 null 인된다   
+따라서 JPA 관련 기술이 아닌 것을 사용할떄 Query문을 날리기 전에 강제로 flush()를 호출해서 사용하도록 한다   
+
+```SQL
+Hibernate: 
+    /* dynamic native SQL query */ select
+        member_id,
+        locker_id,
+        team_id,
+        username 
+    from
+        MEMBER
+Hibernate: 
+    select
+        team0_.team_id as team_id1_4_0_,
+        team0_.name as name2_4_0_ 
+    from
+        Team team0_ 
+    where
+        team0_.team_id=?
+===========================
+member1 = hellojpa.relationmapping.Member@310aee0b
+member1 = hellojpa.relationmapping.Member@1f1ff879
+```   
+## _JPQL(Java Persistence Query Language)_   
+## _JPQL - 기본 문법과 기능_   
+* ### _JPQL 소개_   
+`JPQL은 SQL을 추강화해서 특정데이터베이스 SQL에 의존하지 않는다.`   
+`JPQL은 결국 매핑 정보랑 방언이 조합이 되서 SQL로 변환돼 실행된다.`
+결국 DB는 SQL만 받을 수 있느니까   
+사진 첨부하고 새 프로젝트에 Member, Team, JpaMain, Orders, Product 코드 작성   
+* ### _JPQL문법_   
+엔티이 이름: @Entity(name ="MM") default: Class Name   
+관례상 default를 사용   
+* ### _TypeQuery, Query_   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    //두 번째 파라미터에 응답 클래스에 대한 타입 정보를 중 수 있다(타입 정보는 아무거나 줄 수없으며 기본적으로 엔티티를 줘야한다
+    TypedQuery<Member> query1 = entityManager.createQuery("select m From Member m", Member.class);
+    TypedQuery<String> query2 = entityManager.createQuery("select m.username From Member m", String.class);
+    //m.username 은 String, m.age 는 int 로 타입이 서로 달라 두 번째 파라미터에 타입을 명시할 수 없다.
+    //이럴때는 반환타입을 Query를 사용해야 한다(타입 정보를 방을 수 없을 경우)
+    Query query3 = entityManager.createQuery("select m.username, m.age From Member m");
+
+    transaction.commit();
+}
+```   
+* ### _결과 조회 API_   
+결과가 하나 이상일 때, 즉 결과가 컬렉션일 경우 getResultList()를 사용한다   
+결과가 없으면 빈 리스트를 반환하므로 nullPointException에 대해서는 걱정할 필요가 없다     
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    TypedQuery<Member> query = entityManager.createQuery("select m From Member m", Member.class);
+    List<Member> resultList = query.getResultList(); //컬렉션을 반환한다
+
+    for (Member member1 : resultList) {
+        System.out.println("member1 = " + member1);
+    }
+
+    transaction.commit();
+}
+```   
+결과가 정확히 하나   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    TypedQuery<Member> query = entityManager.createQuery("select m From Member m", Member.class);
+    Member result = query.singleResult();
+
+    System.out.println("result = " + result);
+
+    transaction.commit();
+```    
+결과가 없는으면   
+```Java
+try {
+    TypedQuery<Member> query = entityManager.createQuery("select m From Member m", Member.class);
+
+    Member result = query.getSingleResult();
+    System.out.println("result = " + result);
+
+    transaction.commit();
+}
+```
+```
+javax.persistence.NoResultException: No entity found for query
+```   
+* ### _파라미터 바인딩 - 이름 기분, 위치 기준_   
+이름 기반 파라미터 바인딩   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    TypedQuery<Member> query = entityManager.createQuery("select m From Member m where m.username = :username ", Member.class);
+    query.setParameter("username", "member1");
+    Member result = query.getSingleResult();
+    System.out.println("result = " + result.getUsername());
+
+    transaction.commit();
+} 
+```   
+일반적으로는 메서드 체인을 이용   
+```Java
+Member result = entityManager.createQuery("select m From Member m where m.username = :username ", Member.class)
+        .setParameter("username", "member1")
+        .getSingleResult();
+
+System.out.println("result = " + result.getUsername());
+
+transaction.commit();
+```
+위치 기반 파라미터 바인딩   
+위치기반은 웬만하면 사용하지 않는다   
+왜냐하면 숫자로 표기되어 있는데  중간에 추가 되거나 삭제 된다면  구분하기 힘들어진다   
+* ### _프로젝션_   
+엔티티 프로젝션     
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    //엔티티들이 반환이 됐는데 List<Member>에서 Member 는 영속성 컨텍스트에 관리가 될것인가 안될것이기?
+    List<Member> result = entityManager.createQuery("select m From Member m", Member.class)
+            .getResultList();
+
+    Member findMember = result.get(0);
+    findMember.setAge(20); //바뀌면 영속성 컨텍스트에서 관리가 되는것이고, 바뀌지 않으면 영속성 컨텍스트에서 관리가 되지 않는것이다
+
+    transaction.commit();
+}
+```
+```SQL
+Hibernate: 
+    /* update
+        jpql.Member */ update
+            Member 
+        set
+            age=?,
+            team_id=?,
+            username=? 
+        where
+            member_id=?
+```
+>엔티티 프로젝션을 사용하면 "select m From Member m"의 select 절에 대상이 전부다 영속성 컨텍스트에서 관리가 된다   
+
+select m.team from Member m: Member 엔티티에 연관된 Team 엔티티 프로젝션 
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    List<Team> result = entityManager.createQuery("select m.team From Member m", Team.class)
+            .getResultList();
+
+    transaction.commit();
+}
+```
+```SQL
+Hibernate: 
+    /* select
+        m.team 
+    From
+        Member m */ select
+            team1_.team_id as team_id1_3_,
+            team1_.name as name2_3_ 
+        from
+            Member member0_ 
+        inner join
+            Team team1_ 
+                on member0_.team_id=team1_.team_id
+```   
+>inner join 해서 team 이랑 조인을 하고 있다   
+조인 쿼리가 나가는 이유   
+JPQL은 select m.team From Member m" 이렇게 생겼지만 SQL 입장에서는 Member에 연관된 Team 테이블을 조인해서 찾아야 한다     
+
+임베디드 타입 프로젝션   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    entityManager.createQuery("select o.address From Order o", Address.class)
+            .getResultList();
+
+    transaction.commit();
+}
+```
+```SQL
+Hibernate: 
+    /* select
+        o.address 
+    From
+        
+    Order o */ select
+        order0_.city as col_0_0_,
+        order0_.street as col_0_1_,
+        order0_.zipcode as col_0_2_ from
+            ORDERS order0_
+```
+>이베디드 타입 프로젝션의 한계는 임베디드 타입만으로는 안되며, 엔티티로부터 시작을 해야한다   
+
+스칼라 타입 프로젝션   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    entityManager.createQuery("select distinct m.username, m.age From Member m")
+            .getResultList();
+
+    transaction.commit();
+} 
+```
+```SQL
+Hibernate: 
+    /* select
+        distinct m.username,
+        m.age 
+    From
+        Member m */ select
+            distinct member0_.username as col_0_0_,
+            member0_.age as col_1_0_ 
+        from
+            Member member0_
+```
+>스칼라 타입 프로젝션이 일반 SQL의 select 프로젝션과 똑같다고 볼 수 있다   
+
+* ### _프로젝션 - 여러 값 조회_   
+Query 타입으로 조회
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    List resultList = entityManager.createQuery("select m.username, m.age From Member m")
+            .getResultList();
+
+    Object o = resultList.get(0);
+    //내부적으로는 Object 배열이 들어간다(m.username, m.age 가 배열의 첫 번쨰, 두 번째)
+    Object[] result = (Object[]) o; //타입 캐스팅
+    System.out.println("result = " + result[0]);
+    System.out.println("result = " + result[1]);
+
+    transaction.commit();
+}
+```
+```
+result = member1
+result = 20
+```
+>타입을 명시할 수 없으니 Object로 반환하는 것이다   
+
+Object[] 타입으로 조회   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    List<Object[]> resultList = entityManager.createQuery("select m.username, m.age From Member m")
+            .getResultList();
+
+    Object[] result = resultList.get(0);
+    System.out.println("result = " + result[0]);
+    System.out.println("result = " + result[1]);
+
+    transaction.commit();
+}
+```
+>제네릭에 Object[] 를 선언하는 방법   
+
+new 명령어로 조회(가장 깔끔한 방법)   
+```Java
+        try {
+            Member member = new Member();
+            member.setUsername("member1");
+            member.setAge(10);
+            entityManager.persist(member);
+
+            entityManager.flush();
+            entityManager.clear();
+
+            //생성자를 통해서 호출이 된다
+            List<MemberDTO> result = entityManager.createQuery("select new jpql.MemberDTO(m.username, m.age) From Member m", MemberDTO.class)
+                    .getResultList();
+
+            MemberDTO memberDTO = result.get(0);
+            System.out.println("memberDTO = " + memberDTO.getUsername());
+            System.out.println("memberDTO = " + memberDTO.getAge());
+
+            transaction.commit();
+        }
+```
+
+* ### _페이징 API_   
+* ### _페이징 API 예시_   
+```Java
+try {
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    List<Member> result = entityManager.createQuery("select m from Member m order by m.age desc", Member.class)
+            .setFirstResult(1)
+            .setMaxResults(10)
+            .getResultList();
+
+    System.out.println("result.size = " + result.size());
+    //Member 클레스에 toString
+    for (Member member1 : result) {
+        System.out.println("member1 = " + member1);
+    }
+
+    transaction.commit();
+} 
+```
+```SQL
+Hibernate: 
+    /* select
+        m 
+    from
+        Member m 
+    order by
+        m.age desc */ select
+            member0_.member_id as member_i1_0_,
+            member0_.age as age2_0_,
+            member0_.team_id as team_id4_0_,
+            member0_.username as username3_0_ 
+        from
+            Member member0_ 
+        order by
+            member0_.age desc limit ? offset ?
+result.size = 8
+```
+>desc limit ? offset ?   
+
+* ### _조인_   
+inner join (inner)생량 가능   
+```Java
+try {
+    Team team = new Team();
+    team.setName("teamA");
+
+    entityManager.persist(team);
+
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    member.setTeam(team);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    String query = "select m from Member m inner join m.team t";
+    List<Member> result = entityManager.createQuery(query, Member.class)
+            .getResultList();
+
+    transaction.commit();
+}
+```
+```SQL
+Hibernate: 
+    /* select
+        m 
+    from
+        Member m 
+    inner join
+        m.team t */ select
+            member0_.member_id as member_i1_0_,
+            member0_.age as age2_0_,
+            member0_.team_id as team_id4_0_,
+            member0_.username as username3_0_ 
+        from
+            Member member0_ 
+        inner join
+            Team team1_ 
+                on member0_.team_id=team1_.team_id
+```
+> fetch LAZY 설정   
+
+* ### _1. 조인 대상 필터링_   
+on 은 join할 때 조건   
+* ### _서브 쿼리_   
+서브쿼리와 메인 쿼리는 전혀 관계가 없다   
+* ### _ JPQL 타입 표현식_   
+```Java
+try {
+    Team team = new Team();
+    team.setName("teamA");
+
+    entityManager.persist(team);
+
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    member.setTeam(team);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    String query = "select m.username, 'HELLO', true from Member m ";
+    List<Object[]> result = entityManager.createQuery(query)
+            .getResultList();
+
+    for (Object[] objects : result) {
+        System.out.println("objects = " + objects[0]);
+        System.out.println("objects = " + objects[1]);
+        System.out.println("objects = " + objects[2]);
+    }
+
+    transaction.commit();
+}
+```
+```
+objects = member1
+objects = HELLO
+objects = true
+```
+ENUM   
+```Java
+try {
+    Team team = new Team();
+    team.setName("teamA");
+
+    entityManager.persist(team);
+
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    member.setTeam(team);
+    member.setType(MemberType.ADMIN);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    String query = "select m.username, 'HELLO', true from Member m " +
+                    "where m.type = jpql.MemberType.ADMIN";
+    List<Object[]> result = entityManager.createQuery(query)
+            .getResultList();
+
+    for (Object[] objects : result) {
+        System.out.println("objects = " + objects[0]);
+        System.out.println("objects = " + objects[1]);
+        System.out.println("objects = " + objects[2]);
+    }
+
+    transaction.commit();
+} 
+```
+파라미터 바인딩을 해준다   
+```Java
+
+String query = "select m.username, 'HELLO', true from Member m " +
+                "where m.type = :userType";
+List<Object[]> result = entityManager.createQuery(query)
+        .setParameter("userType", MemberType.ADMIN)
+        .getResultList();
+```
+* ### _조건식 - CASE식_   
+기본 CASE식   
+```Java
+try {
+    Team team = new Team();
+    team.setName("teamA");
+
+    entityManager.persist(team);
+
+    Member member = new Member();
+    member.setUsername("member1");
+    member.setAge(10);
+    member.setTeam(team);
+    member.setType(MemberType.ADMIN);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    String query = "select " +
+                           "case when m.age <= 10 then '학생요금' " +
+                           "     when m.age >= 60 then '경로요금' " +
+                           "     else '일반요금' " +
+                           "end " +
+                   "from Member m";
+    List<String> result = entityManager.createQuery(query, String.class)
+            .getResultList();
+
+    for (String s : result) {
+        System.out.println("s = " + s);
+    }
+
+    transaction.commit();
+}
+```   
+COALESCE   
+```Java
+try {
+    Team team = new Team();
+    team.setName("teamA");
+
+    entityManager.persist(team);
+
+    Member member = new Member();
+    member.setUsername(null);
+    member.setAge(10);
+    member.setTeam(team);
+    member.setType(MemberType.ADMIN);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    String query = "select coalesce(m.username, '이름 없는 회원') from Member m ";
+    List<String> result = entityManager.createQuery(query, String.class)
+            .getResultList();
+
+    for (String s : result) {
+        System.out.println("s = " + s);
+    }
+
+    transaction.commit();
+}
+```
+NULLIF   
+```Java
+try {
+    Team team = new Team();
+    team.setName("teamA");
+
+    entityManager.persist(team);
+
+    Member member = new Member();
+    member.setUsername("관리자");
+    member.setAge(10);
+    member.setTeam(team);
+    member.setType(MemberType.ADMIN);
+    entityManager.persist(member);
+
+    entityManager.flush();
+    entityManager.clear();
+
+    String query = "select nullif(m.username, '관리자') from Member m ";
+    List<String> result = entityManager.createQuery(query, String.class)
+            .getResultList();
+
+    for (String s : result) {
+        System.out.println("s = " + s);
+    }
+
+    transaction.commit();
+}
+```
+
+
+## 패치 조인
+## 경로 표현식
+## 다형성 쿼리
+## 엔티티 직접 사용
+## Named 쿼리
+## 벌크 연산
 
 
 
