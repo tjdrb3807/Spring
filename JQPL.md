@@ -1,7 +1,31 @@
 # _객체지향 쿼리 언어(JPQL)_
 ## _객체지향 쿼리 언어 소개_
-* JPA는 다양한 쿼리 방법을 지원   
-* JPQL1   
+<br>
+
+* ### _JPA는 다양한 쿼리 방법을 지원_ 
+  * JPQL   
+  * JPA Citeria   
+  * QueryDSL   
+  * 네이티브 SQL   
+  * JDBC API 직접 사용, MyBatis, SpringJdbcTemplate 함께 사용   
+<br>
+
+* ### _JPQL 소개_
+  * 가장 단순한 조회 방밥
+    * EntityManager.find()
+    * 객체 그래프 탐색(a.getB().getC())
+  * JPA를 사용하면 엔티티 객체를 중심으로 개발한다
+  * 문제는 검색 쿼리
+  * 검색을 할 때도 `테이블이 아닌 엔티티 객체를 대상으로 검색`
+  * 모든 DB 데이터를 객체로 변환해서 검색하는 것은 불가능
+  * 애플리케이션이 필요한 데이터만 DB에서 불러오면 결국 검색 조건이 포함된 SQL이 필요하다.
+  * JPA는 SQL을 추상화한 JPQL이라는 객체 지향 쿼리 언어를 제공한다.
+  * SQL과 문법이 유사하다.
+    * SELECT, FROM, WHERE, GROUP BY, HAVING, JOIN 지원
+  * JPQL은 엔티티 객체를 대상으로 쿼리
+  * SQL은 데이터베이스 테이블을 대상으로 쿼리
+  
+   
 ```Java
 try {
     List<Member> result = entityManager.createQuery("select m from Member m where m.username like '%kiim%'",
@@ -737,10 +761,174 @@ try {
     transaction.commit();
 }
 ```
+* ### _JPQL 기본 함수_   
+SIZE --> select size(t.Members) from Team t   
+컬렉션의 크기를 반환한다    
+* ### _사용자 정의 함수 호출_   
+```Java
+            String query = "select function('group_concat', m.username) from Member m ";
+            List<String> result = entityManager.createQuery(query, String.class)
+                    .getResultList();
+
+            for (String s : result) {
+                System.out.println("s = " + s);
+            }
+
+            transaction.commit();
+```
+injectLanguage 설정을 Hibernate로 바꾼다면   
+select group_concat(m.username) from Member m    
+## _JPQL - 경로 표현식_   
+* ### _경로 표현식_   
+세가지 경로 필드가 존재한다(상태 필드, 단일 값 연괄 필드, 컬렉션 값 연관 필드)   
+어떤 결로 필드로 탐색하느냐에 따라 내부적으로 동장하는 방식 즉 결과가 달라진다  
+즉 이 세가지를 꼭 구분해서 이해해야 한다   
+select m.username -> 상태 필드로 객체 그래프를 탐색했다   
+* ### _결로 표현식 특징_   
+상태 필드는 경로 탐색의 끝 이므로 더이상 탐색이 불가능하다  
+단일 값 연관 경로는 `묵시적 내부 조인이 발생한다`   
+```Java
+            String query = "select m.team From Member m";
+            List<Team> result = entityManager.createQuery(query, Team.class)
+                    .getResultList();
+
+            for (Team s : result) {
+                System.out.println("s = " + s);
+            }
+
+            transaction.commit();
+```
+```SQL
+Hibernate: 
+    /* select
+        m.team 
+    From
+        Member m */ select
+            team1_.team_id as team_id1_3_,
+            team1_.name as name2_3_ 
+        from
+            Member member0_ 
+        inner join
+            Team team1_ 
+                on member0_.team_id=team1_.team_id
+```
+JPQL은 select m.team 이지만 SQL은 join Team team 을 해서 team을 select 프로젝션에 나열했다   
+객체 입장에서는 .을 이요해서 탐색을 하면 되지만 DB입장에서는 Join을 해서 탐색을 해야한다   
+이떄 발생한 Join을 묵시적 내부 조인 이라 한다   
+실무에서는 JPQL을 묵시적 내부조인이 발생하지 않도록 작성해야 한다   
+컬렉션 값 연관 경로는 묵시적 내부 조인이 발생하며 탐색이 불가능하다   
+따라서 From 절에 명시적 조인을 통해서 별칭을 얻으면 별칭을 통해 탐색한다   
+select m.username From Team t Join t.members m   
+From 절에서 명시적 조인을 하면 별칭을 얻을 수 있다   
+영한이가 권장하는 방법은 위의 것들을 다 무시하고 묵시적 조인을 사용하지 않는것이다   
+명시족 조인을 사용해야 한다  실제 쿼리 튜닝하기가 쉽다   
+* ### _명시적 조인, 묵시적 조인_   
+묵시적 조인: 경로 표현식에 의해 묵시적으로 SQL 조인 발생   
+내부조인(innerJoin)만 가능 
+외부 조인은 불가능하다 외부조인을 하고싶다면 명시적 조인을 하면 된다   
+Select m From Member m left join m.team t   
+* ### _경로 표현식 - 예제_   
+select o.member.team From Order o   
+join이 두 번 발생하다   
+select t.members from Team   
+members가 컬렉션이지만 끝을 냈으므로 성공, 더 들어가게 되면 탐색 불가로 실패   
+select t.members.username From Team t   
+members를 그대로 가져오거나 .size() 정도만 가능하다   
+## _JPQL - 페치 조인(fetch join)_   
+* ### _엔티티 페치 조인_   
+SQL   
+즉시로딩 SQL이랑 똑같은 쿼리문   
+하지만 페치 조인은 쿼리로 내가 원하는 어떤 객체 그래프를 한 번에 조회할것이라는 것을  내가 직접 명시적으로 동적인 타이밍에 정할 수 있다   
+* ### _테이블 세팅_   
+```Java
+        try {
+            Team teamA = new Team();
+            teamA.setName("팀A");
+
+            entityManager.persist(teamA);
+
+            Team teamB = new Team();
+            teamB.setName("팀B");
+
+            entityManager.persist(teamB);
+
+            Member member1 = new Member();
+            member1.setUsername("회원1");
+            member1.setTeam(teamA);
+
+            entityManager.persist(member1);
+
+            Member member2 = new Member();
+            member2.setUsername("회원2");
+            member2.setTeam(teamA);
+
+            entityManager.persist(member2);
+
+            Member member3 = new Member();
+            member3.setUsername("회원3");
+            member3.setTeam(teamB);
+
+            entityManager.persist(member3);
+
+            entityManager.flush();
+            entityManager.clear();
+
+            String query = "select m From Member m";
+            List<Member> result = entityManager.createQuery(query, Member.class)
+                    .getResultList();
+
+            for (Member member : result) {
+                System.out.println("member = " + member);
+            }
+
+            transaction.commit();
+        }
+``` 
+```SQL
+Hibernate: 
+    /* select
+        m 
+    From
+        Member m */ select
+            member0_.member_id as member_i1_0_,
+            member0_.age as age2_0_,
+            member0_.team_id as team_id5_0_,
+            member0_.type as type3_0_,
+            member0_.username as username4_0_ 
+        from
+            Member member0_
+member = Member{id=3, username='회원1', age=0}
+member = Member{id=4, username='회원2', age=0}
+member = Member{id=5, username='회원3', age=0}
+```
+* ### _페치 조인 사용 코드_   
+Member 와 Team 의 연관관계가 ManyToOne이며 지연로딩(LAZY)설정   
+```Java
+@Entity
+public class Member {
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private List<Team> team;
 
 
-## 패치 조인
-## 경로 표현식
+}
+```
+member의 이름과 member와 연관관계 매핑된 team 의 이름을 같이 출력하는 코드 작성   
+```Java
+            for (Member member : result) {
+                System.out.println("member = " + member.getUsername() + ", " + member.getTeam().getName());
+                //회원1, 팀A(SQL)
+                //회원2, 팀A(1차 캐시)
+                //회원3, 팀B(SQL)
+            }
+
+```
+Team 은 프록시로 들어왔다가 member.getTeam().getName() 호출 시점에 DB에 쿼리를 날린다    
+
+
+
+
 ## 다형성 쿼리
 ## 엔티티 직접 사용
 ## Named 쿼리
