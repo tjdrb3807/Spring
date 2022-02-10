@@ -11,42 +11,37 @@
 <br>
 
 * ### _JPQL 소개_
-  * 가장 단순한 조회 방밥
-    * EntityManager.find()
-    * 객체 그래프 탐색(a.getB().getC())
-  * JPA를 사용하면 엔티티 객체를 중심으로 개발한다
-  * 문제는 검색 쿼리
-  * 검색을 할 때도 `테이블이 아닌 엔티티 객체를 대상으로 검색`
-  * 모든 DB 데이터를 객체로 변환해서 검색하는 것은 불가능
-  * 애플리케이션이 필요한 데이터만 DB에서 불러오면 결국 검색 조건이 포함된 SQL이 필요하다.
+  * JPA를 사용하면 엔티티를 중심으로 개발하게 된다.
+  * 모든 DB 데이터를 엔티티 변환해서 검색하는 것은 불가능
+  * 애플리케이션이 필요한 데이터만 DB에서 불러오려면 결국 `검색 조건이 포함된 SQL이 필요`하다.
   * JPA는 SQL을 추상화한 JPQL이라는 객체 지향 쿼리 언어를 제공한다.
   * SQL과 문법이 유사하다.
     * SELECT, FROM, WHERE, GROUP BY, HAVING, JOIN 지원
-  * JPQL은 엔티티 객체를 대상으로 쿼리
-  * SQL은 데이터베이스 테이블을 대상으로 쿼리
-  
-   
-```Java
-try {
-    List<Member> result = entityManager.createQuery("select m from Member m where m.username like '%kiim%'",
-                    Member.class)
-            .getResultList();
-    for (Member member : result) {
-        System.out.println("member = " + member);
-    }
+  * JPQL은 `테이블이 아닌 엔티티 객체를 대상으로 쿼리`
+    * SQL은 데이터베이스 테이블을 대상으로 쿼리   
+    <br>
 
-    transaction.commit();
-}
-```
-JPQL문에서 Member는 테이블이 아닌 Entity이다
-```SQL
-Hibernate: 
+    ```Java
+    try {
+        String jpql = "select m From Member m where m.username like '%hello%'";
+
+        List<Member> result = entityManager.createQuery(jpql, Member.class).getResultList();
+        
+        transaction.commit();
+    }
+    ```
+    >entityManager.createQuery(jpal, `Member.class`).getResultList();   
+      * 테이블이 아닌 엔티티 객체를 대상으로 쿼리문을 날린다    
+    <br>
+
+    ```SQL
+    Hibernate: 
     /* select
         m 
     from
         Member m 
     where
-        m.username like '%kiim%' */ select
+        m.username like '%hello%' */ select
             member0_.member_id as member_i1_1_,
             member0_.locker_id as locker_i3_1_,
             member0_.team_id as team_id4_1_,
@@ -54,106 +49,137 @@ Hibernate:
         from
             Member member0_ 
         where
-            member0_.username like '%kiim%'
-```
->주석으로 JPQL이 보인다   
-"select m from Member m where m.username like '%kiim%'"은 엔티티를 대상으로 쿼리를 한 것이다   
-실제 SQL로 번역이 되서 실행된다   
-엔티티의 매핑정보를 확인해서 적절한 SQL은 만들어낸다   
-* ### _Criteria 소개_   
-위에서 친 "select m from Member m where m.username like '%kiim%'"코드는 인텔리제이가 도와줘서 그런것이지 사실은 단순한 String 이다   
-단순 문자이므로 동적 쿼리를 만들기 엄청 어렵다   
-이런 난관의 대안법이 Criteria 이다. 꼭 이 난관 뿐 아니라도 다른 장점들도 존재한다    
-```Java
-try {
-    CriteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
-    CriteriaQuery<Member> query = criteriaBuilder.createQuery(Member.class);
+            member0_.username like '%hello%'
+    ```
+    >Member Entity의 매핑 정보를 확인해서 적절한 SQL문으로 번역후 실행
+* ### _Criteria 소개_  
+    JPQL에서 작성한 `"select m from Member m where m.username like '%hello%'` 코드는 사실 단순한 String이다.   
+    단순한 문자이므로 동적 쿼리를 만들기에는 엄청난 제약과 어려움이 동반한다.   
+    이러한 어려움을 개선할 뿐 아니라 다른 장점들도 존재하는 것이 `Cirteria`이다.   
+    ```Java
+    try {
+        //Criteria 사용 준비
+        CirteriaBuilder criteriaBuilder = entityManager.getCriteriaBuilder();
+        CriteriaQuery<Member> query = criteriaBuilder.createQuery(Member.class);
 
-    Root<Member> m = query.from(Member.class);
+        //루트 클래스(조회를 시작할 클래스)
+        Root<Member> m = query.from(Member.class);
+        
+        //쿼리 생성
+        CriteriaQuery<Member> cq = query.select(m).where(criteriaBuilder.equal(m.get("username"), "hello"));
+        List<Member> result = entityManager.createQuery(cq).getResultList();
 
-    CriteriaQuery<Member> cq = query.select(m).where(criteriaBuilder.equal(m.get("username"), "kim"));
-    List<Member> result = entityManager.createQuery(cq).getResultList();
-
-    transaction.commit();
-}
-```
->쿼리를 코드로 짜고있다   
-```SQL
-Hibernate: 
-    /* select
-        generatedAlias0 
-    from
-        Member as generatedAlias0 
-    where
-        generatedAlias0.username=:param0 */ select
-            member0_.member_id as member_i1_1_,
-            member0_.locker_id as locker_i3_1_,
-            member0_.team_id as team_id4_1_,
-            member0_.username as username2_1_ 
-        from
-            Member member0_ 
-        where
-            member0_.username=?
-```
-자바 코드로 SQL문을 짜기 떄문에 엄청난 장점이 있다   
-예를 들어 오타가 발생하면 컴파일러 레벨에서 오류를 잡을 수 있다   
-또하나의 장점은 조건문 등을 황용해서 동적 쿼리를 짜기에 훨신 수월하다   
-하지만 단점은 SQL스럽지 못하다는 점이다   
-실무에서는 잘 사용하지 않는다.. 코드를 보기 어려우며 유지보수가 힘들다   
-* ### _QueryDSL 소개_   
-* ### _네이티브 SQL 소개_   
-```Java
-try {
-    entityManager.createNativeQuery("select member_id, locker_id, team_id, username from MEMBER")
-            .getResultList();
-
-    transaction.commit();
-}
-```
-```SQL
-Hibernate: 
-    /* dynamic native SQL query */ select
-        member_id,
-        locker_id,
-        team_id,
-        username 
-    from
-        MEMBER
-```   
-* ### _JDBC 직접 사용, SpringJdbcTemplate 등_   
-단 영속성 컨텍스트를 적절한 시점에 강제로 플러시 필요   
-영속석 컨텍스트는 entityManager.flush()를 호출해야 쿼리를 날려서 DB에 데이터가 저장되게 된다   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("memberA");
-
-    entityManager.persist(member);
-
-    //flush()가 호출되는 시점 --> commit()호출시, Query 날라갈때
-    System.out.println(" ===========================");
-    List<Member> resultList = entityManager.createNativeQuery("select member_id, locker_id, team_id, username from MEMBER", Member.class)
-            .getResultList();
-    System.out.println(" ===========================");
-
-    for (Member member1 : resultList) {
-        System.out.println("member1 = " + member1);
+        transaction.commit();
     }
+    ```
+      
+        
+    ```SQL
+    Hibernate: 
+        /* select
+            generatedAlias0 
+        from
+            Member as generatedAlias0 
+        where
+            generatedAlias0.username=:param0 */ select
+                member0_.member_id as member_i1_1_,
+                member0_.locker_id as locker_i3_1_,
+                member0_.team_id as team_id4_1_,
+                member0_.username as username2_1_ 
+            from
+                Member member0_ 
+            where
+                member0_.username=?
+    ```
+    `자바 코드로 SQL`문을 짜기 떄문에 오타가 발생하면 컴파일러 레벨에서 오류를 잡을 수 있는 업청난 장점이 있다.   
+    또한 조건문 등을 확용해서 동적 쿼리를 작성하기에 훨신 수월하다.   
+    하지만 치명적인 단점은 SQL스럽지 못하다는점과 코드를 보기 어려우며, 실용성이 없기 때문에 실무에서는 잘 사용하지않는다.     
+    따라서 Criteria 대신에 `QueryDSL`사용을 권장한다.   
+* ### _QueryDSL 소개_   
+    문자가 아닌 자바코드로 JPQL을 작성할 수 있으므로 컴파일 시점에 문법 오류를 찾을 수 있으며, 동적쿼리 작성이 편리다하는 장점을 갖는다.   
+    또한 Cirteria처럼 코드가 복잡하지 않으며 단순하고 쉽기 때문에 실무 사용을 권장한다.   
+* ### _네이티브 SQL 소개_   
+    JPA가 제공하는 SQL을 직접 사용하는 기능을 갖고 있으며, JPQL로 해결할 수 없는 특정 데이터베이스에 의존적인 기능을 갖는다.   
+    예를 들면, 오라클 CONNECT BY, 특정 DB만 사용하는 SQL힌트 등...   
+    ```Java
+    try {
+        entityManager.createNativeQuery("select member_id, locker_id, team_id, username form Member").getResultList();
 
-    transaction.commit();
-}
-```
-```SQL
-===========================
-Hibernate: 
-    /* insert hellojpa.relationmapping.Member
-        */ insert 
-        into
-            Member
-            (locker_id, team_id, username, member_id) 
-        values
-            (?, ?, ?, ?)
-```
+        transaction.commit();
+    }
+    ```
+
+    ```SQL
+    Hibernate: 
+        /* dynamic native SQL query */ select
+            member_id,
+            locker_id,
+            team_id,
+            username 
+        from
+            MEMBER
+    ```   
+* ### _JDBC 직접 사용, SpringJdbcTemplate 등_   
+    JPA를 사용하면서 JDBC 커넥션을 직접 사용하거나, 스프링 JdbcTemplate, 마이바티스 등을 함께 사용 가능하다.   
+    `단 영속성 컨텍스트를 적절한 시점에 강제로 flush()호출이 필요하다.`
+    ```Java
+    try {
+        Member member = new Member();
+        member.setUsername("memberA");
+
+        entityManager.persist(member);
+
+        //flush()가 호출되는 시점 --> commit(), Query를 날릴때
+        System.out.println("=========================");
+        List<Member> resultList = entityManager.createNativQuery("select member_id, locker_id, team_id, username from Member", Member.class)
+                    .getResultList();
+        System.out.println("=========================");
+
+        for (Member member1 : resultList) {
+            System.out.println("member1 = " + member1);
+        }
+
+        transaction.commit();
+    }
+    ```
+
+    ```SQL
+    ===========================
+    Hibernate: 
+        /* insert hellojpa.relationmapping.Member
+            */ insert 
+            into
+                Member
+                (locker_id, team_id, username, member_id) 
+            values
+                (?, ?, ?, ?)
+    Hibernate: 
+        /* dynamic native SQL query */ select
+            member_id,
+            locker_id,
+            team_id,
+            username 
+        from
+            MEMBER
+    Hibernate: 
+        select
+            team0_.team_id as team_id1_4_0_,
+            team0_.name as name2_4_0_ 
+        from
+            Team team0_ 
+        where
+            team0_.team_id=?
+    ===========================
+    member1 = hellojpa.relationmapping.Member@310aee0b
+    member1 = hellojpa.relationmapping.Member@1f1ff879
+    ```
+    > flush()가 selet Query가 나가기 이전에 먼저 호출되서 insert Query가 나간것을 확인할 수 있다   
+    flush()는 transaction.commit()이 호출되는 시점에 호출되기도 하지만, entityManager를 통해서 Query를 내보내는 바로 직전에도 flush()가 호출된다.   
+    JPA관련 기술을 사용할 때는 위의 결과처럼 entityManger를 통해서 Query를 내보낼때 자동으로 flush()가 호출되도록 설정되어있지만, JPA관련 기술이 아닌것을 사용하면서 commit()호출시점 이전에 entityMamger를 통해서 Query를 날리는 코드를 작성했다면 자동으로 flush()가 호출되지 않아 DB에 데이터는 null값으로 설정된다.   
+    따라서 JPA 관련 기술이 아닌 다른 기술을 사용할떄는 entityManager를 통해 Query를 내보내는 코드 바로 이전에 flush()를 기입해서 수동적으로 flush()를 호출해서 사용하도록 한다.   
+
+
+
 >flush()가 먼저 되고 Query가 호출된다   
 flush()는 commit()직전에 호출되기도 하지만 entityManager를 통해서 Query가 날라갈때고 flush()가 호출된다   
 JPA관련 기술들을 사용할 떄는 이렇게 flush()호출이 AUTO 인데 만약 JPA 관련기술이 아닌 기술을 사용한다면...   
@@ -921,15 +947,81 @@ member의 이름과 member와 연관관계 매핑된 team 의 이름을 같이 �
                 //회원1, 팀A(SQL)
                 //회원2, 팀A(1차 캐시)
                 //회원3, 팀B(SQL)
+
+                //회원 100명 --> N + 1 
             }
 
 ```
 Team 은 프록시로 들어왔다가 member.getTeam().getName() 호출 시점에 DB에 쿼리를 날린다    
+페치 조인 사용 코드 사용   
+```Java
+            String query = "select m From Member m join fetch m.team";
+            List<Member> result = entityManager.createQuery(query, Member.class)
+                    .getResultList();
 
+            for (Member member : result) {
+                System.out.println("member = " + member.getUsername() + ", " + member.getTeam().getName());
+            }
+```
+```SQL
+Hibernate: 
+    /* select
+        m 
+    From
+        Member m 
+    join
+        fetch m.team */ select
+            member0_.member_id as member_i1_0_0_,
+            team1_.team_id as team_id1_3_1_,
+            member0_.age as age2_0_0_,
+            member0_.team_id as team_id5_0_0_,
+            member0_.type as type3_0_0_,
+            member0_.username as username4_0_0_,
+            team1_.name as name2_3_1_ 
+        from
+            Member member0_ 
+        inner join
+            Team team1_ 
+                on member0_.team_id=team1_.team_id
+```
+result에 담기는 순간 team은 프록시가 아닌 실제 엔티티가 담긴다    
+영속석 컨텍스트에 team의 데이터가 올가가있다   
+지연로딩으로 설정을 해도 페치 조인이 우선순위를  갖는다   
+* ### _컬렉션 페치 조인_   
+```Java
+            String query = "select t From Team t join fetch t.members";
+            List<Team> result = entityManager.createQuery(query, Team.class)
+                    .getResultList();
 
+            for (Team team : result) {
+                System.out.println("member = " + team.getName() + ", " + team.getMembers().size());
+            }
+```
+```SQL
+member = 팀A, 2
+member = 팀A, 2
+member = 팀B, 1
+```
+컬렉션 페치 조인에서 조심해야하는 부분   
+member = 팀A, 2, member = 팀A, 2가 중복으로 출력,.,,   
+DB입장에서 1:N조인을 하면 데이터가 뻥튀기가 된다???   
+테이블 표 참고   
+팀A 입장에서 Member 테이블과 조인하게 팀 A에 소속된 회원이 2명이므로 기본적으로 생성되는 Join데이터를 아래 테이플과같이 생겼다   
+팀A 입장에서는 row 하나인데 Member가 두명이므로 row가 두줄이 된다   
+JPA는 row가 두 줄이 된지 모른다  외냐하면 팀A에 회원이 몇명이 있을지 모르기 때문이다    
+따라서 이 타이밍에 JPA가 별로 할 수 있는것이 없다  그래서 그냥 row개를 받아들인다   
+이것이 객체와 RDB의차이라 볼 수 있다 객체 입장에서 어떻게 할 수 있는 것이 없다   
+팀A의 PK가 1로 같기 떄문에 영속성 컨텍스트 1차 캐시에는 하나로 등록되지만 조회한 컬렉션에는 같은 주소값을 가진 두 줄이 생성된다   
+* ### _페치 조인과 DISTINCT_   
+SQL의 DISTINCT만으로는 중복을 전부 제거할 수 없다   
+따라서 JPQL의 DISTINCT 2가지 추가 기능 제공   
+* ### _페치 조인의 특징과 한계_   
+페치 조인 대상에는 별칭을 줄 수 없다.   
+select t From Team t join fetch t.members [as] m   
+페치 조인은 기본적으로 나랑 연관된 엔티티를 전부 끌고오는 것이다  
+페치 조인의 컬렉션은 딱 한 개만 조인할 수 있다   
+## _다형성 쿼리_   
+## _엔티티 직접 사용_   
 
-
-## 다형성 쿼리
-## 엔티티 직접 사용
 ## Named 쿼리
 ## 벌크 연산
