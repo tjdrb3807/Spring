@@ -296,170 +296,137 @@
         ``` 
         >Javax.persistence.NoUniqueResultException: query did not retuern a unique result: 2
 
-* ### _파라미터 바인딩 - 이름 기분, 위치 기준_   
-이름 기반 파라미터 바인딩   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+<br>
 
-    TypedQuery<Member> query = entityManager.createQuery("select m From Member m where m.username = :username ", Member.class);
-    query.setParameter("username", "member1");
-    Member result = query.getSingleResult();
-    System.out.println("result = " + result.getUsername());
+* ### _파라미터 바인딩 - 이름 기준, 위치 기준_   
+  * 이름 기준 파라미터 바인딩   
+    ```Java
+    try {
+        String jpql = "select m from Member m where m.age = :age";
+        List<Member> result = entityManager.createQuery(jpql, Member.class)
+                .setParameter("age", 28)
+                .getResultList();
+    
+        for (Member member : result) {
+            System.out.println("member = " + member.getAge());
+        }
 
-    transaction.commit();
-} 
-```   
-일반적으로는 메서드 체인을 이용   
-```Java
-Member result = entityManager.createQuery("select m From Member m where m.username = :username ", Member.class)
-        .setParameter("username", "member1")
-        .getSingleResult();
+        tansaction.commit();
+    }
+    ``` 
+  * 위치 기준 파라미터 바인딩   
+    >`select m from Member m where m.username = :1;`   
+    위치 기준 파라미터 바인딩은 숫자로 표기되므로, 만약 엔티티에 필드가 추가되거나 삭제될 경우 구분하기 힘들어지기 떄문에 사용하지 않는다.
 
-System.out.println("result = " + result.getUsername());
+<br>
 
-transaction.commit();
-```
-위치 기반 파라미터 바인딩   
-위치기반은 웬만하면 사용하지 않는다   
-왜냐하면 숫자로 표기되어 있는데  중간에 추가 되거나 삭제 된다면  구분하기 힘들어진다   
 * ### _프로젝션_   
-엔티티 프로젝션     
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+  * SELECT 절에 조회할 대상을 지정하는 것
+  * 프로젝션 대상: 엔티티, 임베디드 타입, 스칼라 타입(숫자, 문자등 기본 데이터 타입)
+  * SELECT `m` FROM Member m -> 엔티티 프로젝션  
+ 
+    ```Java
+    try {
+        String jpql = "select m from Member m";
 
-    entityManager.flush();
-    entityManager.clear();
+        List<Member> resultList = entityManager.createQuery(jpql, 
+        Member.class)
+                .getResultList();
 
-    //엔티티들이 반환이 됐는데 List<Member>에서 Member 는 영속성 컨텍스트에 관리가 될것인가 안될것이기?
-    List<Member> result = entityManager.createQuery("select m From Member m", Member.class)
-            .getResultList();
+        Member member = resultList.get(0);
+        member.setAge(20);
 
-    Member findMember = result.get(0);
-    findMember.setAge(20); //바뀌면 영속성 컨텍스트에서 관리가 되는것이고, 바뀌지 않으면 영속성 컨텍스트에서 관리가 되지 않는것이다
+        transcation.commit();
+    }
+    ``` 
+    >`getResultList()`를 통해서 엔티티들이 반환됐다.   
+    반환된 `List<Member>`의 Member 엔티티들은 영속성 컨텍스트에서 관리가 될까?   
+    `member.setAge(20)`을 호출해서 DB에 값이 바뀌면 영속성 컨텍스트에서 관리되고, 값이 바뀌지 않으면 영속성 컨텍스트에서 관리되지 않는것이다.   
+    ```SQL
+    Hibernate: 
+        /* update
+            jpql.Member */ update
+                Member 
+            set
+                age=?,
+                team_id=?,
+                username=? 
+            where
+                member_id=?
+    ```
+    >update Query가 나가면서 DB의 값이 바뀐것을 확인할 수 있다.   
+    엔티티 프로젝션을 사용하면 `select m From Member m`의 select절의 대상은 전부 영속성 컨텍스트에서 관리가 된다.   
+  * SELECT `m.team` FROM Member m --> 엔티티 프로젝션
+    ```Java
+    try {
+        String jpql = "select m.team from Member m";
 
-    transaction.commit();
-}
-```
-```SQL
-Hibernate: 
-    /* update
-        jpql.Member */ update
-            Member 
-        set
-            age=?,
-            team_id=?,
-            username=? 
-        where
-            member_id=?
-```
->엔티티 프로젝션을 사용하면 "select m From Member m"의 select 절에 대상이 전부다 영속성 컨텍스트에서 관리가 된다   
-
-select m.team from Member m: Member 엔티티에 연관된 Team 엔티티 프로젝션 
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
-
-    entityManager.flush();
-    entityManager.clear();
-
-    List<Team> result = entityManager.createQuery("select m.team From Member m", Team.class)
-            .getResultList();
-
-    transaction.commit();
-}
-```
-```SQL
-Hibernate: 
-    /* select
-        m.team 
-    From
-        Member m */ select
-            team1_.team_id as team_id1_3_,
-            team1_.name as name2_3_ 
-        from
-            Member member0_ 
-        inner join
-            Team team1_ 
-                on member0_.team_id=team1_.team_id
-```   
->inner join 해서 team 이랑 조인을 하고 있다   
-조인 쿼리가 나가는 이유   
-JPQL은 select m.team From Member m" 이렇게 생겼지만 SQL 입장에서는 Member에 연관된 Team 테이블을 조인해서 찾아야 한다     
-
-임베디드 타입 프로젝션   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
-
-    entityManager.flush();
-    entityManager.clear();
-
-    entityManager.createQuery("select o.address From Order o", Address.class)
-            .getResultList();
-
-    transaction.commit();
-}
-```
-```SQL
-Hibernate: 
-    /* select
-        o.address 
-    From
+        Team singleResult = entityManger.createQuery(jpql, Team.class)
+                .getSingleResult();
         
-    Order o */ select
-        order0_.city as col_0_0_,
-        order0_.street as col_0_1_,
-        order0_.zipcode as col_0_2_ from
-            ORDERS order0_
-```
->이베디드 타입 프로젝션의 한계는 임베디드 타입만으로는 안되며, 엔티티로부터 시작을 해야한다   
+        tarnsaction.commit();
+    }
+    ``` 
+    ```SQL
+    Hibernate: 
+        /* select
+            m.team 
+        From
+            Member m */ select
+                team1_.team_id as team_id1_3_,
+                team1_.name as name2_3_ 
+            from
+                Member member0_ 
+            inner join
+                Team team1_ 
+                    on member0_.team_id=team1_.team_id    
+    ```
+    >team 테이블과 inner join   
+    * JOIN Query가 호출되는 이유
+      * JPQL은 엔티티 매핑 정보와 방언은 조합하여 SQL문으로 번역하여 호출된다.
+      * Member Entity는 @ManyToOne 으로 Team Entity와 연관관계 매핑상태이다.
+  * SELECT `o.address` FROM Order o --> 임베디드 타입 프로젝션 
+    ```Java
+    try {
+        String jpql = "select o.address from Order o";
 
-스칼라 타입 프로젝션   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+        List<Address> resultList = entityManger.createQuery(jpql, Address.class)
+                .getReultList();
 
-    entityManager.flush();
-    entityManager.clear();
+        transaction.commit();
+    }
+    ```   
+    ```SQL
+    Hibernate: 
+        /* select
+            o.address 
+        From
+            
+        Order o */ select
+            order0_.city as col_0_0_,
+            order0_.street as col_0_1_,
+            order0_.zipcode as col_0_2_ from
+                ORDERS order0_    
+    ```
+    >임베디드 타입 프로젝션의 한계는 임베디드 타입만으로는 조회가 불가능하며, 엔티티로부터 시작해야한다.   
+  * SELECT `m.username, m.age` FROM Member m --> 스칼라 타입 프로젝션  
+  * DISTINCT로 중복 제거
 
-    entityManager.createQuery("select distinct m.username, m.age From Member m")
-            .getResultList();
-
-    transaction.commit();
-} 
-```
-```SQL
-Hibernate: 
-    /* select
-        distinct m.username,
-        m.age 
-    From
-        Member m */ select
-            distinct member0_.username as col_0_0_,
-            member0_.age as col_1_0_ 
-        from
-            Member member0_
-```
->스칼라 타입 프로젝션이 일반 SQL의 select 프로젝션과 똑같다고 볼 수 있다   
+<br>
 
 * ### _프로젝션 - 여러 값 조회_   
+  * SELECT `m.username, m.age` FROM Member m
+  1. Query 타입으로 조회
+  2. Object[] 타입으로 조회
+  3. new 명령어로 조회
+     * 단순 값을 DTO로 바로 조회
+     >SELECT `new` jpabook.jpql.UserDTO(m.username, m.age) FROM Member m   
+     * 페키지 명을 포함한 전체 클래스 명 입력
+     * 순서와 타입이 일치하는 생성자 필요
+
+<br>
+
+
 Query 타입으로 조회
 ```Java
 try {
