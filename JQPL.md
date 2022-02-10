@@ -173,117 +173,129 @@
     member1 = hellojpa.relationmapping.Member@310aee0b
     member1 = hellojpa.relationmapping.Member@1f1ff879
     ```
-    > flush()가 selet Query가 나가기 이전에 먼저 호출되서 insert Query가 나간것을 확인할 수 있다   
-    flush()는 transaction.commit()이 호출되는 시점에 호출되기도 하지만, entityManager를 통해서 Query를 내보내는 바로 직전에도 flush()가 호출된다.   
+    > flush()가 select Query가 나가기 이전에 먼저 호출되서 insert Query가 나간것을 확인할 수 있다.   
+    flush()는 transaction.commit()이 호출되는 시점에 호출되기도 하지만, `entityManager를 통해서 Query를 내보내는 바로 직전에도 flush()가 호출된다.`   
     JPA관련 기술을 사용할 때는 위의 결과처럼 entityManger를 통해서 Query를 내보낼때 자동으로 flush()가 호출되도록 설정되어있지만, JPA관련 기술이 아닌것을 사용하면서 commit()호출시점 이전에 entityMamger를 통해서 Query를 날리는 코드를 작성했다면 자동으로 flush()가 호출되지 않아 DB에 데이터는 null값으로 설정된다.   
-    따라서 JPA 관련 기술이 아닌 다른 기술을 사용할떄는 entityManager를 통해 Query를 내보내는 코드 바로 이전에 flush()를 기입해서 수동적으로 flush()를 호출해서 사용하도록 한다.   
+    따라서 JPA 관련 기술이 아닌 다른 기술을 사용할떄는 `entityManager를 통해 Query를 내보내는 코드 바로 이전에 flush()를 기입`해서 수동적으로 flush()를 호출해서 
+    사용하도록 한다.    
 
-
-
->flush()가 먼저 되고 Query가 호출된다   
-flush()는 commit()직전에 호출되기도 하지만 entityManager를 통해서 Query가 날라갈때고 flush()가 호출된다   
-JPA관련 기술들을 사용할 떄는 이렇게 flush()호출이 AUTO 인데 만약 JPA 관련기술이 아닌 기술을 사용한다면...   
-commti() 이전에 쿼리를 날린다면 flush()가 호출되지 않아 DB에 데이터는 null 인된다   
-따라서 JPA 관련 기술이 아닌 것을 사용할떄 Query문을 날리기 전에 강제로 flush()를 호출해서 사용하도록 한다   
-
-```SQL
-Hibernate: 
-    /* dynamic native SQL query */ select
-        member_id,
-        locker_id,
-        team_id,
-        username 
-    from
-        MEMBER
-Hibernate: 
-    select
-        team0_.team_id as team_id1_4_0_,
-        team0_.name as name2_4_0_ 
-    from
-        Team team0_ 
-    where
-        team0_.team_id=?
-===========================
-member1 = hellojpa.relationmapping.Member@310aee0b
-member1 = hellojpa.relationmapping.Member@1f1ff879
-```   
+---    
 ## _JPQL(Java Persistence Query Language)_   
 ## _JPQL - 기본 문법과 기능_   
 * ### _JPQL 소개_   
-`JPQL은 SQL을 추강화해서 특정데이터베이스 SQL에 의존하지 않는다.`   
-`JPQL은 결국 매핑 정보랑 방언이 조합이 되서 SQL로 변환돼 실행된다.`
-결국 DB는 SQL만 받을 수 있느니까   
-사진 첨부하고 새 프로젝트에 Member, Team, JpaMain, Orders, Product 코드 작성   
+  * JPQL은 객체지향 쿼리 언어다. 따라서 테이블을 대상으로 쿼리를 하는 것이 아니라 `엔티티 객체를 대상으로 쿼리`한다.  
+  * JPQL은 SQL을 추상화해서 특정데이터베이스 SQL에 의존하지 않는다.   
+  * DB는 SQL만 받을 수 있으므로 `JPQL은 결국 엔티티 객체의 매핑 정보와 방언이 조합돼서 SQL로 변환돼 실행된다.`  
+![](img/img332.png)
+![](img/img333.png)  
+<br>
+
 * ### _JPQL문법_   
-엔티이 이름: @Entity(name ="MM") default: Class Name   
-관례상 default를 사용   
+    ```
+    select_문 :: = 
+        select_절
+        from_절
+        [where_절]
+        [groupby_절]
+        [having_절]
+        [orderby_절]
+    update_문 :: = update_절[where_절]
+    delete_문 :: = delete_절[where_절]
+    ```
+  > select m from Member [as] m where m.age > 18   
+  * 엔티티와 속성은 대소문자를 구분한다(Member, age)
+  * JPQL 키워드는 대소문자를 구분하지 않는다(SELECT, FROM, where)
+  * `테이블 이름이 아닌 엔티티 이름을 사용한다.` 
+    * 엔티티 이름: @Entity(name = ""), defalut = Class Name
+    * 관례상 default를 사용한다
+  * `별칭은 필수(m)`, (as는 생량이 가능하다)
+* ### _집합과 정렬_   
+    ```SQL
+    select
+        COUNT(m),    /* 회원수 */
+        SUM(m.age),  /* 나이 합 */
+        AVG(m.age),  /* 평균 나이 */
+        MAX(m.age),  /* 최대 나이 */
+        MIN(m.age)   /* 최소 나이 */
+    from Member m
+    ```
+  * GROUP BY, HAVING
+  * ORDER BY
+
+<br>
+
 * ### _TypeQuery, Query_   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+  * `TypeQuery`: 반환 타입이 명확할 때 사용
+    ```Java
+    TypeQuery<Memer> query1 = entityManger.createQuery(
+        "select m from Member m", Member.calss);
 
-    //두 번째 파라미터에 응답 클래스에 대한 타입 정보를 중 수 있다(타입 정보는 아무거나 줄 수없으며 기본적으로 엔티티를 줘야한다
-    TypedQuery<Member> query1 = entityManager.createQuery("select m From Member m", Member.class);
-    TypedQuery<String> query2 = entityManager.createQuery("select m.username From Member m", String.class);
-    //m.username 은 String, m.age 는 int 로 타입이 서로 달라 두 번째 파라미터에 타입을 명시할 수 없다.
-    //이럴때는 반환타입을 Query를 사용해야 한다(타입 정보를 방을 수 없을 경우)
-    Query query3 = entityManager.createQuery("select m.username, m.age From Member m");
+    TypeQuery<String> query3 = entityManger.createQuery(
+        "select m.username from Member m", String.class);
+    ```
+    >createQuery() 두 번쨰 파라미터에는 반홥타입 클래스에 대한 정보를 넘겨줄 수 있다.   
+    타입 정보는 아무거나 줄 수 없으며, 기본적으로 엔티티 타입을 넘겨줘야한다.   
+  * `Query`: 반환 타입이 명확하지 안을 때 사용
+    ```Java
+    Query query3 = entityManger.createQuery(
+        "select m.username, m.age from Member m");
+    )
+    ```
+    >String username, int age로 서로 타입이 다르므로 createQuert()으 두 번째 파라미터에 반환 타입을 명시할 수 없다.   
 
-    transaction.commit();
-}
-```   
+<br>
+
 * ### _결과 조회 API_   
-결과가 하나 이상일 때, 즉 결과가 컬렉션일 경우 getResultList()를 사용한다   
-결과가 없으면 빈 리스트를 반환하므로 nullPointException에 대해서는 걱정할 필요가 없다     
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+  * `query.getResultList()`: 결과가 하나 이상일 때 즉, 결과가 컬렉션일 경우 리스트 반환  
+    ```Java
+    String jpql = "select m from Member m";
 
-    TypedQuery<Member> query = entityManager.createQuery("select m From Member m", Member.class);
-    List<Member> resultList = query.getResultList(); //컬렉션을 반환한다
+    TypeQuery<Mmeber> query = entityManager.createQuery(jpql, Member.class);
+    List<Member> resultList = query.getResultList();
 
-    for (Member member1 : resultList) {
-        System.out.println("member1 = " + member1);
+    for (Member member : resultList) {
+        System.out.println("member = " + member.getUsername);
     }
+    ```
+    >member = memberA
 
-    transaction.commit();
-}
-```   
-결과가 정확히 하나   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+    * 결과가 없으면 빈 리스트 반환   
+    * NullPointException에 대한 걱정을 할 필요 없다.  
+  * `query.getSingleResult()`: 결과가 정확히 하나, 단일 객체 반환   
+    * 결과가 없으면: javax.persistence.NoResultException
 
-    TypedQuery<Member> query = entityManager.createQuery("select m From Member m", Member.class);
-    Member result = query.singleResult();
+        ```Java
+        try {
+            String jpql = "select t from Team t";
 
-    System.out.println("result = " + result);
+            TypedQuery<Team> query = entityManager.createQuery(jpql, Team.class);
+            Team singleResult = query.getSingleResult();
 
-    transaction.commit();
-```    
-결과가 없는으면   
-```Java
-try {
-    TypedQuery<Member> query = entityManager.createQuery("select m From Member m", Member.class);
+            System.out.println("singleResult = " + singleResult);
 
-    Member result = query.getSingleResult();
-    System.out.println("result = " + result);
+            transaction.commit();
+        }    
+        ```
+        >javax.persistence.NoResultException: No entity found by query
+    * 둘 이상이면: javax.persistence.NoUniqueResultException   
 
-    transaction.commit();
-}
-```
-```
-javax.persistence.NoResultException: No entity found for query
-```   
+        ```Java
+        try {
+            Member member = new Member();
+            member.setUsername("memberB");
+            member.setAge(29);
+
+            entityManager.persist(member);
+
+            String jpql = "select m from Member m";
+            TypeQuery<Member> query = entityManager.createQuery(jpql, Member.class);
+            Member singleResult = query.getSingleResult();
+
+            System.out.println("member = " + sigleResult.getUsername());
+        }
+        ``` 
+        >Javax.persistence.NoUniqueResultException: query did not retuern a unique result: 2
+
 * ### _파라미터 바인딩 - 이름 기분, 위치 기준_   
 이름 기반 파라미터 바인딩   
 ```Java
