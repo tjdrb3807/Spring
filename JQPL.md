@@ -417,186 +417,216 @@
 * ### _프로젝션 - 여러 값 조회_   
   * SELECT `m.username, m.age` FROM Member m
   1. Query 타입으로 조회
+    ```Java
+    try {
+        String jpql = "select m.username, m,age from Member m";
+
+        List resultList = entityManager.createQuery(jpql)
+                .getResultList();
+
+        Object o = resultList.get(0);
+        Objcet[] result = (Object[]) o;  //타입 캐스팅
+        System.out.println("m.username = " _ result[0]);
+        System.out.println("m.age = " _ result[1]);
+
+        transaction.commit();
+    }
+    ```
+    >타입을 명시할 수 없으므로 Object로 반환하는 것이다.   
+    내부적으로 Object[]이 들어가있으므로 타입 캐스팅을 해준다.    
+    
+    ```
+    m.username = member1
+    m.age = 20
+    ```
   2. Object[] 타입으로 조회
+    ```Java
+    try {
+        String jpql = "select m.username, m.age from Member m";
+
+        List<Objcet[]> resultList = entityManager.createQuery(Jpql)
+                .getResultList();
+        
+        Object[] result = resultList.get(0);
+        System.out.println("m.username = " + result[0]);
+        System.out.println("m.age = " + result[1]);
+
+        transaction.commit
+    }
+    ```
+    >`제네릭에 Object[]를 선언`하는 방법   
   3. new 명령어로 조회
-     * 단순 값을 DTO로 바로 조회
-     >SELECT `new` jpabook.jpql.UserDTO(m.username, m.age) FROM Member m   
-     * 페키지 명을 포함한 전체 클래스 명 입력
-     * 순서와 타입이 일치하는 생성자 필요
+    ```Java
+    public class MemberDTO {
+
+        private String username;
+        private int age;
+
+        public MemberDTO(String username, int age) {
+            this.username = username;
+            this.age = age;
+        }
+
+        //Getter, Setter
+    }
+    ```
+    ```Java
+    try {
+        String jpql = "select new jpal.MemberDTO(m.username, m.age) from Member m";
+
+        List<MemberDTO> result = entityManager.createQuery(jpql, MemberDTO.class)
+                .getResultList();
+        
+        MemberDTO memberDTO = result.get(0);
+        System.out.println("m.username = " + memgerDTO.getUsername());
+        System.out.println("m.age = " + memgerDTO.getAge());
+        
+        transaction.commit();
+    }
+    ```
+    >단순 값을 DTO로 바로 조회   
+    페키지 명을 포함한 전체 클래스 명 입력   
+    순서와 타입이 일치하는 생성자 필요   
 
 <br>
 
-
-Query 타입으로 조회
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
-
-    entityManager.flush();
-    entityManager.clear();
-
-    List resultList = entityManager.createQuery("select m.username, m.age From Member m")
-            .getResultList();
-
-    Object o = resultList.get(0);
-    //내부적으로는 Object 배열이 들어간다(m.username, m.age 가 배열의 첫 번쨰, 두 번째)
-    Object[] result = (Object[]) o; //타입 캐스팅
-    System.out.println("result = " + result[0]);
-    System.out.println("result = " + result[1]);
-
-    transaction.commit();
-}
-```
-```
-result = member1
-result = 20
-```
->타입을 명시할 수 없으니 Object로 반환하는 것이다   
-
-Object[] 타입으로 조회   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
-
-    entityManager.flush();
-    entityManager.clear();
-
-    List<Object[]> resultList = entityManager.createQuery("select m.username, m.age From Member m")
-            .getResultList();
-
-    Object[] result = resultList.get(0);
-    System.out.println("result = " + result[0]);
-    System.out.println("result = " + result[1]);
-
-    transaction.commit();
-}
-```
->제네릭에 Object[] 를 선언하는 방법   
-
-new 명령어로 조회(가장 깔끔한 방법)   
-```Java
-        try {
-            Member member = new Member();
-            member.setUsername("member1");
-            member.setAge(10);
-            entityManager.persist(member);
-
-            entityManager.flush();
-            entityManager.clear();
-
-            //생성자를 통해서 호출이 된다
-            List<MemberDTO> result = entityManager.createQuery("select new jpql.MemberDTO(m.username, m.age) From Member m", MemberDTO.class)
-                    .getResultList();
-
-            MemberDTO memberDTO = result.get(0);
-            System.out.println("memberDTO = " + memberDTO.getUsername());
-            System.out.println("memberDTO = " + memberDTO.getAge());
-
-            transaction.commit();
-        }
-```
-
 * ### _페이징 API_   
+  * JPA는 페이징을 다음 두 API로 추상화
+  * `setFirstResult`(int startPosition): 조회 시작 위치(0부터 시작)
+  * `setMaxtResult`(int maxResult): 조회할 테이터 수
+
+<br>
+
 * ### _페이징 API 예시_   
-```Java
-try {
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    entityManager.persist(member);
+    ```Java
+    try {
+        String jpql = "select new jpql.MemberDTO(m.username, m.age) from Member m order by m.age desc";
 
-    entityManager.flush();
-    entityManager.clear();
-
-    List<Member> result = entityManager.createQuery("select m from Member m order by m.age desc", Member.class)
-            .setFirstResult(1)
-            .setMaxResults(10)
-            .getResultList();
-
-    System.out.println("result.size = " + result.size());
-    //Member 클레스에 toString
-    for (Member member1 : result) {
-        System.out.println("member1 = " + member1);
+        List<MemberDTO> result = entityManager.createQuery(jpql, MemberDTO.class)
+                .setFirstResult(1)
+                .setMaxResult(10)
+                .getResultList();
+        
+        System.out.println("result.size = " + result.size());
     }
-
-    transaction.commit();
-} 
-```
-```SQL
-Hibernate: 
-    /* select
-        m 
-    from
-        Member m 
-    order by
-        m.age desc */ select
-            member0_.member_id as member_i1_0_,
-            member0_.age as age2_0_,
-            member0_.team_id as team_id4_0_,
-            member0_.username as username3_0_ 
+    ```
+    ```SQL
+    Hibernate: 
+        /* select
+            m 
         from
-            Member member0_ 
+            Member m 
         order by
-            member0_.age desc limit ? offset ?
-result.size = 8
-```
->desc limit ? offset ?   
+            m.age desc */ select
+                member0_.member_id as member_i1_0_,
+                member0_.age as age2_0_,
+                member0_.team_id as team_id4_0_,
+                member0_.username as username3_0_ 
+            from
+                Member member0_ 
+            order by
+                member0_.age desc limit ? offset ?
+    result.size = 10
+    ```
+    >limit 숫자: 출력할 행의 수   
+    offeset 숫자: 몇 번째 row 부터 출력   
+    limit 숫자1, 숫자2: 숫자1 번째 row부터 출력해서 숫자2 개의 행 출력    
+
+<br>
 
 * ### _조인_   
-inner join (inner)생량 가능   
-```Java
-try {
-    Team team = new Team();
-    team.setName("teamA");
+  * 내부 조인: SELECT m FROM Member m [INNER] JOIN m.team t
+    ```Java
+    try {
+        String jpql = "select m from Member m join m.team t";
 
-    entityManager.persist(team);
+        List<Member> result = entityManager.createQuery(jpql, Member.class)
+                .getResultList();
 
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    member.setTeam(team);
-    entityManager.persist(member);
-
-    entityManager.flush();
-    entityManager.clear();
-
-    String query = "select m from Member m inner join m.team t";
-    List<Member> result = entityManager.createQuery(query, Member.class)
-            .getResultList();
-
-    transaction.commit();
-}
-```
-```SQL
-Hibernate: 
-    /* select
-        m 
-    from
-        Member m 
-    inner join
-        m.team t */ select
-            member0_.member_id as member_i1_0_,
-            member0_.age as age2_0_,
-            member0_.team_id as team_id4_0_,
-            member0_.username as username3_0_ 
+        transaction.commit();
+    }
+    ```
+    >inner join에서 join 생량 가능    
+    ```SQL
+    Hibernate: 
+        /* select
+            m 
         from
-            Member member0_ 
+            Member m 
         inner join
-            Team team1_ 
-                on member0_.team_id=team1_.team_id
-```
-> fetch LAZY 설정   
+            m.team t */ select
+                member0_.member_id as member_i1_0_,
+                member0_.age as age2_0_,
+                member0_.team_id as team_id4_0_,
+                member0_.username as username3_0_ 
+            from
+                Member member0_ 
+            inner join
+                Team team1_ 
+                    on member0_.team_id=team1_.team_id    
+    ```
+    >Member class의 `@ManyToOne(fetch = FetchType.LAZY)`   
+  * 외부 조인: SELECT m FROM Member m LEFT [OUTER] JOIN m.team t
+  * 세타 조인: select count(m) from Member m, Team t where m.username = t.name
+
+<br>
+
+* ### _조인 - ON 절_   
+  * ON절을 확용한 조인(JPA 2.1부터 지원)
+    1. 조인 대상 필터링   
+    2. 연관관계 없는 엔티티 외부 조인(하이버네이트 5.1부터)   
+
+<br>
 
 * ### _1. 조인 대상 필터링_   
-on 은 join할 때 조건   
+  * $ex.$ 회원과 팀을 조인하면서, 팀 이름이 A인 팀만 조인
+    >JPQL: SELECT m, t FROM Member m [LEFT] JOIN m.team t `on` t.name = 'A'   
+    SQL: SELECT m.*, t.* FROM Member m [LEFT] JOIN Team t `ON` m.TEAM_ID = t.id and t.name = 'A' 
+
+<br>
+
+* ### _2. 연관관계 없는 엔티티 외부 조인_   
+  * $ex.$ 회원의 이름과 팀의 이름이 같은 대상 외부 조인   
+    >JPQL: SELECT m, t FROM Member m [LEFT] JOIN Team t `on` m.username = t.name   
+    SQL: SELECT m.*, t.* FROM Member m [LEFT] JOIN Team t `ON` m.username = t.name   
+
+<br> 
+
 * ### _서브 쿼리_   
-서브쿼리와 메인 쿼리는 전혀 관계가 없다   
+  * 나이가 평균보다 많은 회원
+    >select m from Member m where m.age > `(select avg(m2.age) from Memver m2)`
+  * 한 건이라도 주문한 고객
+    >select m from Member m where `(select count(o) from Object o where m = o.member)`
+
+<br>
+
+* ### _ 서브 쿼리 지원 함수_   
+  * [NOT] EXISTS (subquery): 서브쿼리에 결과가 존해하면 참   
+    * {ALL|ANY|SOME} (subquery)
+    * ALL: 모두 만족하면 참   
+    * ANY, SOME: 같은 의미, 조건을 하나라도 만족하면 참
+  * [NOT] IN (subquery): 서브쿼리의 결과 중 하나라도 같은 것이 있으면 참
+
+<br>
+
+* ### _서브 쿼리 - 예제_   
+  * $ex.$ 팀A 소속인 회원
+    >select m from Member m where `exist` (select t from m.team t where t.name = '팀A')
+  * $ex.$ 전체 상품 각각의 재고보다 주문량이 많은 주문들   
+    >select o from Order o where o.orderAmount > `ALL` (select p.stockAmount from Product p)
+  * $ex.$ 어떤 팀이든 팀에 소속된 회원
+    >select m from Member m where m.team = `ANY` (select t from Team t)
+
+<br>
+
+* ### _JPA 서브 쿼리 한계_   
+  * JPA는 WHERE, HAVING 절에서만 서브 쿼리 사용 가능    
+  * SELECT 절도 가능(하이버네이트에서 지원)
+  * `FROM 절의 서브 쿼리는 현재 JPQL 에서 불가능`
+    * `조인으로 풀 수 있으면 풀어서 해결`
+
+<br>
+
 * ### _ JPQL 타입 표현식_   
 ```Java
 try {
