@@ -536,6 +536,7 @@
 
 * ### _조인_   
   * 내부 조인: SELECT m FROM Member m [INNER] JOIN m.team t
+    * [INNER] JOIN: 기준 테이블과 조인 테이블의 조인 컬럼에 해당하는 값이 `모두 존재하는 경우`에만 데이터가 조회된다. 
     ```Java
     try {
         String jpql = "select m from Member m join m.team t";
@@ -567,6 +568,10 @@
     ```
     >Member class의 `@ManyToOne(fetch = FetchType.LAZY)`   
   * 외부 조인: SELECT m FROM Member m LEFT [OUTER] JOIN m.team t
+    * OUTER JOIN: 기준 테이블에만 데이터가 존재하면 조회가 된다.   
+      * LETF [OUTER] JOIN: 조인 테이블에 데이터가 없더라도 `기준 테이블의 모든 데이터가 조회`된고 조인 테이블에 테이가저 존재할 경우 해당 데이터를 참조할 수 있다. 
+      * RIGHT [OUTER] JOIN: RIGHT에 대항하는 테이블이 기준 테이블이 된다.    
+        * 기준 테이블의 모든 데이터가 조회되고 조인 테이블의 데이터가 있을 경우 해당 값을 표시한다.   
   * 세타 조인: select count(m) from Member m, Team t where m.username = t.name
 
 <br>
@@ -580,19 +585,19 @@
 
 * ### _1. 조인 대상 필터링_   
   * $ex.$ 회원과 팀을 조인하면서, 팀 이름이 A인 팀만 조인
-    >JPQL: SELECT m, t FROM Member m [LEFT] JOIN m.team t `on` t.name = 'A'   
-    SQL: SELECT m.*, t.* FROM Member m [LEFT] JOIN Team t `ON` m.TEAM_ID = t.id and t.name = 'A' 
+    >JPQL: SELECT m, t FROM Member m LEFT JOIN m.team t `on` t.name = 'A'   
+    SQL: SELECT m.*, t.* FROM Member m LEFT JOIN Team t `ON` m.TEAM_ID = t.id and t.name = 'A' 
 
 <br>
 
 * ### _2. 연관관계 없는 엔티티 외부 조인_   
   * $ex.$ 회원의 이름과 팀의 이름이 같은 대상 외부 조인   
-    >JPQL: SELECT m, t FROM Member m [LEFT] JOIN Team t `on` m.username = t.name   
-    SQL: SELECT m.*, t.* FROM Member m [LEFT] JOIN Team t `ON` m.username = t.name   
+    >JPQL: SELECT m, t FROM Member m LEFT JOIN Team t `on` m.username = t.name   
+    SQL: SELECT m.*, t.* FROM Member m LEFT JOIN Team t `ON` m.username = t.name   
 
 <br> 
 
-* ### _서브 쿼리_   
+* ### _서브 쿼리_    
   * 나이가 평균보다 많은 회원
     >select m from Member m where m.age > `(select avg(m2.age) from Memver m2)`
   * 한 건이라도 주문한 고객
@@ -600,8 +605,8 @@
 
 <br>
 
-* ### _ 서브 쿼리 지원 함수_   
-  * [NOT] EXISTS (subquery): 서브쿼리에 결과가 존해하면 참   
+* ### _서브 쿼리 지원 함수_   
+  * [NOT] EXISTS (subquery): 서브쿼리에 결과가 존재하면 참   
     * {ALL|ANY|SOME} (subquery)
     * ALL: 모두 만족하면 참   
     * ANY, SOME: 같은 의미, 조건을 하나라도 만족하면 참
@@ -627,41 +632,32 @@
 
 <br>
 
-* ### _ JPQL 타입 표현식_   
-```Java
-try {
-    Team team = new Team();
-    team.setName("teamA");
+* ### _JPQL 타입 표현식_   
+  * 문자: 'HELLO', 'She''s'
+  * 숫자: 10L(Long), 10D(Double), 10F(Float)
+  * Boolean: TRUE, FALSE
+    ```Java
+    try {
+        Spring jpql = "select m.username, 'HELLO', true from Member m";
 
-    entityManager.persist(team);
+        List<Object[]> resultList = entityManager.createQuery(jpql)
+                .getResultList();
 
-    Member member = new Member();
-    member.setUsername("member1");
-    member.setAge(10);
-    member.setTeam(team);
-    entityManager.persist(member);
-
-    entityManager.flush();
-    entityManager.clear();
-
-    String query = "select m.username, 'HELLO', true from Member m ";
-    List<Object[]> result = entityManager.createQuery(query)
-            .getResultList();
-
-    for (Object[] objects : result) {
-        System.out.println("objects = " + objects[0]);
-        System.out.println("objects = " + objects[1]);
-        System.out.println("objects = " + objects[2]);
+        for (Object o : resultList) {
+            System.out.println("objects = " + o[0]);
+            System.out.println("objects = " + o[1]);
+            System.out.println("objects = " + o[2]);
+        }
     }
+    ```
+    ```
+    objects = member1
+    objects = HELLO
+    objects = true
+    ```
+  * ENUM: jpabook.MemberType.Admin(패키지명 포함)
+  * 엔티티 타입: TYPE(m) = Member(상속 관계에서 사용)
 
-    transaction.commit();
-}
-```
-```
-objects = member1
-objects = HELLO
-objects = true
-```
 ENUM   
 ```Java
 try {
