@@ -3,7 +3,10 @@
 <br>
 
 ## _프로젝트 생성_
-* ### 사용 기능   
+
+<br>
+
+* ### _사용 기능_
   * $Web$
     >implementation 'org.springframework.boot:spring-boot-starter-web' 
   * $Thymeleaf$
@@ -17,8 +20,18 @@
      annotationProcessor 'org.projectlombok:lombok'
   * $Validation$
     >implementation 'org.springframework.boot:spring-boot-starter-validation'   
-    
+
 <br>
+
+* ### _쿼리 파라미터 로그 남기기_
+  * 외부 라이브러리 사용
+    >https://github.com/gavlyukovskiy/spring-boot-data-source-decorator   
+  * 스프링 부트를 사용하면 라이브러리를 추가하면 된다 
+  * 참고
+    >쿼리 파라미터를 로그로 남기는 외부 라이브러리는 시스템 자원을 사용하므로, 개발 단계에서는 편하게 사용해도 된다.   
+    하지만 운영시스템에서 적용하려면 꼭 성능테스트를 하고 사용하는 것이 좋다.   
+
+<br> 
 
 ## _JPA와 DB설정, 동작확인_
 * ### _YAML_
@@ -244,7 +257,7 @@
        @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
        private List<OrderItem> orderItems = new ArrayList<>();
 
-       @OneToOne(fetch = FetchType.LAZY)
+       @OneToOne(fetch = FetchType.LAZY, casecade = CascadeType.ALL)
        @JoinColumn(name = "delivery_id")
        private Delivery delivery;   //배송 정보
 
@@ -605,25 +618,246 @@
 
 ## _애플리케이션 아키텍처_
 ![](img/img337.png)
+* ### _계층형 구조 사용_
+  * controller, web: 웹 계층
+  * service: 비즈니스 로직, 트랜잭션 처리
+  * repository: JPA를 직접 사용하는 계층, 엔티티 매니저 사용
+  * domain: 엔티티가 모여 있는 계층, 모든 계층에서 사용
 
+<br>
+
+* ### _패키지 구조_
+  * jpabook.jpashop
+    * domain
+    * execption
+    * respository
+    * service
+    * web
+  * 개발 순서: 서비스, 리포지토리 계층을 개발하고, 테스트 케이스를 작성해서 검증, 마지막에 웹 계층 적용
 
 <br>
 <br>
 <br>
 
 # _회원 도메인 개발_
+* ### _구현 기능_
+  * 회원 등록
+  * 회원 목록 조회
 
+<br>
+
+* ### _순서_
+  * 회원 엔티티 코드 다시 보기
+  * 회원 리포지토리 개발
+  * 회원 서비스 개발
+  * 회원 기능 테스트 
 <br>
 
 ## _회원 리포지토리 개발_
 
 <br>
 
+* ### _회원 리포지토리 코드_   
+  ```Java
+  package jpabook.jpashop.repositoy;
+
+  @Repository
+  public class MemberRepository {
+
+      @PersistenceContext
+      private EntityManager entityManager;
+
+      public void save(Member member) {
+          entityManger.persist(member);
+      }
+
+      public Member findOne(Long id) {
+          return entityManager.fine(Member.class, id);
+      }
+
+      public List<Member> findAll() {
+          return entityManger.createQuery("select m from Member m", Member.class)
+              .getResultList();
+      }
+
+      public List<Member> findByName(String name) {
+          return entityManager.createQuery("select m from Member m where m.name =: memberName", Member.class)
+              .setParameter("memberName", name)
+              .getResultList();
+      }
+  }
+  ```
+
+<br>
+
+* ### _기술 설명_
+  * `@Repository`: 스프링 빈으로 등록
+    * `@Component` 애노테이션 탑재
+    * JPA 예외를 스프링 기반 예외로 변환
+  * `@PersistenceContext`: 엔티티 매니저(`EntityManager`)주입
+  * `@PersistenceUnit`: 엔티티 매니저 팩토리(`EntityManagerFactory`)주입
+  
+
+<br>
+
 ## _회원 서비스 개발_
+* ### _회원 서비스 코드_
+  ```Java
+  package jpabook.jpashop.service;
+
+  @Service
+  @RequiredArgsConstructor
+  @Transactional(readOnly = true)
+  public class MemverService {
+
+      private final MemberRepository memberRespository;
+
+      /*
+      * 회원 가입
+      */
+      @Transaction
+      public Long join(Member member) {
+          validateDuplicationMember(member);  //중복 회원 검증
+
+          memberRepository.save(member);
+          
+          return member.getId();
+      }
+
+      private void validateDuplicationMember(Member member) {
+          List<Member> findMembers = memberRepository.findByName(member.getName());
+          if (!fineMember.isEmpty()) {
+              throw new IllegalStateException("이미 존재하는 회원입니다.");
+          }          
+      }
+
+      /*
+      * 전체 회원 조회
+      */
+      public List<Member> findAll() {
+          return memberRepository.findAll();
+      }
+
+      public Member findOn(Long memberId) {
+          return memberRepository.findOne(memberId);
+      }
+  }
+  ```
+
+<br>
+
+* ### _기술 설명_
+  * `@Transactional`: 트랜잭션, 영속성 컨텍스트
+    * `readOnly = true`: 데이터의 변경이 없는 읽기 전용 메서드에 사용, 영속성 컨텍스트를 플러시 하지 않으므로 약간의 선능 향상(읽기 전용에는 다 적용)
+    * 데이터베이스 드라이버가 지원하면 DB에서 선능 향상
+  * `@Autowired`
+    * 생성자 Injection 많이 사용, 생성자가 하나면 생략 가능
+  * 참고
+    >실무에서는 검증 로직이 있어도 멀티 쓰레드 상황을 고려해서 회원 테이블의 회원명 컬럼에 유니크 제약 조건을 추가하는 것이 안전하다.  
+
+<br>
+
+* ### _생성자 주입_
+  * 생성자 주입 방식을 권장
+  * 변경 불가능한 안전한 객체 생성 가능
+  * 생성자가 하나면 `@Autowired`를 생량할 수 있다.
+  * `final`키워드를 추가하면 컴파일 시점에 `memberRepository`를 설정하지 않는 오류를 체그할 수 있다.(보통은 기본 생성자를 추가할 때 발견)
+  * 참고
+    >스프링 데이터 JPA를 사용하면 `EntityMamager`도 주입 가능 
 
 <br>
 
 ## _회원 기능 테스트_
+
+<br>
+
+* ### _테스트 요구사항_
+  * 회원가입을 성공해야 한다
+  * 회원가입 할 때 같은 이름이 있으면 예외가 발생해야 한다.
+  
+<br>
+
+* ### _회원가입 테스트 코드_
+  ```Java
+  package jpabook.jpashop.service;
+
+  @SpringBootTest
+  @Transaction
+  public class MemberServiceTest {
+
+      @Autowired MemberRepository memberRepository;
+      @Autowired MemberService memberService;
+
+      @Test
+      void 회원가입() throws Exception {
+          //given
+          Member member = Member.bulider
+                .name("memberA")
+                .bulid();
+            
+          //when
+          Long findId = memberService.join(member);
+
+          //then
+          assertEquals(member, memberRepository.findOne(findId));
+      }
+
+      @Test
+      void 중복_회원_예외() throws Exception {
+          //given
+          Member memberA = Member.bulider
+                .name("mamberA")
+                .bulid();
+
+          Member memberB = Member.bulider
+                .name("memberA")
+                .bulid();
+
+          //when
+          memberService.join(memberA);
+
+          //then
+          IlligalStateException illigalStateException = assertThorw(IlligalStateException.class,
+                () -> memberService.join(memberB));
+      }
+  }
+  ```
+
+<br>
+
+* ### _기술 설명_
+  * `@SpringBootTest`: 스프링 부트를 띄우고 테스트(이게 없으면 `@Autowired`)다 실패)
+  * `@Transactional`: 반복 가능한 테스트 지원, 각각의 테스트를 실행할 때마다 트랜잭션을 시작하고 `테스트가 끝나면 트랜잭션을 강제로 롤백`(이 애노테이션이 테스트 케이스에서 사용될 때만 롤백)
+
+<br>
+
+* ### _테스트 케이스를 위한 설정_
+  * 테스트 케이스는 격리된 환경에서 실행하고, 끝나면 데이터를 초기화하는 것이 좋다.
+  * 따라서 메모리 DB를 사용하는 것이 가장 이상적이다.
+  * 추가로 테스트 케이스를 위한 스프링 환경과, 일반적으로 애플리케이션을 실행하는 환경은 보통 다르므로 설정 파일을 다르게 사용하자.
+  * `test/resources/application.yml`
+    ```Java
+    spring:
+      //datasource:
+        //url: jdbc:h2:tcp://localhost/~/jpashop
+        //username: sa
+        //password:
+        //driver-class-name: org.h2.Driver
+
+      //jpa:
+        //hibernate:
+          //ddl-auto: create
+        //properties:
+          //hibernate:
+            //#        show_sql: true -> sout 출력...
+            //fromat_sql: true
+
+    //logging:
+      //level:
+        //org.hibernate.SQL: debug
+        //org.hibernate.type: trace    
+    ```
+  * 이제 테스트에서 스프링을 실행하면 이 위치에
 
 <br>
 <br>
@@ -633,7 +867,102 @@
 
 <br>
 
+* ### _구현 기능_
+  * 상품 등록
+  * 상품 목록 조회
+  * 상품 수정
+
+<br>
+
+* ### _순서_
+  * 상품 엔티티 개발(비즈니스 로직 추가)
+  * 상품 리포지토리 개발
+  * 상품 서비스 개발
+  * 상품 기능 테스트
+
+<br>
+
 ## _상품 엔티티 개발(비즈니스 로직 추가)_
+
+<br>
+
+* ### _상품 엔티티 코드_
+  ```Java
+  package jpabook.jpashop.domain;
+
+  @Entity
+  @Inheritance(strategy = InheritenceType.JOINED)
+  @DiscriminatorColumn(neme = "dtype")
+  @NoArgsConstructor(access = PROTECTED)
+  @Getter
+  public abstract class Item {
+
+      @Id @GeneratedValue
+      @Column(name = "item_id")
+      private Long id;
+
+      private String name;
+
+      private int price;
+
+      private int stockQuantity;
+
+      @OneToMany(mappedBy = "item")
+      private List<OrderItem> orderItems = new ArrayList<>();
+
+      @OneToMany(mappedBy = "item")
+      private List<CategoryItem> categoryItems = new ArrayList<>();
+
+      //== 비즈니스 로직 ==//
+      public void addStock(int quantity) {
+          this.stockQuantity += quantity;
+      }
+
+      public void removeStock(int quantity) {
+          int restStock = this.stockQuantity -= quantity;
+          if (restStock < 0) {
+              throw new NotEnoughStockException("need more stock");
+          }
+
+          this.stockQuantity = restStock;
+      }
+  }
+  ```
+
+<br>
+
+* ### _예외 추가_
+  ```Java
+  package jpabook.jpashop0.exception;
+
+  public class NotEnoughStockException extends RuntimeException {
+
+      public NotEnoughStockException() {
+          super();
+      }
+
+      public NotEnoughStockException(String message) {
+          super(message);
+      }
+
+      public NotEnoughStockException(String message, Throwable cause) {
+          super(message, cause);
+      }
+
+      public NotEnoughStockException(Throwable cause) {
+          super(cause);
+      }
+  }
+  ```
+
+<br>
+
+* ### _비즈니스 로직 분석_
+  * `addStock()`메서드는 파라미터로 넘어온 수만큼 재고를 늘린다.
+    * 이 메서드는 재고가 증가하거나 상품 주문을 취소해서 재고를 다시 늘려야 할 때 사용한다.
+  * `removeStock()`메서드는 파라미터로 넘어온 수만큼 재고를 줄인다.
+    * 만약 재고가 부족하면 예외가 발생한다.
+    * 주로 상품을 주문할 때 사용한다.
 
 <br>
 
@@ -641,7 +970,74 @@
 
 <br>
 
+* ### _상품 리포지토리 코드_
+  ```Java
+  package jpabook.jpashop.repository;
+
+  @Repository
+  @RequiredArgsConstructor
+  public abstract class Item {
+
+      private final EntityManager entityManger;
+
+      public void sava(Item item) {
+          if (item.getId() == null) {
+              entityManager.find(item);
+          } else {
+              entityManger.merge(item);
+          }
+      }
+
+      public Item findOne(Long itemId) {
+          return entityManger.fine(Item.class, itemId);
+      }
+
+      public List<Item> findAll() {
+          return entityManager.createQuery("select i from Item i", Item.class)
+              .getResultList();
+      }
+  }
+  ```
+
+<br>
+
+* ### _기능 설명_
+  * `save()`
+    * `itemId`가 없으면 신규로 보고 `persist()`실행
+    * `itemId`가 있으면 이미 데이터베이스에 저장된 엔티티를 수정한다 보고, `merge()`를 실행, 자세한 내용은 뒤에 웹에서 설명
+
+<br>
+
 ## _상품 서비스 개발_
+
+<br>
+
+* ### _상품 서비스 코드_
+  ```Java
+  package jpabook.jpashop.service;
+
+  @Service
+  @RequiredArgsConstructor
+  @Transactional(readOnly = true)
+  public class ItemService {
+
+      private final ItemRepository itemRepository;
+
+      @Transactional
+      public void sace(Item item) {
+          itemRepository.save(item);
+      } 
+
+      public List<Item> findItems() {
+          return itemRepository.findAll();
+      }
+
+      public Item findOne(Long itemId) {
+          return itemRepository.findOne(itemId);
+      }
+  }
+  ```
+* 상품 서비스는 상품 리포지토리에 단순히 위임만 하는 클래스
 
 <br>
 <br>
@@ -651,7 +1047,179 @@
 
 <br>
 
+* ### _구현 기능_
+  * 상품 주문
+  * 주문 내역 조회
+  * 주문 취소
+
+<br>
+
+* ### _순서_
+  * 주문 엔티티, 상품 주문 엔티티 개발
+  * 주문 리포지토리 개발
+  * 주문 서비스 개발
+  * 주문 검색 기능 개발
+  * 주문 기능 테스트
+
+<br>
+
 ## _주문, 주문상품 엔티티 개발_
+
+<br>
+
+* ### _주문 엔티티 코드_
+  ```Java
+  package jpabook.jpashop.domain;
+  
+  @Entity
+  @Table(name = "orders")
+  @NoArgsConstructor(access = PROTECTED)
+  @Getter
+  public class order {
+
+      @Id @GeneratedValue
+      @Column(name = "order_id")
+      private Long id;
+
+      @ManyToOne(fetch = FetchType.LAZY)
+      @JoinColumn(name = "member_id")
+      private Member member;
+
+      @OneToOne(fetch = FetchType.LAZY)
+      @JoinColumn(name = "delivery_id")
+      private Delivery delivery;
+
+      @OneToMany(mappedBy = "order")
+      @Singular
+      private List<OrderItem> orderItems = new ArrayList<>();
+
+      private LocalDateTime = orderDate;
+
+      @Eumnerated(EnumType.STRING)
+      private OrderStatus status;
+
+      @Builer
+      private Order(Member member, Delivery delivery, OrderItem orderItems, LocalDateTime orderDate, OrderStatus status) {
+          this.member = member;
+          this.delivery = delivery;
+          this.orderItems = orderItems;
+          this.orderDate = orderDate;
+          this.status = status;
+      }
+
+      public void changeStatus(OrderStatus status) {
+        this.status = status;
+      }
+
+      //== 양방향 연관관관계 편의 메서드 ==//
+      public void byMember(Member member) {
+          this.member = member;
+          member.getOrders().add(this);
+      }
+
+      public void byDelivery(Delivery delivery) {
+          this.delivery = delivery;
+          delivery.setOrder(this);
+      }
+
+      public addOrdreItem(OrderItem orderItem) {
+          this.orderItems.add(orderItem);
+          orderItem.setOrder(this);
+      }
+
+      //==== 비즈니스 로직 ====//
+
+      //== 주문 취소 ==//
+      public void cancel() {
+          if (delivery.getStatus == DeliveryStatus.COMP) {
+              throw new IlligalStatusException("이미 배송완료된 상품은 취소가 불가능합니다.");
+          } else {
+              this.changeStatus(OrderStatuts.CANCEL);
+              for (OrderItem orderItem : orderItems) {
+                  ordetItem.cancel();
+              }
+          }
+      }
+
+      //==== 조회 로직 ====//
+      //== 전체 주문 가격 조회 ==//
+      public int getTotalPrice() {
+          int totalPrice = 0;
+          for (OrderItem orderItem : orderItems) {
+              totalPrice += orderItem.getTotalPrice();
+          }
+
+          return totalPrice;
+      }
+  }
+  ```
+
+<br>
+
+* ### _기능 설명_
+  * `생성 메서드(createOrder())`: 주문 엔티티를 생성할 떄 사용한다. 
+    * 주문 회원, 배속 정보, 주문 상품의 정보를 받아서 실제 주문 엔티티를 생성한다.
+  * `주문 취소(cancel())`: 주문 취소시 사용한다.
+    * 주문 상태를 취소로 변경하고 주문상품에 주문 취소를 알린다.
+    * 만약 이미 배속을 완료한 상품이면 주문을 취소하지 못하도록 예외를 발생시킨다.
+  * `전체 주문 가격 조회`: 주문 시 사용한 전체 주문 가격을 조회한다.
+    * 전체 주문 가격을 알려면 각각의 주문상품 가격을 알아야 한다.
+    * 로직을 보면 연관된 주문상품들의 가격을 조회해서 더한 값을 반환환다.
+    * 실무에서는 주로 주문에 전체 주문 가격 필드를 두고 역정규화 한다.
+
+* ### _주문상품 엔티티 코드_
+  ```Java
+  package jpabook.jpashop.domain;
+
+  @Entity
+  @NoArgsConstructor(access = PROTECTED)
+  @Getter
+  public class OrderItem {
+
+      @Id @GeneratedValue
+      @Column(name = "order_item_id")
+      private Long id;
+
+      @ManyToOne(fetch = FetchType.LAZY)
+      @JoinColumn(nema = "order_id")
+      private Order order;
+
+      @ManytoOne(fetch = FetchType.LAZY)
+      @JoinColumn(name = "item_id")
+      private Item item;
+
+      private int orderPirce;
+      private int count;
+
+      @Builder
+      private OrderItem(Order order, Item item, int orderPrice, int count) {
+          this.order = order;
+          this.item = item;
+          this.orderPrice = orderPirce;
+          this.count = count;
+      }
+
+      //==== 비즈니스 로직 ====//
+      //== 주문 취소 ==//
+      public void cencel() {
+          getItem.addStock(count);
+      }
+
+      //==== 조회 로직 ====//
+      //== 주문상품 전체 가격 조회 ==//
+      public int getTotalPrice() {
+          return getOrderPrice() * getConut();
+      }
+  }
+  ``` 
+
+<br>
+
+* ### _기능 설명_
+  * `생성 메서드(createOrderItem())`: 주문 상품, 가격, 수량 정보를 사용해서 주문 상품 엔티티를 생성한다.
+    * `item.removeStock(count)`를 호출해서 주문한 수량만큼 상품의 재고를 줄인다.
+  * `주문 취소(cancel())`: `getItem().addStock(count)`를 호출해서 취소한 주문 수량만큼 상품의 재고를 증가시킨다.
+  * `주문 가격 조회(getTotalPrice()`: 주문 가격에 수량을 곱한 값을 반환한다.
 
 <br>
 
@@ -659,13 +1227,122 @@
 
 <br>
 
+* ### _주문 리포지토리 코드_
+    ```Java
+    package jpabook.jpashop.repository;
+
+    @Repository
+    @RequiredArgsConstructor
+    public class ordre {
+
+        private final EntityManager entityManager;
+
+        public void save(Order oder) {
+            entityManager.persist(order);
+        }
+
+        public Order findOne(Long orderId) {
+            return entityManager.find(Order.class, orderId);
+        }
+    }
+    ``` 
+  * 주문 리포지토이에는 주문 엔티티를 저장하고 검색하는 기능이 있다.
+  * 마지막의 `findAll(OrderSearch orderSearch)`메서드는 조금 뒤에 있는 주문 검색 기능에서 자세히 알아본다.
+
+<br>
+
 ## _주문 서비스 개발_
+
+<br>
+
+* ### _주문 서비스 코드_
+    ```Java
+    package jpabook.jpashop01.service;
+
+    @Service
+    @RequiredArgsConstructor
+    @Transactional(readOnly = true)
+    public class OrderService {
+
+        private final OrderRepository orderRepository;
+        private final MemberRepository memberRepository;
+        private final ItemRepository itemRepository;
+
+        /**
+        * 주문
+        */
+        @Transactional
+        public Long order(Long memberId, Long itemId, int count) {
+            //엔티티 조회
+            Member member = memberRepository.findOne(memberId);
+            Item item = itemRepository.findOne(itemId);
+
+            //배송 정보 생성
+            Delivery delivery = Delivery.builder()
+                    .address(member.getAddress())
+                    .status(DeliveryStatus.READY)
+                    .build();
+
+            //주문 상품 생성
+            OrderItem orderItem = OrderItem.builder()
+                    .item(item)
+                    .orderPrice(item.getPrice())
+                    .count(count)
+                    .build();
+            orderItem.getItem().removeStock(count);
+
+            //주문 생성
+            Order order = Order.builder()
+                    .member(member)
+                    .delivery(delivery)
+                    .orderItem(orderItem)
+                    .build();
+
+            //주문 저장
+            orderRepository.save(order);
+
+            return order.getId();
+        }
+
+        /**
+        * 주문 취소
+        */
+        @Transactional
+        public void cancelOrder(Long orderId) {
+            //주문 엔티티 조회
+            Order order = orderRepository.findOne(orderId);
+
+            //주문 취소
+            order.cancel();
+        }
+    }
+    ``` 
+  * 주문 서비스는 주문 엔티티와 주문 상품 엔티티의 비즈니스 로직을 활용해서 주문, 주문 취소, 주문 내역 검색 기능을 제공한다.
+  * `주문(order())`: 주문하는 회원 식별자, 주문 수량 정보를 받아서 실제 주문 엔티티를 생성한 후 저장한다.
+  * `주문 취소(cancleOrder())`: 주문 식별자를 받아서 주문 엔티티를 조회한 후 주문 엔티티에 주문 취소를 요청한다.
+  * `주문 검색(findOrders()`: `OrderSearch`라는 검색 조건을 가진 객채로 주문 엔티티를 검색한다. 
+    * 자세한 내용은 다음에 나오는 주문 검색 기능에서 알아본다.
+  * 참고
+    * 주문 서비스의 주문과 주문 취소 메서드를 보면 비즈니스 로직 대부분이 엔티티에 있다. 
+    * 서비스 계층 은 단순히 엔티티에 필요한 요청을 위임하는 역할을 한다. 
+    * 이처럼 엔티티가 비즈니스 로직을 가지고 객체 지 향의 특성을 적극 활용하는 것을 `도메인 모델 패턴`(http://martinfowler.com/eaaCatalog/ domainModel.html)이라 한다. 
+    * 반대로 엔티티에는 비즈니스 로직이 거의 없고 서비스 계층에서 대부분 의 비즈니스 로직을 처리하는 것을 `트랜잭션 스크립트 패턴`(http://martinfowler.com/eaaCatalog/ transactionScript.html)이라 한다.
 
 <br>
 
 ## _주문 기능 테스트_
 
 <br>
+
+* ### _테스트 요구사항_
+  * 상품 주문이 성공해야 한다.
+  * 상품을 주문할 떄 재고 수량을 초과하면 안된다.
+  * 주문 취소가 성공해야 한다.
+
+* ### _상품 주문 테스트 코드_
+  ```Java
+
+  ``` 
 
 ## _주문 검색 기능 개발_
 
