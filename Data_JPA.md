@@ -862,7 +862,7 @@ JPA에서 페이징을 어떻게 할 것인가?
         public long totalCount(ints age) {
             return entityManager.createQuery("select count(m) from Member m where m.age = :age", Long.class)
                     .setPrarameter("age", age)
-                    .getResultList();
+                    .getSingleResult();
         }
     }
     ```
@@ -886,7 +886,7 @@ JPA에서 페이징을 어떻게 할 것인가?
 
         //when
         List<Member> members = memberJpaRepository.findByPage(age, offset, limit);
-        long totalCount = memberJpaRepository(age);
+        long totalCount = memberJpaRepository.totalCount(age);
 
         //페이지 계산 공식 적용...
         //totalPage = totalCount / size ...
@@ -952,17 +952,17 @@ JPA에서 페이징을 어떻게 할 것인가?
         memberRePository.svae(new Member("member5", 10));
 
         //when
-        PageRequest pageRequset = PageRequset(0, 3, Sort.Direction.DESC, "username");
+        PageRequest pageRequset = PageRequset.of(0, 3, Sort.Direction.DESC, "username");
         Page<Member> page = memberRepository(10, pageRequest);
 
         //then
         List<Member> content = page.getContent();  //조회된 데이터
         assertThat(content.size()).isEqualTo(3);   //조회된 데이터 수
-        assertThat(content.getTotalElements()).isEqualTo(5);  //전체 데이터 수
-        assertThat(content.getNumber()).isEqualTo(0);  //페이지 번호
-        assertThat(content.getTotalPage()).isEqualTo(2);  //전체 페이지 번호
-        assertThat(content.isFrist()).isTrue();  //천번째 항복인가?
-        assertThat(content.hasNext()).isTrue();  //다음 페이지가 있는가?
+        assertThat(page.getTotalElements()).isEqualTo(5);  //전체 데이터 수
+        assertThat(page.getNumber()).isEqualTo(0);  //페이지 번호
+        assertThat(page.getTotalPage()).isEqualTo(2);  //전체 페이지 번호
+        assertThat(page.isFrist()).isTrue();  //천번째 항복인가?
+        assertThat(page.hasNext()).isTrue();  //다음 페이지가 있는가?
     }
     ```
   * 두 번째 파라미터로 받은 `Pageable`은 인터페이스 이다.
