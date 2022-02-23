@@ -51,7 +51,7 @@
 
 <br>
 
-* ### _개발이나 테스트 용도로 가볍고 편리한 DB, 웹 퐈면 제공_
+* ### _개발이나 테스트 용도로 가볍고 편리한 DB, 웹 화면 제공_
   * 권한주기: `chmod 755 h2.sh`
   * 데이터베이스 파일 생성 방법
     * `jdbc:h2:~/datajpa`(최초 한번)
@@ -252,7 +252,7 @@
   * 카운트
   * 참고
     >JPA에서 수정은 변경감지 기능을 사용하면 된다.   
-    트랜잭션 안에서 엔티티를 조회한 다음에 데이터를 변경하면, 트랜잭션 종료 시점에 변경감지 기능이 작동해서 변경된 엔티티를 감지하고 UPDATA SQL을 실행한다. 
+    트랜잭션 안에서 엔티티를 조회한 다음에 데이터를 변경하면, 트랜잭션 종료 시점에 변경감지 기능이 작동해서 변경된 엔티티를 감지하고 UPDATE SQL을 실행한다. 
 
 <br>
 
@@ -260,19 +260,16 @@
     ```Java
     @Repository
     @RequiredArgsConstructor
-    @Transactional(readOnly = true)
     public class MemberJpaRepository {
 
         private final EntityManger entityManger;
 
-        @Transactional
         public Long save(Member member) {
             entityManager.persist(member);
 
             return member.getId();
         }
 
-        @Transactional
         public void delete(Member member) {
             entityManager.remove(member);
         }
@@ -305,19 +302,16 @@
     ```Java
     @Repository
     @RequiredArgsConstructor
-    @Transactional(readOnly = true)
     public class TeamJpaRespoitory {
 
         private final EntityManager entityManger;
 
-        @Transactional
         public Long save(Team team) {
             entityManger.persist(team)
 
             return team.getId();
         }
 
-        @Transactional
         public void delete(Team team) {
             entityManger.remove(Team team);
         }
@@ -571,7 +565,6 @@
     ```Java
     @Repository
     @RequiredArgsConstructor
-    @Transactional(readOnly = true)
     public class MemberJpaRepository {
 
         private final EntityManager entityManager;
@@ -587,7 +580,7 @@
 
 <br>
 
-* ### _순수 JPA TextCode_
+* ### _순수 JPA TestCode_
     ```Java
     @SpringBootTest
     @Transactional
@@ -597,7 +590,7 @@
         void findUsernameAndAgeGreaterThan() {
             //given
             Member member1 = new Member("AAA", 10);
-            Member member2 = new Member("BBB", 20);
+            Member member2 = new Member("AAA", 20);
 
             memberJpaRepository.save(member1);
             memberJpaRepository.save(member2);
@@ -643,35 +636,268 @@
     >이 기능은 엔티티의 필드명이 변경되면 인터페이스에 정의한 메서드 이름도 꼭 함께 변경해야 한다.   
     그렇지 않으면 애플리케이션을 시작하는 시점에 오류가 발생한다.   
     이렇게 애플리케이션 로딩 시점에 오류를 인지할 수 있는 것이 스프링 데이터 JPA의 매우 큰 장점이다.    
-     
-
-<br>
-
-* ### _쿼리 메서드 필터 조건_
 
 <br>
 
 ## _JPA NamedQuery_
+* JPA의 NamedQuery를 호출할 수 있다.
+* `@NamedQuery` 어노테이션으로 Named쿼리 정의
+    ```Java
+    @Entity
+    @NamedQuery(
+            name = "Member.findByUsername",
+            query = "select m from Member m where = :username")
+    public class Member {
+
+        ...
+    }
+    ```
+
+<br>
+
+* ### _JPA를 직접 사용해서 NamedQuery 호출_
+    ```Java
+    @Repository
+    @RequiredArgsConstructor
+    public class MemberJapRepository {
+
+        public List<Member> findByUsername(String username) {
+            return entityManager.createNamedQuery("Member.findByUsername", Member.classs)
+                    .setParameter("username", username)
+                    .getResultList();
+        }
+    }
+    ```
+
+<br>
+
+* ### _스프링 데이터 JPA로 NamedQuery 사용_
+    ```Java
+    @Query(name = "Member.findByUersname")
+    List<Member> findByUsername(@Param("username") String username);
+    ```
+  * `@Query`를 생량하고 메서드 이름으로만 Named 쿼리를 호출할 수 있다.
+
+<br>
+
+* ### _스프링 데이터 JPA로 Named 쿼리 호출_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> { /* 여기 선언한 Member 도메인 클래스 */
+
+        List<Member> findByUersname(@Param("username") String username);
+    }
+    ```
+  * 스프링 데이터 JPA는 선언한 `"도메인 클래스 + .(점) + 메서드 이름"`으로 Named 쿼리를 찾아서 실행
+  * 만약 실행할 Named 쿼리가 없으면 메서드 이름으로 쿼리 생성 전략을 사용한다.
+  * 필요하면 전략을 변경할 수 있지만 권장하지 않는다.
+    * [참고](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#repositories.query-methods.query-lookup-strategies)
+    * 참고
+      >스프링 데이터 JPA를 사용하면 실무에서 Named Query를 직접 등록해서 사요하는 일은 드물다.   
+      대신 `@Query`를 사용해서 리퍼지토리 메소드에 쿼리를 직접 정의한다.    
 
 <br>
 
 ## _@Query, 리포지토리 메소드에 쿼리 정의하기_
+* ### _메서드에 JPQL 쿼리 작성_
+    ```Java
+    public interface MemberRepository extends JpaRepositroy<Member, Long> {
+
+        @Query("select m from Member m where m.username = :username and m.age = :age")
+        List<Member> findUser(@Param("username") String username, @Param("age") int age);
+    }
+    ```
+  * `@org.springframework.data.jpa.repository.Query`어노테이션을 사용
+  * 실행할 메서드에 정적 쿼리를 직접 작성하므로 이름 없는 Named 쿼리라 할 수 있음.
+  * JPA Named 쿼리처럼 애플리케이션 실행 시점에 문법 오류를 발견할 수 있다(매우 큰 장점)
+  * 참고
+    >실무에서는 메서드 이름으로 쿼리 생성 기능은 파라미터가 증가하면 매서드 이름이 매우 지저분해진다.   
+    따라서 `@Query`기능을 자주 사용하게 된다.    
 
 <br>
 
 ## _@Query, 값, DTO 조회하기_
+* ### _단순히 값 하나를 조회_
+    ```Java
+    public interface MemberRepository extends JpaRepositroy<Member, Long> {
 
+        @Query("select m.username from Member m")
+        List<String> findUsernameList();
+    }
+    ```
+  * JPA 값 타임(`@Embedded`)도 이 방식으로 조회할 수 있다.
+
+<br>
+
+* ### _DTO로 직접 조회_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        @Query("select new data.datajpa.dto.MemberDto(m.id, m.username, t.name)" +
+                " from Member m join m.team t")
+        List<MemberDto> findMemberDto();
+    }
+    ```
+  * 주의!
+    >DTO로 직접 조회 하려면 JPA의 `new`명령어를 사용해야 한다.   
+    그리고 다음와 같이 생성자가 맞는 DTO가 필요하다(JPA와 사용방식이 동일하다.)   
+    
+    ```Java
+    @Data
+    public class MemberDto {
+
+        private Long id;
+        private String username;
+        private String teamName;
+
+        public MemberDto(Long id, String username, String teamName) {
+            this.id = id;
+            this.username = username;
+            this.teamName = teamName;
+        }
+    }
+    ```
 <br>
 
 ## _파라미터 바인딩_
+* 위치 기반
+* 이름 기반
+    ```Java
+    select m from Member m where m.username = ?0 //위치 기반
+    select m from Member m where m.username = :name //이름 기반
+    ```
 
 <br>
+
+* ### _파라미터 바인딩_
+    ```Java
+    public interface MemberRepositroy extends JpaRepositroy<Member Long> {
+
+        @Query("select m from Member m where m.username = :username")
+        List<Member> findMembers(@Param("username") String username);
+    }
+    ```
+  * 참고
+    >코드 가동성과 유지보수를 위해 이름 기반 파라미터 바인딩을 사용하자.   
+    위치기반은 순서 실수가 바꾸면...
+
+<br>
+
+* ### _컬렉션 파라미터 바인딩_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        @Query("select m from Member where m.username in :names")
+        List<Member> findByNames(@Param("names") List<String> names);
+    }
+    ```
+<br> 
 
 ## _반환 타입_
+* ### _스프링 데이터 JPA는 유연한 반환 타입 지원_
+    ```Java
+    List<Member> findListByUsername(String name); //컬렉션
+    Member findMemberByUsername(String name); //단건
+    Optional<Member> findOptionalByUsername(String name); //단건 Optional
+    ```
+  * [스프링 데이터 JPA 공식 문서](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#repository-query-return-types)
+
+* ### _TestCode_  
+    ```Java
+    @Test
+    void returnType() {
+        //given
+        Member member = new Member("Jeon", 29);
+        memberRepository.save(member);
+
+        //when
+        List<Member> findList = memberRepository.findListByUsername("없는 회원 이름");
+        Member findMember = memberRepository.findMemberByUsername("없는 회원 이름");
+        Optional<Member> findOptional = memberRepository.findOptrionalByUsername("없는 회원 이름");
+
+        //then
+        assertThat(findList.size()).isEqualTo(0);
+        assertThat(findMember).isEqualTo(null);
+        assertThat(findOptional).isEqualTo(Optional.empty());
+    }
+    ```
+  
+<br>
+
+* ### _조회 결과가 많거나 없으면?_
+  * 컬렉션
+    * 결과 없음: 빈 컬렉션 반환
+  * 단건 조회
+    * 결과가 없음: `null` 반환
+    * 결과 2건 이상: `javax.persistence.NonUniqueResultException` 예외 발생
+  * 참고
+    >단건으로 지정한 메서드를 호출하면 스프링 테이터 JPA는 내부에서 JPQL의 `Query.getSingleResult()`메서드를 호출한다.   
+    이 메서드를 호출했을 때 조회 결과가 없으면 `javax.persistence.NoRewultException`예외가 발생하는데 개발자 입장에서는 다루기가 상당히 불편하다.   
+    스프링 데이터 JPA는 단건을 조회할 때 이 예외가 발생하면 예외를 무시하고 대신에 `null`을 반환한다.    
 
 <br>
 
-## _순수 JPA 페이징과 정렬_
+## _순수 JPA 페이징과 정렬_   
+JPA에서 페이징을 어떻게 할 것인가?   
+다음 조건으로 페이징과 정렬을 사용하는 예제 코드를 보자.   
+* 검색 조건: 나이가 10살
+* 정렬 조건: 이름으로 내림 차순
+* 페이징 조건: 첫 번째 페이지, 페이지당 보여줄 데이터는 3건
+
+<br>
+
+* ### _JPA페이징 리포지토리 코드_
+    ```Java
+    @Repositroy
+    @RequiredArgeConstructor
+    @Transaction(readOnly = true)
+    public class MemberJpaRepository {
+
+        public List<Member> findByPage(int age, int offset, int limit) {
+            return entityManager.createQuery("select m from Member where m.age = :age order by m.username desc", Member.class)
+                    .setParameter("age", age)
+                    .setFristResult(offset)
+                    .setMaxResult(limit)
+                    .getResultList();
+        }
+
+        public long totalCount(int age) {
+            return entityManager.createQuert("select count(m) from Member m where m.age = :age", Long.class)
+                    .setParameger("age", age)
+                    .getSingleResult();
+        }
+    }
+    ```
+
+<br>
+
+* ### _JPA 페이징 테스트 코드_
+    ```Java
+    @Test
+    void paging() throws Exception {
+        //given
+        memberJpaRepository.save(new Member("member1", 10));
+        memberJpaRepository.save(new Member("member2", 10));
+        memberJpaRepository.save(new Member("member3", 10));
+        memberJpaRepository.save(new Member("member4", 10));
+
+        int age = 10;
+        int offset = 0;
+        int limit = 3;
+
+        //when
+        List<Member> members = memberJpaRespoistory.findByPage(age, offset, limit);
+        long totalCount = memberJpaRepository.totalCount(age);
+
+        //페이지 계산 공식 적용...
+        //totalPage = totalCount / size ...
+        //마지막 페이지...
+        //최초 페이지...
+
+        //then
+        assertThat(members.size()).isEqualTo(3);
+        assertThat(totalCount).isEqualTo(5); 
+    }
+    ```
 
 <br>
 
