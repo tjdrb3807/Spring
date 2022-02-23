@@ -847,23 +847,22 @@ JPA에서 페이징을 어떻게 할 것인가?
 
 * ### _JPA페이징 리포지토리 코드_
     ```Java
-    @Repositroy
-    @RequiredArgeConstructor
-    @Transaction(readOnly = true)
+    @Repository
+    @RequiredArgsConstructor
     public class MemberJpaRepository {
 
         public List<Member> findByPage(int age, int offset, int limit) {
-            return entityManager.createQuery("select m from Member where m.age = :age order by m.username desc", Member.class)
+            return entityManager.createQuery("select m from Member m where m.age = :age order by m.username desc", Member.class)
                     .setParameter("age", age)
-                    .setFristResult(offset)
+                    .setFirstResult(offset)
                     .setMaxResult(limit)
                     .getResultList();
         }
 
-        public long totalCount(int age) {
-            return entityManager.createQuert("select count(m) from Member m where m.age = :age", Long.class)
-                    .setParameger("age", age)
-                    .getSingleResult();
+        public long totalCount(ints age) {
+            return entityManager.createQuery("select count(m) from Member m where m.age = :age", Long.class)
+                    .setPrarameter("age", age)
+                    .getResultList();
         }
     }
     ```
@@ -873,35 +872,171 @@ JPA에서 페이징을 어떻게 할 것인가?
 * ### _JPA 페이징 테스트 코드_
     ```Java
     @Test
-    void paging() throws Exception {
+    void paging() {
         //given
-        memberJpaRepository.save(new Member("member1", 10));
-        memberJpaRepository.save(new Member("member2", 10));
-        memberJpaRepository.save(new Member("member3", 10));
-        memberJpaRepository.save(new Member("member4", 10));
+        memberJpaRespsitory.save(new Member("member1", 10));
+        memberJpaRespsitory.save(new Member("member2", 10));
+        memberJpaRespsitory.save(new Member("member3", 10));
+        memberJpaRespsitory.save(new Member("member4", 10));
+        memberJpaRespsitory.save(new Member("member5", 10));
 
         int age = 10;
         int offset = 0;
         int limit = 3;
 
         //when
-        List<Member> members = memberJpaRespoistory.findByPage(age, offset, limit);
-        long totalCount = memberJpaRepository.totalCount(age);
+        List<Member> members = memberJpaRepository.findByPage(age, offset, limit);
+        long totalCount = memberJpaRepository(age);
 
         //페이지 계산 공식 적용...
         //totalPage = totalCount / size ...
-        //마지막 페이지...
-        //최초 페이지...
+        //마지막 페이지 ...
+        //최초 페이지 ...
 
         //then
         assertThat(members.size()).isEqualTo(3);
-        assertThat(totalCount).isEqualTo(5); 
+        assertThat(totalCount).isEqualTo(5);
     }
     ```
 
 <br>
 
 ## _스프링 데이터 JPA 페이징과 정렬_
+* ### _페이징과 정렬 파라미터_
+  * `org.springframework.data.domain.Sort`: 정렬 기능
+  * `org.springframework.data.domain.pageable`: 페이징 기능(내부에 `Sort` 포함)
+  
+<br>
+
+* ### _특별한 반환 타입_
+  * `org.springframework.data.domain.Page`: 추가 count쿼리 결과를 포함하는 페이징
+  * `org.springframework.data.domain.Slice`: 추가 count쿼리 없이 다음 페이지만 확인 가능
+    * 내부적으로 limit + 1 조회
+  * `List`(자바 컬렉션): 추가 count 쿼리 없이 결과만 반환
+
+<br>
+
+* ### _페이징과 정렬 사용 예제_
+    ```Java
+    Page<Member> findByUsername(String name, Pageagle pageable);  //count 쿼리 사용
+    Slice<Member> findByUsername(String name, Pageable pageable); //count 쿼리 사용 안함
+    List<Member> findByUsername(String name, Pageable pageable);  //count 쿼리 사용 안함
+    List<Member> findByUsername(String name, Sort sort);
+    ```
+  * 다음 조건으로 페이징과 정렬을 사용하는 예제 코드를 보자
+    * 검색 조건: 나이가 10살 
+    * 정렬 조건: 이름으로 내림차순
+    * 페이징 조건: 첫 번째 페이지, 페이지당 보여줄 데이터는 3건
+
+<br>
+
+* ### _Page 사용 예제 정의 코드_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        Page<Member> findByPage(int age, Pageable pageable);
+    }
+    ```
+
+<br>
+
+* ### _Page 사용 예제 실행 코드_
+    ```Java
+    @Test
+    void page() {
+        //given
+        memberRePository.svae(new Member("member1", 10));
+        memberRePository.svae(new Member("member2", 10));
+        memberRePository.svae(new Member("member3", 10));
+        memberRePository.svae(new Member("member4", 10));
+        memberRePository.svae(new Member("member5", 10));
+
+        //when
+        PageRequest pageRequset = PageRequset(0, 3, Sort.Direction.DESC, "username");
+        Page<Member> page = memberRepository(10, pageRequest);
+
+        //then
+        List<Member> content = page.getContent();  //조회된 데이터
+        assertThat(content.size()).isEqualTo(3);   //조회된 데이터 수
+        assertThat(content.getTotalElements()).isEqualTo(5);  //전체 데이터 수
+        assertThat(content.getNumber()).isEqualTo(0);  //페이지 번호
+        assertThat(content.getTotalPage()).isEqualTo(2);  //전체 페이지 번호
+        assertThat(content.isFrist()).isTrue();  //천번째 항복인가?
+        assertThat(content.hasNext()).isTrue();  //다음 페이지가 있는가?
+    }
+    ```
+  * 두 번째 파라미터로 받은 `Pageable`은 인터페이스 이다.
+    * 따라서 실제 사용할 때는 해당 인터페이스를 구현한 `org.springframework.data.domain.pageRequest`객체를 사용한다.
+  * `pageRequest` 생성자의 첫 번째 파라미터에는 현재 페이지를, 두 번째 파라미터에는 조회할 데이터 수를 입력한다.
+    * 여기에 추가로 정보도 파라미터로 사용할 수 있다. 참고로 페이지는 0부터 시작한다.
+  * 주의
+    >Page는 1부터 시작이 아니라 0부터 시작이다.
+
+<br>
+
+* ### _Page 인터페이스_
+    ```Java
+    public interface Page<T> extends Slice<T> {
+
+        int getTotalPages();  //전체 페이지 수
+        long getTotalElements();  //전체 데이터 수
+        <U> Page<U> map<Function<? super T, ? extends U> converter);  //변환기
+    }
+    ```
+
+<br>
+
+* ### _Slice 인터페이스_
+    ```Java
+    public interface Slice<T> extends Streamable<T> {
+
+        int getNumber();            //현재 페이지 번호
+        int getSize();              //페이지 크기
+        int getNumberOfElements();  //현재 페이지에 나올 데이터 수
+        List<T> getContent();       //조회된 데이터
+        boolean hasContent();       //조회된 데이터 존재 여부
+        Sort getSort();             //정렬 정보
+        boolean isFrist();          //현재 페이지가 첫 페이지 인지 여부
+        boolean isLast();           //현재 페이지가 마지막 페이지 인지 여부
+        boolean hasNext();          //다음 페이지 여부
+        boolean hasPrevious();      //이전 페이지 여부
+        Pageable getPageable();     //페이지 요청 정보
+        Pageable nextPageable();    //다음 페이지 객체
+        Pageable previousPageable();//이전 페이지 객체
+        <U> Slice<U> map(Function<? super T, ? extends U> converter);  //변환기
+    }
+    ```
+
+<br>
+
+* ### _참고: count 쿼리를 다음과 같이 분리할 수 있음_
+    ```Java
+    @Query(value = "select m from Member m", 
+          countQuery = "select count(m.username) from Member m")
+    Page<Member> findMemberAllCountBy(Pageable pageable);
+    ```
+
+  * [_Top, First 사용 참고_](https://docs.spring.io/spring-data/jpa/docs/current/reference/html/#repositories.limit-query-result)
+  * `List<Member> findTop3By();`
+
+<br>
+
+* ### _페이지를 유지하면서 엔티티를 DTO로 변환하기_
+    ```Java
+    Page<Member> page = memberRepositroy.findByAge(10, pageRequset);
+    page<MemberDto> dtoPage = page.map(m -> new MemberDto());
+    ```
+
+<br>
+
+* ### _실습_
+  * Page
+  * Slice(count X)추가로 limit + 1을 조회한다. 그래서 다음 페이지 여부 확인(최근 모바일 리스트 생각해보면 됨)
+  * List (count X)
+  * 카운트 쿼리 분리(이건 복잡한 sql에서 사용, 데이터는 left join, 카운트는 left join 안해도 된다.)
+    * 실무에서 매우 중요!!!
+  * 참고
+    >전체 count 쿼리는 매우 무겁다. 
 
 <br>
 
