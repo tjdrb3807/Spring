@@ -676,7 +676,7 @@
     @Query(name = "Member.findByUersname")
     List<Member> findByUsername(@Param("username") String username);
     ```
-  * `@Query`를 생량하고 메서드 이름으로만 Named 쿼리를 호출할 수 있다.
+  * `@Query`를 생략하고 메서드 이름으로만 Named 쿼리를 호출할 수 있다.
 
 <br>
 
@@ -1041,15 +1041,224 @@ JPA에서 페이징을 어떻게 할 것인가?
 <br>
 
 ## _벌크성 수정 쿼리_
+* ### _JPA를 사용한 벌크성 수정 쿼리_
+    ```Java
+    @Repositroy
+    @RequiredArgsConstructor
+    public class MemberJpaRepository {
+
+        private final EntityMamager entityManager;
+
+        public int bulkAgePlus(int age) {
+            return entityManager.createQuery("update Member m set m.age = m.age + 1 where m.age >= :age")
+                  .setParameter("age", age);
+                  .excuteUpdate();
+        }
+    }
+    ```
+  * `excuteUpdate()`
+    * 데이터베이스에서 데이터를 추가(`Insert`), 삭제(`Delete`), 수정(`Update`)하는 SQL문을 실행.
+    * 메서드의 반환값은 해당 SQL문 실행에 영향을 받을 row의 수 
 
 <br>
 
+* ### _스프링 데이터 JPA를 사용한 벌크성 수정 쿼리_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        @Modifying(clearAutomaticlly = true)
+        @Query("update Member m set m.age = m.age + 1 where m.age >= :age")
+        int bulkAgePlus(@Param("age") ing age);
+    }
+    ```
+
+<br>
+
+* ### _스프링 데이터 JPA를 사용한 벌크성 수정 쿼리 테스트_
+    ```Java
+    @Test
+    void bulkAgePlus() {
+        //given
+        memberRepository.save(new Member("member1", 10));
+        memberRepository.save(new Member("member2", 19));
+        memberRepository.save(new Member("member3", 20));
+        memberRepository.save(new Member("member4", 21));
+        memberRepository.save(new Member("member5", 40));
+
+        //when  
+        int resultCount = memberRepository.bulkAgePlus(20);
+
+        //then
+        assertThat(resultCount).isEqualTo(3);
+    }
+    ```
+  * 벌크설 수정, 삭제 쿼리는 `@Modifying` 어노테이션을 사용
+    * 사용하지 않는다면 다음 예외 발생
+    * `org.hibernate.hql.internal.QueryExcutionRequestException: Not supported for DML operations`
+  * 벌크설 쿼리를 실행하고 나서 영속성 컨텍스트 초기화: `@Modifying(clearAutomatically = true)`
+    * 이 옵션의 기본값은 `false`
+    * 이 옵션 없이 회원을 `findBy`로 다시 조회하면 영속성 컨텍스트에 과거 값이 남아서 문제가 될 수 있다.
+    * 만약 다시 조회해야 하면 꼭 영속성 컨텍스트를 초기화 하자.
+  * 참고
+    >벌크 연산은 영속성 컨텍스트를 무시하고 실행하기 떄문에, 영속성 컨텍스트에 있는 엔티티의 상태와 DB에 엔티티 상태가 달라질 수 있다.   
+    벌크 연산 이후 연속성 컨텍스트를 비워야 한다.     
+    1. 영속성 컨텍스트에 엔티티가 없는 상태에서 벌크 연산을 먼저 실행한다.   
+    2. 부득이하게 영속성 컨텍스트에 엔티티가 있으면 벌크 연산 직후 영속성 컨텍스트를 초기화 한다.    
+<br>
+
 ## _@EntityGraph_
+연관된 엔티티들을 SQL 한번에 조회하는 방법   
+member -> team은 지연로딩(LAZY)관계이다.    
+따라서 team의 데이터를 조회할 때 마다 쿼리가 실행된다(N + 1 문제 발생)
+
+<br>
+
+* ### _지연로딩에 의한 N + 1문제_
+    ```Java
+    @Test
+    void findMmeberLazy() {
+        //given
+        Team teamA = new Team("teamA");
+        Team teamB = new Team("teamB");
+
+        teamRepository.save(teamA);
+        teamRepository.save(teamB);
+
+        memberRepository.sava(new Member("member1", 10, teamA));
+        memberRepository.sava(new Member("member2", 20, teamB));
+
+        //영속성 컨텍스트를 비워 다음 조회시 DB에 직접 Query를 날려 조회하도록 설정한다.
+        entityManager.flush();
+        entityManager.clear();
+
+        //when
+        List<Member> findMembers = memberRepository.findAll();
+
+        //then
+        for (Member member : findMembers) {
+            System.out.println("member = " + member.getTeam().getName());
+        }
+    }
+    ```
+  * 연관된 엔티티를 한번에 조회하려면 페치 조인이 필요하다.
+
+<br>
+
+* ### _JPQL 페치 조인_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        @Query("select m from Member m fetch join m.team")
+        List<Member> findMemberFetchJoin();
+    }
+    ```
+ * 스프링 데이터 JPA는 JPA가 제공하는 엔티티 그래프 기능을 편리하게 사용하도록 도와준다.
+ * 이 기능을 사용하면 JPQL 없이 페치 조인을 사용할 수 있다.(JPQL + 엔티티 그래프도 가능)
+ 
+<br>
+
+* ### _EntityGraph_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        //공통 메서드 오버라이드
+        @Overried
+        @EntityGraph(attributePaths = {"team"})
+        List<Member> findAll();
+
+        //JPQL + 엔티티 그래프
+        @EntityGraph(attributePaths = {"team"})
+        @Query("select m from Member m")
+        List<Member> findMemberEntityGraph();
+
+        //메서드 이름으로 쿼리에서 특히 편리
+        @EntityGraph(attributePaths = {"team"})
+        List<Member> findEntityGraphByUsername();
+    }
+    ```
+
+<br>
+
+* ### _EntityGraph 정리_
+  * 사실상 페치 조인(Fetch Join)의 간편 버전
+  * left outer join 사용
+
+<br>
+
+* ### _NamedEntityGraph 사용 방법_
+    ```Java
+    @NamedEntityGraph(name = "Member.all", attributeNodes = @NamedAttributeNode("team"))
+    @Entity
+    public class Member {
+
+        ...
+    }
+    ```
+    ```Java
+    @EntityGraph("Member.all")
+    @Query("select m from Member m")
+    List<Member> findMemberEntityGraph();
+    ```
 
 <br>
 
 ## _JPA Hint & Lock_
+* ### _JPA Hint_
+  * JPA 쿼리 힌트(SQL 힌트가 아니라 JPA 구현체에게 제공하는 힌트)
 
+<br>
+
+* ### _쿼리 힌트 사용_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        @QueryHints(value = @QueryHint(name = "org.hibernate.readOnly"), value = "true")
+        Member findReadOnlyByUsername(String username);
+    }
+    ```
+
+<br>
+
+* ### _쿼리 힌틑 사용 확인_
+    ```Java
+    @Test
+    void queryHint() {
+        //given
+        memberRepository.sava(new Member("member1", 20));
+
+        entityManger.flush();
+        entityManger.clear();
+
+        //when
+        Member member = memberRepository.findReadOnlyByUsername("member1");
+        member.setUsername("member2");
+
+        entityManager.flush();  //Update Query 실행X
+        
+    }
+    ```
+
+<br>
+
+* ### _쿼리 힌트 Page 추가 예제_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long> {
+
+        @QueryHints(value = {@QueryHint(name = "org.hibernate.readOnly", value = "ture")},
+              forCounting = true)
+        Page<Member> findByUsernames(String name, Pageable pageable);
+    }
+    ```
+  * `org.springframework.data.jpa.repository.QueryHints` 어노테이션을 사용
+  * `forCounting`: 반환 타입으로 `Page`인터페이스를 적용하면 추가로 호출하는 페이징을 위한 count 쿼리도 쿼리 힌트 적용(기본값 true)
+
+* ### _Lock_
+    ```Java
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    List<Member> findByUsername(String name);
+    ```
+  * `org.springframework.data.jpa.repository.Lock` 어노테이션을 사용
+  * JPA가 제공하는 락은 JPA 16.1 트탠젝션과 락 절을 참고
 <br>
 <br>
 <br>
@@ -1059,10 +1268,125 @@ JPA에서 페이징을 어떻게 할 것인가?
 <br>
 
 ## _사용자 정의 리포지토리 구현_
+* 스프링 데이터 JPA 리포지토리는 인터페이스만 정의하고 구현체는 스프링이 자동으로 생성
+* 스프링 데이터 JPA가 제공하는 인터페이스는 직접 구현해야 하는 기능이 너무 많다.
+* 다양한 이유로 인터페이스의 메서드를 직접 구현하고 싶다면?
+  * JPA 직접 사용()
+  * 스프링 JDBC Template 사용
+  * MyBatis 사용
+  * 데이터베이스 커넥션 직접 사용 등등...
+  * Querydsl 사용
+
+<br>
+
+* ### _사용자 정의 인터페이스_
+    ```Java
+    public interface MemberRepositoryCustom {
+
+        List<Member> findMemberCustom();
+    }
+    ```
+
+<br>
+
+* ### _사용자 정의 인터페이스 구현 클래스_
+    ```Java
+    @RequiredArgsConstructor
+    public class MemberRepositoryImpl implements MemberRepositoryCustom {
+
+        private final EntityManager entityManger;
+
+        @Override
+        public List<Member> findMemberCustom() {
+            return entityManager.createQuery("select m from Member m")
+                  .getResultList();
+        }
+    }
+    ```
+
+<br>
+
+* ### _사용자 정의 인터페이스 상속_
+    ```Java
+    public interface MemberRepository extends JpaRepository<Member, Long>, MemberRepositoryCustom {
+
+        ...
+    }
+    ```
+
+<br>
+
+* ### _사용자 정의 메서드 호출 코드_
+    ```Java
+    @Tese
+    void custom() {
+        memberRepository.findMemberCustom();
+    }
+    ```
+
+<br>
+
+* ### _사용자 정의 인터페이스 구현 클래스_
+  * 규칙: 리포지토리 인테페이스 이름 + `Impl`
+  * 스프링 데이터 JPA가 인식해서 스프링 빈으로 등록
+
+<br>
+
+* ### _Impl 대신 다른 이름으로 변경하고 싶으면?_
+  * XML 설정
+    ```XML
+    <repositories base-package = "study.datajpa.repository"
+                  repository-impl-postfix = "Impl" />
+    ```
+  * JavaConfig 설정
+    ```Java
+    @EnableJpaRepositories(basePackages = "study.datajpa.repository",
+                          repositoryImplementationPostfix = "Impl")
+    ``` 
+  * 참고
+    >실무에서는 주로 QueryDSL이나 SpringJdbcTemplate을 함께 사용할 떄 사용자 정의 리포지토리 기능 자주 사용
+  * 참고
+    >항상 사용자 정의 리포지토리가 필요한 것은 아니다.   
+    그냥 임의의 리포지토리를 만들어오면 된다.   
+    예를들어 MemberQueryRepository를 인터페이스가 아닌 클래스로 만들고 스프링 빈으로 등록해서 그냥 직접 사용해도 된다.   
+    물론 이 경우 스프링 데이터 JPA와는 아무런 관계 없이 별도로 동작한다.   
+
+<br>
+
+* ### _사용자 정의 리포지토리 구현 최신 방식_
+  > 스프링 데이터 2.x 부터는 사용자 정의 구현 클래스에 리포지스토리 인터페이스 이름 + `Impl`을 적용하는 대신에 사용자 정의 인터페이스명  + `Impl`방식도 지원한다.   
+  예를 들어 위 예제의 `MemberRepositoryImpl` 대신에 `MemberRepositoryCustomImpl`같이 구현해도 된다.   
+
+* ### _최신 사용자 저의 인터페이스 구현 클래스 예제_
+    ```Java
+    @RequiredArgsConstructor
+    public class MemberRepositoryCustomImpl implements MemverRepositoryCustom {
+
+        private final EntityManager entityManager;
+
+        @Override
+        public List<Member> findMemberCustom() {
+            return entityMnager.createQuery("select m from Member m")
+                    .getResultList();
+        }
+    }
+    ```
+  >기존 방식보다 이 방식이 사용자 정의 인터페이스 이름과 구현 클래스 이름이 비슷하므로 더 직관적이다.   
+  추가로 여러 인터페이스를 분리해서 구현하는 것도 가능하기 때문에 새롭게 변경된 이 방식을 사용하는 것을 더 권장한다.   
 
 <br>
 
 ## _Auditing_
+* 엔티티를 생성, 변경할 때 변겨한 사람과 시간을 추적하고 싶으면?
+  * 등록일
+  * 수적일
+  * 등록자
+  * 수정자
+
+<br>
+
+* ### _순수 JPA 사용_
+  * 우선 등록일, 수정일 등록
 
 <br>
 
