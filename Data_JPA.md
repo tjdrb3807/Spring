@@ -1294,12 +1294,12 @@ member -> team은 지연로딩(LAZY)관계이다.
     @RequiredArgsConstructor
     public class MemberRepositoryImpl implements MemberRepositoryCustom {
 
-        private final EntityManager entityManger;
+        private final EntityManager entityManager;
 
-        @Override
+        @Overried
         public List<Member> findMemberCustom() {
-            return entityManager.createQuery("select m from Member m")
-                  .getResultList();
+            return entityMenager.createQuery("select m from Member m", Member.class)
+                    .getResultList();
         }
     }
     ```
@@ -1360,13 +1360,13 @@ member -> team은 지연로딩(LAZY)관계이다.
 * ### _최신 사용자 저의 인터페이스 구현 클래스 예제_
     ```Java
     @RequiredArgsConstructor
-    public class MemberRepositoryCustomImpl implements MemverRepositoryCustom {
+    public class MemberRepositoryCustomImpl implements MemberRepositoryCustom {
 
         private final EntityManager entityManager;
 
         @Override
         public List<Member> findMemberCustom() {
-            return entityMnager.createQuery("select m from Member m")
+            return entityManger.createQuery("select m from Member m", Member.class)
                     .getResultList();
         }
     }
@@ -1377,7 +1377,7 @@ member -> team은 지연로딩(LAZY)관계이다.
 <br>
 
 ## _Auditing_
-* 엔티티를 생성, 변경할 때 변겨한 사람과 시간을 추적하고 싶으면?
+* ### _엔티티를 생성, 변경할 때 변경한 사람과 시간을 추적하고 싶으면?_
   * 등록일
   * 수적일
   * 등록자
@@ -1387,14 +1387,325 @@ member -> team은 지연로딩(LAZY)관계이다.
 
 * ### _순수 JPA 사용_
   * 우선 등록일, 수정일 등록
+    ```Java
+    @MappedSuperclass
+    @Getter
+    public class JpaBaseEntity {
+
+        @Column(updatable = flase)
+        private LocalDateTime createDate;
+        private LocalDateTime updateDate;
+
+        @PrePersist
+        public void prePersist() {
+            LocalDateTiem now = LocalDateTime.now();
+
+            createDate = now;
+            updateDate = now;
+        }
+
+        @PreUpdate
+        public void preUpdate() {
+            updateDate = LocalDateTime.now();
+        }
+    }
+    ```
+  * 엔티티에 상속
+    ```Java
+    public class Member extends JpaBaseEntity {
+
+        ...
+    }
+    ``` 
+  * 확인 코드
+    ```Java
+    @Test
+    void jpaEventBaseEntity() throws Exception {
+        //given
+        Member member = new Member("member1");
+        memberRepository.save(member);  //@PrePersist
+
+        Thread.sleep(100);
+        member.setUsername("member2");
+
+        entityManager.flush();  //@PreUpdate
+        entityManager.clear();
+
+        //when
+        Member findMember = memberRepository.findById(member.getId()).get();
+
+        //then
+        System.out.println("findMember.createDate = " + findMember.getCreateDate());
+        System.out.println("findMember.updateDate = " + findMember.getUpdateDate());
+    }
+    ``` 
+  * JPA 주요 이벤트 어노테이션
+    * @PrePersist, @PostPersist
+    * @PreUpdate, @PostUpdate
 
 <br>
 
-## _Web확장 - 도메인 클래스 컨버터_
+* ### _스프링 데이터 JPA 사용_
+  * 설정
+    * `@EnableJpaAuditing` -> 스프링 부트 설정 클래스에 적용해야 한다.
+    * `@EntityListeners(AuditingEntityListener.class` -> 엔티티에 적용해야 한다
+  * 사용 어노테이션
+    * `@CreateDate`
+    * `@LastModifideDate`
+    * `@CreateBy`
+    * `@LastModifiedBy`
+  * 스프링 데이터 Auditing 적용 - 등록일, 수정일
+    ```Java
+    @EntityListneers(AuditingEntityListener.class)
+    @MappedSuperclass
+    @Getter
+    public class BaseEntity {
+
+        @CreateDate
+        @Column(updateable = false)
+        private LocalDateTime createDate;
+
+        @ListModifiedDate
+        private LocalDateTime = lastModifiedDate;
+    }
+    ```
+  * 스프링 데이터 Auditing 적용 - 등록자, 수정자
+    ```Java
+    @EntityListeners(AuditingEntityListener.class)
+    @MappedSuperclass
+    public class BaseEntity {
+
+        @CreateBy
+        @Column(updateable = false)
+        private String createBy;
+
+        @LastModifiedBy
+        private String lastModifideBy;
+    }
+    ```  
+  * 등록자, 수정자를 처리해주는 `AuditorAware` 스프링 빈 등록
+    ```Java
+    @Bean
+    public AuditorAware<String> auditorProvider() {
+        return () -> Optional.of(UUID.randomUUID().toString());
+    }
+    ``` 
+    * 실무에서는 세션 정보나, 스프링 시큐리티 로그인 정보에서 ID를 받는다.
+  * 참고
+    >실무에서 대부분의 엔티티는 등록시간, 수정시간이 필요하지만, 등록자, 수정자는 없을 수도 있다.   
+    그래서 다음과 같이 Base 타입을 분리하고, 원하는 타입을 선택해서 상속한다. 
+  
+  * BaseTimeEntity
+    ```Java
+    public class BaseTiemEntity {
+
+        @CreateDate
+        @Column(updateable = false)
+        private LocalDateTime = createDate;
+
+        @LastModifiedDate
+        private LocaldateTime = lastModifiedDate;
+    }
+    ``` 
+    ```Java
+    @EntityListener(AuditingEntityListener.class)
+    @MappedSuperclaas
+    @Getter
+    public class BaseEntity extends BastTiemEntity {
+
+        @CreateBy
+        @Column(updateable = false)
+        private String createBy;
+
+        @LastModifiedBy
+        private String lastModifiedBy;
+    }
+    ```
+  * 참고
+    >저장한시점에 등록일, 등록자는 물론이고, 수정일 수정자도 같이 데이터가 저장된다.   
+    데이터가 중복 저장되는 것 같지만, 이렇게 해두면 변경 컬럼만 확인해도 마지막에 업데이트한 유저를 확인할 수 있으므로 유지보수 관점에서 편리하다.   
+    이렇게 하지 않으면 변경 컬럼이 `null`일때 등록 컬럼을 또 찾아야 한다.   
+    참고로 저장시점에 저장데이터만 입력하고 싶으면 `@EnableJpaAuditing(modifyOnCreate = false)`옵션을 사용하면 된다.   
 
 <br>
 
-## _Web확장 - 페이징과 정렬_
+* ### _전체 적용_
+  * `@EntityListeners(AuditingEntityListener.class)`를 생량하고 스프링 데이터 JPA가 제공하는 이벤트를 엔티티 전체에 적용하려면 orm.xml에 다음과 같이 등록하면 된다.
+  * `META-INF/orm.xml`
+    ```xml
+    <?xml version=“1.0” encoding="UTF-8”?>
+    <entity-mappings xmlns=“http://xmlns.jcp.org/xml/ns/persistence/orm”
+                     xmlns:xsi=“http://www.w3.org/2001/XMLSchema-instance”
+                     xsi:schemaLocation=“http://xmlns.jcp.org/xml/ns/persistence/
+    orm http://xmlns.jcp.org/xml/ns/persistence/orm_2_2.xsd”
+                     version=“2.2">
+        <persistence-unit-metadata>
+            <persistence-unit-defaults>
+                <entity-listeners>
+                    <entity-listener
+    class="org.springframework.data.jpa.domain.support.AuditingEntityListener”/>
+                </entity-listeners>
+            </persistence-unit-defaults>
+        </persistence-unit-metadata>
+    </entity-mappings>   
+    ``` 
+<br>
+
+## _Web확장 - 도메인 클래스 컨버터_   
+HTTP 파라미터로 넘어온 엔티티의 아이디로 엔티티 객체를 찾아서 바인딩   
+
+* ### _도메인 클래스 컨버터 사용 전_
+    ```Java
+    @RestController
+    @RequiredArgsConstructor
+    public class MemberController {
+
+        private final MemberRepository mamberRepository;
+
+        @GetMapptin("/members/{id}")
+        public String findMember(@PathVariable("id") Long id) {
+            Member member = memberRepository.findById(id).get();
+
+            return member.getUesrname();
+        }
+    }
+    ``` 
+
+<br>
+
+* ### _도메인 클래스 컨버터 사용 후_
+    ```Java
+    @RestController
+    @RequiredArgsConstructor
+    public class MemberController {
+
+        private final MemberRepository memberRepository;
+
+        @GetMapping("/members2/{id}")
+        public String findMember2(@PathVariable("id") Member member) {
+            return member.getUsername();
+        }
+    }
+    ``` 
+  * HTTP 요청은 회원 `id`를 받지만, 도메인 클레스 컨버터가 중간에 동작해서 회원 엔티티 객체를 반환
+  * 도메인 클래스 컨버터도 리퍼지토리를 사용해서 엔티티를 찾음
+  * 주의
+    >도메인 클래스 컨버터로 엔티티를 파라미터로 받으면, 이 엔티티는 단순 조회용으로만 사용해야 한다.   
+    (트랜젝션이 없는 범위에서 엔티티를 조회했으므로, 엔티티를 변경해도 DB에 반영되지 않는다.)    
+
+<br>
+
+## _Web확장 - 페이징과 정렬_    
+스프링 데이터가 제공하는 페이징과 정렬 기능을 스프링 MVC에서 편리하게 사용할 수 있다.   
+
+<br>
+
+* ### _페이징과 정렬 예제_
+    ```Java
+    @RestController
+    @RequiredArgsConstructor
+    public class MemberController {
+
+        private final MemberRepository memberRepository;
+
+        @GetMapping("/members")
+        public Page<MemberDto> list(Pageable pageable) {
+
+            Page<Member> page = memberRepository.finaAll(pageable);
+            Page<MemberDto> map = page.map(m -> new MemberDto(m));
+
+            return map;
+        }
+    }
+    ```
+  * 파라미터로 `Pageable`을 받을 수 있다.
+  * `Pageable`은 인터페이스, 실제는 `org.springframework.data.domain.PageRequest`객체 생성
+
+<br>
+
+* ### _요청 파라미터_
+* $ex$. `/members?page=0&size=3&sort=id,desc&sort=username,desc`
+  * page: 현재 페이지, `0부터 시작`
+  * size: 한 페이지에 노출한 데이터 건수
+  * sort: 정렬 조건을 정의한다.
+    * 정렬 속성,정렬 속성...(ASC|DESC), 정렬 방향을 변경하고 싶으면 `sort`파라미터 추가(`asc`생량 가능)
+
+<br>
+
+* ### _기본값_
+  * 글로벌 실행: 스프링 부트
+    ```Java
+    spring.data.web.pageable.default-page-size=20  //기본 페이지 사이즈
+    spring.data.seb.pageable.max-page-size=2000    //최대 페이지 사이즈
+    ``` 
+  * 개별 설정
+    ```Java
+    @RequestMapping(value = "/member_page", method = RequestMethod.GET)
+    public String list(@PageableDefault = 12, sort = "username",
+                        direction = Sort.Direction.DESC) Pageable pageable) {
+        
+        ...
+    }
+    ```
+
+<br>
+
+* ### _접두사_
+  * 페이징 정보가 둘 이상이면 접두사로 구분
+  * `@Qualifier`에 접두사명 추가 "(접두사명)_xxx"
+  * 예졔: `/member?member_page=0&order_page=1`
+    ```Java
+    public String list(
+            @Qualifier("member") Pageable memberPageable,
+            @Qualifier("order") Pageable orderPageable, ...)
+    ```
+
+<br>
+
+* ### _Page 내용을 DTO로 변환하기_
+  * 엔티티를 API로 노출하면 다양한 문제가 발생한다. 그래서 엔티티를 꼭 DTO로 변환하ㅐ서 반환해야 한다. 
+  * Page는 `map()`을 지우너해서 내부 데이터를 다른 것으로 변경할 수 있다. 
+    ```Java
+    @Data
+    public class MemberDto {
+
+        private Long id;
+        private String username;
+
+        public MemberDto(Member m) {
+            this.id = m.getId();
+            this.username = m.getUsername();
+        }
+    }
+    ```
+  * `Page.map()`사용
+    ```Java
+    @GetMapptin("/member")
+    public String Page<MemberDto> list(Pageable pageable) {
+
+        Page<Member> page = memberRepository.findAll(pageable);
+        //Page<MemberDto> pageDto = page.map(m -> new MemberDto(m));
+        Page<MemberDto> pageDto = page.map(MemberDto::new);
+
+        return pageDto;
+    }
+    ``` 
+  * `Page.map()`코드 최적화
+    ```Java
+    @GetMapping("/members")
+    public Page<MemberDto> list(Pageable pageable) {
+
+        return memberRepository.findAll(pageable.map(MemberDto::new));
+    }
+    ``` 
+
+<br>
+
+* ### _Page를 1부터 시작하기_
+  * 스프링 데이터는 Page를 0부터 시작한다.
+  * 만약 1부터 시작하려면?
+  1. Pageable, Page를 파라미터와 응답 값으로 사용하지 않고, 직접 클래스를 만들어서 처리한다. 그리고 직접 PageRequest(Pageable 구현체)를 생성해서 리포지토리에 넘긴다. 물론 응답값도 Page 대신에 직접 만들어서 제공해야 한다.
+  2. `spring.data.web.pageable.one-indexed-parameters`를 `true`로 설정해야 한다. 그런데 이 방법은 web에서 `page`파라미터를 `-1`처리 할 뿐이다. 따라서 응닶갑인 `Page`에 모두 0페이지 인텍스를 사용하는 한계가 있다. 
 
 <br>
 <br>
@@ -1405,6 +1716,29 @@ member -> team은 지연로딩(LAZY)관계이다.
 <br>
 
 ## _스프링 데이터 JPA 구현체 분석_
+* ### _스프링 데이터 JPA가 제공하는 공통 인터페이스 구현체_
+  * `org.springframework.data.jpa.repository.support.SimpleJpaRepository`
+    ```Java
+
+  @Repository
+  @Transactional(readOnly = true)
+  public class SimpleJpaRepository<T, ID> ...{
+      @Transactional
+      public <S extends T> S save(S entity) {
+          if (entityInformation.isNew(entity)) {
+              em.persist(entity);
+              return entity;
+          } else {
+              return em.merge(entity);
+          } 
+      }
+      ... 
+    }
+    ```
+  * `@Repository`적용: JPA 예외를 스프링이 추상화한 예외로 변환
+  * `@Transactional` 트랜젝션 적용
+    * JPA의 모든 변경은 프랜잭션 안에서 동작
+    * 스프링 데이터 JPA는 변경(등록, 수정, 삭제) 메서
 
 <br>
 
