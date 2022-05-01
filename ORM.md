@@ -829,7 +829,7 @@
     * `precision, scale(DDL)`: BigDecimal 타입에서 사용한다 (BigInteger도 사용할 수 있다.) precision은 소수점을 포함한 전체 자리수를, scale은 소수의 자릿수다. 참고로 double, float 타입에는 정용되지 않는다. 아주 큰 숫자나 정밀한 소수를 다루어야 할 때만 사용한다 (기본값: persision = 19, scale = 2)
   * #### @Enumerated
     * 자바 enum 타입을 매핑할 떄 사용
-    * `주의! OREINAL 사용X`
+    * `주의! ORDINAL 사용X`
       * Java의 Enum이 변경되었을 때 ORDINAL 에 KEY는 같지만 VALUE가 다른 중복이 발생할 수 있다.
     * `value`
       * `EnumType.ORDINAL`: enum 순서를 데이터베이스에 저장
